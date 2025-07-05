@@ -35,7 +35,7 @@ def main():
     
     # Step 5: Generate Conversion Report
     print("\n📋 Step 5: Generate Conversion Report")
-    generate_conversion_report(log)
+    generate_conversion_report(log, cand)
     
     # Step 6: Quality Validation
     print("\n📋 Step 6: Quality Validation")
@@ -83,29 +83,6 @@ def convert_one(pdf_path: Path, out_xml: Path):
             return "grobid"
     except Exception as e:
         print(f"Grobid failed for {pdf_path.name}: {e}")
-    
-#     # Fallback - pdfplumber text extraction
-#     try:
-#         text = []
-#         with pdfplumber.open(str(pdf_path)) as pdf:
-#             for page in pdf.pages:
-#                 t = page.extract_text() or ''
-#                 text.append(t)
-        
-#         # Create simple XML structure for fallback
-#         xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-# <document>
-# <filename>{pdf_path.name}</filename>
-# <text>
-# {''.join(text)}
-# </text>
-# </document>"""
-        
-#         out_xml.write_text(xml_content, encoding='utf-8')
-#         return "pdfplumber"
-#     except Exception as e:
-#         print(f"Both conversions failed for {pdf_path.name}: {e}")
-#         return "failed"
 
 def execute_batch_conversion(todo):
     """Step 4: Execute Batch Conversion"""
@@ -159,33 +136,105 @@ def execute_batch_conversion(todo):
     
     return log
 
-def generate_conversion_report(log):
+def generate_conversion_report(log, cand):
     """Step 5: Generate Conversion Report"""
-    conversion_log = pd.DataFrame(log)
-    conversion_log.to_csv("Data/document_inventory_step4.csv", index=False)
+    # Handle empty log case (when no new conversions were needed)
+    if log:
+        conversion_log = pd.DataFrame(log)
+    else:
+        # Create empty DataFrame with expected columns
+        conversion_log = pd.DataFrame(columns=[
+            'article_id', 'pdf_path', 'xml_path', 'source', 'error', 
+            'success', 'has_primary', 'has_secondary', 'label_count'
+        ])
     
-    # Generate summary statistics
-    successful = conversion_log[conversion_log['success'] == True]
-    failed = conversion_log[conversion_log['success'] == False]
-    grobid_success = conversion_log[conversion_log['source'] == 'grobid']
-    fallback_success = conversion_log[conversion_log['source'] == 'pdfplumber']
+    # Get ALL existing XML files
+    xml_dir = Path("Data/train/XML")
+    all_xml_files = list(xml_dir.glob("*.xml"))
     
-    print(f"✅ {len(successful)} successful conversions")
-    print(f"   📊 Grobid: {len(grobid_success)}")  
-    print(f"   📊 Fallback: {len(fallback_success)}")
-    print(f"⚠️ {len(failed)} failed conversions")
+    # Create a lookup dictionary for conversion candidates metadata
+    cand_dict = {row['article_id']: row for _, row in cand.iterrows()}
+    
+    # Create entries for ALL existing XML files
+    existing_entries = []
+    for xml_file in all_xml_files:
+        article_id = xml_file.stem
+        
+        # Check if this file was also processed in this run (shouldn't happen, but just in case)
+        if article_id not in [entry['article_id'] for entry in log]:
+            # Check if we have metadata for this file from conversion_candidates.csv
+            if article_id in cand_dict:
+                # File from conversion candidates - include full metadata
+                row = cand_dict[article_id]
+                existing_entries.append({
+                    'article_id': article_id,
+                    'pdf_path': row['pdf_path'],
+                    'xml_path': str(xml_file),
+                    'source': None,  # No conversion source for existing files
+                    'error': None,
+                    'success': None,  # Blank to avoid inflating success rates
+                    'has_primary': row['has_primary'],
+                    'has_secondary': row['has_secondary'],
+                    'label_count': row['label_count']
+                })
+            else:
+                # File NOT from conversion candidates - basic info only
+                existing_entries.append({
+                    'article_id': article_id,
+                    'pdf_path': None,  # No PDF path info available
+                    'xml_path': str(xml_file),
+                    'source': None,  # No conversion source for existing files
+                    'error': None,
+                    'success': None,  # Blank to avoid inflating success rates
+                    'has_primary': None,  # No metadata available
+                    'has_secondary': None,  # No metadata available
+                    'label_count': None  # No metadata available
+                })
+    
+    # Combine conversion log with existing entries
+    existing_df = pd.DataFrame(existing_entries)
+    if len(existing_df) > 0:
+        complete_log = pd.concat([conversion_log, existing_df], ignore_index=True)
+    else:
+        complete_log = conversion_log
+    
+    # Save the complete inventory
+    complete_log.to_csv("Data/document_inventory.csv", index=False)
+    
+    # Generate summary statistics (only for files that were actually processed)
+    processed_files = conversion_log  # Only newly converted files
+    if len(processed_files) > 0:
+        successful = processed_files[processed_files['success'] == True]
+        failed = processed_files[processed_files['success'] == False]
+        grobid_success = processed_files[processed_files['source'] == 'grobid']
+        fallback_success = processed_files[processed_files['source'] == 'pdfplumber']
+        
+        print(f"✅ {len(successful)} successful conversions")
+        print(f"   📊 Grobid: {len(grobid_success)}")  
+        print(f"   📊 Fallback: {len(fallback_success)}")
+        print(f"⚠️ {len(failed)} failed conversions")
+    else:
+        print("✅ 0 new conversions needed (all files already had XML)")
+    
+    # Count files from conversion candidates vs other existing files
+    from_candidates = sum(1 for _, row in complete_log.iterrows() 
+                         if row['article_id'] in cand_dict)
+    other_existing = len(complete_log) - from_candidates
+    
+    print(f"ℹ️  {len(complete_log)} total XML files in inventory")
+    print(f"   📊 From conversion candidates: {from_candidates}")
+    print(f"   📊 Other existing files: {other_existing}")
     
     # Coverage KPI
-    calculate_coverage_kpi()
+    calculate_coverage_kpi(cand)
 
-def calculate_coverage_kpi():
+def calculate_coverage_kpi(cand):
     """Calculate conversion coverage KPI"""
-    original_candidates = pd.read_csv("Data/conversion_candidates.csv")
-    total_candidates = len(original_candidates)
+    total_candidates = len(cand)
     
     # Count existing XML files that match our candidates
     existing_xml = {p.stem for p in Path("Data/train/XML").glob("*.xml")}
-    covered_candidates = sum(1 for article_id in original_candidates['article_id'] 
+    covered_candidates = sum(1 for article_id in cand['article_id'] 
                            if article_id in existing_xml)
     
     # Coverage KPI: covered_candidates / total_candidates >= 0.90
