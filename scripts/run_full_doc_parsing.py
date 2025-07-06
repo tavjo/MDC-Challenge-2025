@@ -8,13 +8,12 @@ Following the MDC-Challenge-2025 Step 5 checklist
 import pandas as pd
 import pickle
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from datetime import datetime
 import os
 
-from ..src.document_parser import parse_document, create_document_entry, validate_document
-from ..src.xml_format_detector import detect_xml_format
-
+from ..src.document_parser import parse_document, create_document_entry
+from ..src.models import Document
 
 def load_document_inventory(inventory_path: str = "Data/document_inventory.csv") -> pd.DataFrame:
     """
@@ -38,14 +37,15 @@ def load_document_inventory(inventory_path: str = "Data/document_inventory.csv")
     return inventory_df
 
 
-def process_all_documents(inventory_df: pd.DataFrame) -> Dict[str, Dict[str, Any]]:
+def process_all_documents(inventory_df: pd.DataFrame) -> List[Tuple[Document, Dict[str, Any]]]:
     """
     Step 2: Process all documents using the parsing dispatcher.
     
     Returns dictionary of parsed documents.
     """
-    parsed_documents = {}
+    # parsed_documents = []
     failed_documents = []
+    res = []
     
     total_files = len(inventory_df)
     print(f"\n🔄 Processing {total_files} documents...")
@@ -66,8 +66,9 @@ def process_all_documents(inventory_df: pd.DataFrame) -> Dict[str, Dict[str, Any
             
             if sections:
                 # Create document entry
-                entry = create_document_entry(article_id, sections, Path(xml_path), source_type)
-                parsed_documents[article_id] = entry
+                entry, validation = create_document_entry(article_id, sections, Path(xml_path), source_type)
+                # parsed_documents.append(entry)
+                res.append((entry, validation))
                 
                 if idx % 50 == 0:  # Progress update every 50 files
                     print(f"✅ Processed {idx + 1}/{total_files}: {article_id} ({len(sections)} sections)")
@@ -80,16 +81,16 @@ def process_all_documents(inventory_df: pd.DataFrame) -> Dict[str, Dict[str, Any
             failed_documents.append(article_id)
     
     print(f"\n📊 Processing complete:")
-    print(f"   ✅ Successfully parsed: {len(parsed_documents)}")
+    print(f"   ✅ Successfully parsed: {len(res)}")
     print(f"   ❌ Failed: {len(failed_documents)}")
     
     if failed_documents:
         print(f"   Failed files: {failed_documents[:10]}{'...' if len(failed_documents) > 10 else ''}")
     
-    return parsed_documents
+    return res
 
 
-def validate_parsed_corpus(parsed_documents: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+def validate_parsed_corpus(parsed_documents: List[Tuple[Document, Dict[str, Any]]]) -> Dict[str, Any]:
     """
     Step 3: Validate the parsed corpus according to checklist criteria.
     """
@@ -105,8 +106,9 @@ def validate_parsed_corpus(parsed_documents: Dict[str, Dict[str, Any]]) -> Dict[
         'validation_passed': 0
     }
     
-    for doi, doc in parsed_documents.items():
-        validation = doc['validation']
+    for doc, validation in parsed_documents:
+        doc = doc.model_dump()
+        # validation = doc['validation']
         
         if validation['validation_passed']:
             validation_stats['validation_passed'] += 1
@@ -160,12 +162,13 @@ def validate_parsed_corpus(parsed_documents: Dict[str, Dict[str, Any]]) -> Dict[
     return validation_stats
 
 
-def save_parsed_corpus(parsed_documents: Dict[str, Dict[str, Any]], 
+def save_parsed_corpus(parsed_documents: List[Tuple[Document, Dict[str, Any]]], 
                       validation_stats: Dict[str, Any],
                       output_dir: str = "Data/train/parsed") -> None:
     """
     Step 4: Save the parsed corpus and summary.
     """
+    parsed_documents = [doc for doc, _ in parsed_documents]
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
@@ -175,21 +178,25 @@ def save_parsed_corpus(parsed_documents: Dict[str, Dict[str, Any]],
         pickle.dump(parsed_documents, f)
     
     print(f"✅ Saved parsed corpus: {pickle_path}")
+
     
     # Create summary CSV
     summary_data = []
-    for doi, doc in parsed_documents.items():
-        validation = doc['validation']
+    for doc, validation in parsed_documents:
+        # get list of section types in order
+        sec_order = [section.section_type for section in sorted(doc.sections, key=lambda x: x.order)]
+        n_sec_texts = sum(1 for section in doc.sections if section.text.strip())
+        doc = doc.model_dump()
         summary_data.append({
-            'doi': doi,
+            'doi': doc['doi'],
             'format_type': doc.get('format_type', 'UNKNOWN'),
             'source_type': doc.get('source_type', None),
             'conversion_source': doc.get('conversion_source', 'unknown'),  # 🆕 NEW
             'section_count': doc['section_count'],
-            'section_order': doc['section_order'],
+            'section_order': sec_order,
             'total_char_length': doc['total_char_length'],
             'clean_text_length': doc['clean_text_length'],
-            'sections_with_text': len(doc.get('section_texts', {})),        # 🆕 NEW - useful summary
+            'sections_with_text': n_sec_texts,        # 🆕 NEW - useful summary
             'validation_passed': validation['validation_passed'],
             'has_methods': validation['has_methods'],
             'has_results': validation['has_results'],

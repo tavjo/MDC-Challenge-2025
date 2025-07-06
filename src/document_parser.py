@@ -16,6 +16,7 @@ from datetime import datetime
 
 from .xml_format_detector import detect_xml_format, setup_namespaces
 from .section_mapping import map_tei_section_type, map_jats_section_type, is_key_section
+from .models import Document, Section
 
 
 def extract_text_content(element) -> str:
@@ -72,7 +73,7 @@ def extract_section_text(sec_element, namespaces: Dict[str, str]) -> str:
     return extract_text_content(sec_copy)
 
 
-def parse_tei_xml(xml_path: Path) -> List[Dict[str, Any]]:
+def parse_tei_xml(xml_path: Path) -> List[Section]:
     """
     Parse TEI XML format (from Step 4 Grobid conversion).
     
@@ -97,15 +98,15 @@ def parse_tei_xml(xml_path: Path) -> List[Dict[str, Any]]:
         for abstract in abstracts:
             text = extract_text_content(abstract)
             if text.strip():
-                sections.append({
-                    'type': 'abstract',
-                    'text': text,
-                    'order': order,
-                    'char_length': len(text),
-                    'sec_level': 0,
-                    'original_type': 'abstract',
-                    'title': 'Abstract'
-                })
+                section = Section(
+                    section_type='abstract',
+                    text=text,
+                    order=order,
+                    char_length=len(text),
+                    sec_level=0,
+                    original_type='abstract',
+                )
+                sections.append(section)
                 order += 1
         
         # Process body sections
@@ -124,15 +125,16 @@ def parse_tei_xml(xml_path: Path) -> List[Dict[str, Any]]:
             text = extract_section_text(div, ns)
             
             if text.strip():
-                sections.append({
-                    'type': canonical_type,
-                    'text': text,
-                    'order': order,
-                    'char_length': len(text),
-                    'sec_level': 1,  # TEI sections are generally flat
-                    'original_type': div_type,
-                    'title': title
-                })
+                body_section = Section(
+                    section_type=canonical_type,
+                    text=text,
+                    order=order,
+                    char_length=len(text),
+                    sec_level=1,
+                    original_type=div_type,
+                    # section_label=title
+                )
+                sections.append(body_section)
                 order += 1
         
         return sections
@@ -169,15 +171,16 @@ def process_section_recursive(sec, sections: List[Dict], ns: Dict[str, str], lev
     text = extract_section_text(sec, ns)
     
     if text.strip():
-        sections.append({
-            'type': canonical_type,
-            'text': text,
-            'order': order_counter[0],
-            'char_length': len(text),
-            'sec_level': level,
-            'original_type': sec_type,
-            'title': title
-        })
+        section = Section(
+            section_type=canonical_type,
+            text=text,
+            sec_order=order_counter[0],
+            char_length=len(text),
+            sec_level=level,
+            original_type=sec_type,
+            # section_label=title
+        )
+        sections.append(section)
         order_counter[0] += 1
     
     # Process nested sections
@@ -190,7 +193,7 @@ def process_section_recursive(sec, sections: List[Dict], ns: Dict[str, str], lev
         process_section_recursive(nested_sec, sections, ns, level + 1, order_counter)
 
 
-def parse_jats_xml(xml_path: Path) -> List[Dict[str, Any]]:
+def parse_jats_xml(xml_path: Path) -> List[Section]:
     """
     Parse JATS XML with proper namespace handling.
     
@@ -225,15 +228,16 @@ def parse_jats_xml(xml_path: Path) -> List[Dict[str, Any]]:
         for abstract in abstracts:
             text = extract_text_content(abstract)
             if text.strip():
-                sections.append({
-                    'type': 'abstract',
-                    'text': text,
-                    'order': 0,
-                    'char_length': len(text),
-                    'sec_level': 0,
-                    'original_type': 'abstract',
-                    'title': 'Abstract'
-                })
+                section = Section(
+                    section_type='abstract',
+                    text=text,
+                    order=0,
+                    char_length=len(text),
+                    # section_label='Abstract',
+                    sec_level=0,
+                    original_type='abstract'
+                )
+                sections.append(section)
         
         # Process body sections recursively
         body_sections = root.xpath(sec_xpath, namespaces=ns)
@@ -256,7 +260,7 @@ def parse_jats_xml(xml_path: Path) -> List[Dict[str, Any]]:
         return []
 
 
-def parse_document(file_path: Path, source_type: Optional[str] = None) -> List[Dict[str, Any]]:
+def parse_document(file_path: Path) -> List[Section]|None:
     """
     Main document parsing dispatcher.
     
@@ -279,7 +283,7 @@ def parse_document(file_path: Path, source_type: Optional[str] = None) -> List[D
         return parse_fallback(file_path)
 
 
-def parse_fallback(file_path: Path) -> List[Dict[str, Any]]:
+def parse_fallback(file_path: Path) -> List[Section]|None:
     """
     Fallback parser for unknown formats.
     
@@ -293,24 +297,23 @@ def parse_fallback(file_path: Path) -> List[Dict[str, Any]]:
         text = extract_text_content(root)
         
         if text.strip():
-            return [{
-                'type': 'other',
-                'text': text,
-                'order': 0,
-                'char_length': len(text),
-                'sec_level': 0,
-                'original_type': 'unknown',
-                'title': 'Full Document'
-            }]
-        
-        return []
+            return [Section(
+                section_type= 'Full Document',
+                text=text,
+                order=0,
+                char_length=len(text),
+                # section_label='Full Document',
+                sec_level=0,
+                original_type='unknown'
+            )]
+        return None
         
     except Exception as e:
         print(f"Fallback parsing error for {file_path}: {e}")
-        return []
+        return None
 
 
-def validate_document(sections: List[Dict[str, Any]], doi: str) -> Dict[str, Any]:
+def validate_document(sections: List[Section], doi: str) -> Dict[str, Any]:
     """
     Validate parsed document according to checklist criteria.
     
@@ -333,9 +336,10 @@ def validate_document(sections: List[Dict[str, Any]], doi: str) -> Dict[str, Any
     
     # Analyze sections
     for section in sections:
-        section_type = section['type']
+        section = section.model_dump()
+        section_type = section['section_type']
         validation['section_types'].append(section_type)
-        validation['total_char_length'] += section.get('char_length', 0)
+        validation['total_char_length'] += section['char_length']
         
         # Check for key sections
         if section_type == 'methods':
@@ -377,8 +381,8 @@ def compute_file_hash(file_path: Path) -> str:
         return ""
 
 
-def create_document_entry(doi: str, sections: List[Dict[str, Any]], 
-                         file_path: Path, source_type: Optional[str] = None) -> Dict[str, Any]:
+def create_document_entry(doi: str, sections: List[Section], 
+                         file_path: Path, source_type: Optional[str] = None) -> Tuple[Document, Dict[str, Any]]:
     """
     Create complete document entry for the parsed corpus.
     
@@ -388,19 +392,19 @@ def create_document_entry(doi: str, sections: List[Dict[str, Any]],
     validation = validate_document(sections, doi)
     
     # Full text assembly
-    full_text = '\n\n'.join(f"## {section.get('title', section['type'].title())}\n{section['text']}" 
-                           for section in sections if section['text'].strip())
+    full_text = '\n\n'.join(f"## {section.section_type}\n{section.text}" 
+                           for section in sections if section.text.strip())
     
     # Section labels (for compatibility)
-    section_labels = [section['type'] for section in sections]
+    section_labels = [section.section_type for section in sections]
     
     # Create section_texts mapping (required for Step 6 chunking)
     section_texts = {}
     section_order = {}
     for section in sections:
-        section_type = section['type']
-        section_text = section['text']
-        order = section.get('order', 0)
+        section_type = section.section_type
+        section_text = section.text
+        order = section.order
         
         # Handle duplicate section types by appending to existing text
         if section_type in section_texts:
@@ -410,7 +414,12 @@ def create_document_entry(doi: str, sections: List[Dict[str, Any]],
             section_order[section_type] = order
     
     # Get conversion source for chunking metadata
-    conversion_source = "grobid" if source_type == "grobid" else "existing_xml"
+    if source_type == "grobid":
+        conversion_source = "GROBID"
+    elif source_type == "pdfplumber":
+        conversion_source = "PDFPLUMBER"
+    else:
+        conversion_source = "UNKNOWN"
     
     # Create entry
     entry = {
@@ -418,8 +427,8 @@ def create_document_entry(doi: str, sections: List[Dict[str, Any]],
         'full_text': full_text,
         'sections': sections,
         'section_labels': section_labels,
-        'section_texts': section_texts,  # Required for Step 6 chunking
-        'section_order': section_order,  # Required for Step 6 chunking
+        # 'section_texts': section_texts,  # Required for Step 6 chunking
+        # 'section_order': section_order,  # Required for Step 6 chunking
         'section_count': len(sections),
         'total_char_length': validation['total_char_length'],
         'clean_text_length': validation['clean_text_length'],
@@ -429,7 +438,7 @@ def create_document_entry(doi: str, sections: List[Dict[str, Any]],
         'file_path': str(file_path),
         'xml_hash': compute_file_hash(file_path),
         'parsed_timestamp': datetime.now().isoformat(),
-        'validation': validation
+        'validated': validation['validation_passed']
     }
     
-    return entry 
+    return Document.model_validate(entry), validation

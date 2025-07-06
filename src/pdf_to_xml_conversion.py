@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PDF to XML Conversion Implementation
+PDF to XML Conversion Implementation (step 4)
 Following the MDC-Challenge-2025 checklist
 """
 

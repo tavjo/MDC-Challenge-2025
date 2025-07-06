@@ -1,7 +1,7 @@
 # scripts/run_prechunking_eda.py
 
 """
-Enhanced Pre-Chunking EDA Script with Comprehensive Report Generation
+Enhanced Pre-Chunking EDA Script with Comprehensive Report Generation (step 3)
 
 This script mirrors the analysis performed in the label_doc_mapping.ipynb notebook
 and generates structured reports of all findings and statistics.

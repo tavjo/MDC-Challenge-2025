@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from semantic_chunking import run_semantic_chunking_pipeline
 
 
+
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
