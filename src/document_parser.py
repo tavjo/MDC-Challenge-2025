@@ -394,17 +394,38 @@ def create_document_entry(doi: str, sections: List[Dict[str, Any]],
     # Section labels (for compatibility)
     section_labels = [section['type'] for section in sections]
     
+    # Create section_texts mapping (required for Step 6 chunking)
+    section_texts = {}
+    section_order = {}
+    for section in sections:
+        section_type = section['type']
+        section_text = section['text']
+        order = section.get('order', 0)
+        
+        # Handle duplicate section types by appending to existing text
+        if section_type in section_texts:
+            section_texts[section_type] += f"\n\n{section_text}"
+        else:
+            section_texts[section_type] = section_text
+            section_order[section_type] = order
+    
+    # Get conversion source for chunking metadata
+    conversion_source = "grobid" if source_type == "grobid" else "existing_xml"
+    
     # Create entry
     entry = {
         'doi': doi,
         'full_text': full_text,
         'sections': sections,
         'section_labels': section_labels,
+        'section_texts': section_texts,  # Required for Step 6 chunking
+        'section_order': section_order,  # Required for Step 6 chunking
         'section_count': len(sections),
         'total_char_length': validation['total_char_length'],
         'clean_text_length': validation['clean_text_length'],
         'format_type': detect_xml_format(file_path),
         'source_type': source_type,
+        'conversion_source': conversion_source,  # Required for Step 6 chunking
         'file_path': str(file_path),
         'xml_hash': compute_file_hash(file_path),
         'parsed_timestamp': datetime.now().isoformat(),

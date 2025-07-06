@@ -12,8 +12,8 @@ from typing import Dict, Any, List
 from datetime import datetime
 import os
 
-from .document_parser import parse_document, create_document_entry, validate_document
-from .xml_format_detector import detect_xml_format
+from ..src.document_parser import parse_document, create_document_entry, validate_document
+from ..src.xml_format_detector import detect_xml_format
 
 
 def load_document_inventory(inventory_path: str = "Data/document_inventory.csv") -> pd.DataFrame:
@@ -184,9 +184,12 @@ def save_parsed_corpus(parsed_documents: Dict[str, Dict[str, Any]],
             'doi': doi,
             'format_type': doc.get('format_type', 'UNKNOWN'),
             'source_type': doc.get('source_type', None),
+            'conversion_source': doc.get('conversion_source', 'unknown'),  # 🆕 NEW
             'section_count': doc['section_count'],
+            'section_order': doc['section_order'],
             'total_char_length': doc['total_char_length'],
             'clean_text_length': doc['clean_text_length'],
+            'sections_with_text': len(doc.get('section_texts', {})),        # 🆕 NEW - useful summary
             'validation_passed': validation['validation_passed'],
             'has_methods': validation['has_methods'],
             'has_results': validation['has_results'],
