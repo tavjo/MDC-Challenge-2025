@@ -75,7 +75,14 @@ class PreprocessingPipeline:
         return self.doc_conversion_report
 
     def document_parsing(self):
-        pass
+        from scripts.run_full_doc_parsing import run_full_document_parsing
+        reporter = run_full_document_parsing(
+            data_dir="Data",
+            output_format="all",
+            save_reports=True
+        )
+        self.document_parsing_report = reporter.generate_json_summary()
+        return self.document_parsing_report
 
     def semantic_chunking(self):
         pass
