@@ -85,7 +85,17 @@ class PreprocessingPipeline:
         return self.document_parsing_report
 
     def semantic_chunking(self):
-        pass
+        from scripts.run_chunking_pipeline import run_semantic_chunking_with_reporting
+        reporter = run_semantic_chunking_with_reporting(
+            input_path="Data/train/parsed/parsed_documents.pkl",
+            output_path="chunks_for_embedding.pkl",
+            chunk_size=200,
+            chunk_overlap=20,
+            output_format="all",
+            save_reports=True
+        )
+        self.semantic_chunking_report = reporter.generate_json_summary()
+        return self.semantic_chunking_report
 
     def create_vector_embeddings(self):
         pass

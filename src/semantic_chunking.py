@@ -25,7 +25,7 @@ import regex as re
 # import numpy as np
 
 # Local imports
-from .models import ChunkMetadata, Chunk, ChunkingResult, Document, Section
+from models import ChunkMetadata, Chunk, ChunkingResult, Document, Section
 from helpers import initialize_logging, timer_wrap
 import os
 
@@ -615,7 +615,7 @@ def run_semantic_chunking_pipeline(input_path: str = "Data/train/parsed/parsed_d
             'validation_passed': validation_passed,
             'pipeline_completed_at': datetime.now().isoformat(),
             'entity_retention': entity_retention,
-            'lost_entities': lost_entities if len(lost_entities) > 0 else None,
+            'lost_entities': lost_entities.to_dict() if len(lost_entities) > 0 else None,
             'output_path': output_path,
             'output_files': output_files,
         }

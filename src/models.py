@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Literal
+from typing import List, Optional, Dict, Literal, Any
 from datetime import datetime
 import pandas as pd
 
@@ -72,7 +72,7 @@ class ChunkingResult(BaseModel):
     entity_retention: float = Field(..., description="Percentage of dataset IDs retained after chunking; aim is 100%.")
     output_path: Optional[str] = Field(None, description="Path to the output files.")
     output_files: Optional[List[str]] = Field(None, description="List of output file paths.")
-    lost_entities: Optional[pd.DataFrame]= Field(None, description="List of dataset IDs that were lost during chunking; aim is 0. Keep for sanity check.") 
+    lost_entities: Optional[Dict[str, Any]]= Field(None, description="List of dataset IDs that were lost during chunking; aim is 0. Keep for sanity check.") 
     error: Optional[str] = Field(None, description="Error message if pipeline failed.")
 
 class Dataset(BaseModel):
