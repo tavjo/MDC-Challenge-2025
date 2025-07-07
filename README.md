@@ -357,7 +357,7 @@ python preprocessing.py --skip-corrupted --skip-missing --continue-on-error
 
 ## 📚 Documentation
 
-- [**Preprocessing Pipeline Guide**](docs/preprocessing_pipeline_guide.md) - Comprehensive guide for the preprocessing pipeline
+- [**Preprocessing Pipeline Guide**](preprocessing_pipeline_guide.md) - Comprehensive guide for the preprocessing pipeline
 - [**Troubleshooting Guide**](docs/troubleshooting_guide.md) - Common issues and solutions
 - [Pre-chunking EDA Guide](docs/prechunking_eda_script_guide.md) - EDA script usage guide
 - [PDF to XML Conversion Guide](docs/pdf_to_xml_guide.md) - PDF conversion documentation
