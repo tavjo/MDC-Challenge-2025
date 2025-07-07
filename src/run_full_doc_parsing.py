@@ -12,8 +12,8 @@ from typing import Dict, Any, List, Tuple
 from datetime import datetime
 import os
 
-from ..src.document_parser import parse_document, create_document_entry
-from ..src.models import Document
+from .document_parser import parse_document, create_document_entry
+from .models import Document
 
 def load_document_inventory(inventory_path: str = "Data/document_inventory.csv") -> pd.DataFrame:
     """

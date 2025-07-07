@@ -12,6 +12,7 @@ These steps will be:
 6) Chunk-level EDA
 7) QC
 8) Export Artifacts for training loop
+9) Generate Report
 """
 
 import sys, os
@@ -53,11 +54,25 @@ class PreprocessingPipeline:
 
     def pre_chunking_eda(self):
         from scripts.run_prechunking_eda import run_prechunking_eda
-        self.pre_chunking_eda_report = run_prechunking_eda(self.data_dir)
+        reporter = run_prechunking_eda(
+            data_dir="Data",
+            output_format="all",
+            save_reports=True,
+            show_plots=False
+        )
+        self.pre_chunking_eda_report = reporter.generate_json_summary()
         return self.pre_chunking_eda_report
 
     def doc_conversion(self):
-        pass
+        from scripts.run_pdf_to_xml_conversion import run_pdf_to_xml_conversion
+        reporter = run_pdf_to_xml_conversion(
+            data_dir="Data",
+            output_format="all",
+            save_reports=True
+        )
+        # Generate custom reports
+        self.doc_conversion_report = reporter.generate_json_summary()
+        return self.doc_conversion_report
 
     def document_parsing(self):
         pass
@@ -86,3 +101,4 @@ class PreprocessingPipeline:
         self.chunk_level_eda()
         self.qc()
         self.export_artifacts()
+        self._generate_report()

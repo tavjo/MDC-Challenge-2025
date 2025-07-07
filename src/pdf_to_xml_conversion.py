@@ -145,7 +145,8 @@ def generate_conversion_report(log, cand):
         # Create empty DataFrame with expected columns
         conversion_log = pd.DataFrame(columns=[
             'article_id', 'pdf_path', 'xml_path', 'source', 'error', 
-            'success', 'has_primary', 'has_secondary', 'label_count'
+            'success', 'has_primary', 'has_secondary', 'label_count',
+            'processing_time'
         ])
     
     # Get ALL existing XML files
@@ -175,7 +176,8 @@ def generate_conversion_report(log, cand):
                     'success': None,  # Blank to avoid inflating success rates
                     'has_primary': row['has_primary'],
                     'has_secondary': row['has_secondary'],
-                    'label_count': row['label_count']
+                    'label_count': row['label_count'],
+                    'processing_time': row['processing_time']
                 })
             else:
                 # File NOT from conversion candidates - basic info only
@@ -188,7 +190,8 @@ def generate_conversion_report(log, cand):
                     'success': None,  # Blank to avoid inflating success rates
                     'has_primary': None,  # No metadata available
                     'has_secondary': None,  # No metadata available
-                    'label_count': None  # No metadata available
+                    'label_count': None,  # No metadata available
+                    'processing_time': None  # No metadata available
                 })
     
     # Combine conversion log with existing entries
