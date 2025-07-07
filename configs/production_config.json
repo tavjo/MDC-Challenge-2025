@@ -1,0 +1,107 @@
+{
+  "name": "Production Pipeline",
+  "description": "Configuration for production environment",
+  "version": "1.0.0",
+  "data_directory": "Data",
+  "log_level": "INFO",
+  "enable_progress_bars": false,
+  "enable_dashboard": false,
+  "generate_diagrams": false,
+  "log_to_file": true,
+  "log_directory": "logs",
+  
+  "steps": {
+    "pre_chunking_eda": {
+      "enabled": true,
+      "parameters": {
+        "show_plots": false,
+        "detailed_analysis": false,
+        "output_format": "json",
+        "save_reports": true
+      },
+      "timeout": null,
+      "retry_count": 3,
+      "retry_delay": 5
+    },
+    "doc_conversion": {
+      "enabled": true,
+      "parameters": {
+        "output_format": "json",
+        "save_reports": true
+      },
+      "timeout": 3600,
+      "retry_count": 3,
+      "retry_delay": 5
+    },
+    "document_parsing": {
+      "enabled": true,
+      "parameters": {
+        "output_format": "json",
+        "save_reports": true
+      },
+      "timeout": 7200,
+      "retry_count": 3,
+      "retry_delay": 5
+    },
+    "semantic_chunking": {
+      "enabled": true,
+      "parameters": {
+        "chunk_size": 200,
+        "chunk_overlap": 20,
+        "output_format": "json",
+        "save_reports": true
+      },
+      "timeout": null,
+      "retry_count": 3,
+      "retry_delay": 5
+    },
+    "vector_embeddings": {
+      "enabled": true,
+      "parameters": {},
+      "timeout": null,
+      "retry_count": 3,
+      "retry_delay": 5
+    },
+    "chunk_level_eda": {
+      "enabled": true,
+      "parameters": {},
+      "timeout": null,
+      "retry_count": 3,
+      "retry_delay": 5
+    },
+    "qc": {
+      "enabled": true,
+      "parameters": {},
+      "timeout": null,
+      "retry_count": 3,
+      "retry_delay": 5
+    },
+    "export_artifacts": {
+      "enabled": true,
+      "parameters": {},
+      "timeout": null,
+      "retry_count": 3,
+      "retry_delay": 5
+    }
+  },
+  
+  "resources": {
+    "memory_limit_gb": null,
+    "cpu_limit_percent": null,
+    "disk_limit_gb": null,
+    "memory_alert_threshold": 85.0,
+    "cpu_alert_threshold": 90.0,
+    "disk_alert_threshold": 90.0
+  },
+  
+  "reporting": {
+    "output_formats": ["json"],
+    "save_reports": true,
+    "reports_directory": "reports",
+    "include_performance_metrics": true,
+    "include_resource_usage": false
+  },
+  
+  "created_at": "2025-01-03T00:00:00",
+  "updated_at": "2025-01-03T00:00:00"
+} 

@@ -379,13 +379,13 @@ class PreprocessingPipeline:
                     'chunks_for_embedding.pkl'
                 ],
                 'chunk_level_eda': [
-                    'chunks_for_embedding.pkl'
+                    'chunks_for_embedding.pkl' # TODO: update with actual dependencies when step is implemented
                 ],
                 'qc': [
-                    'chunks_for_embedding.pkl'
+                    'chunks_for_embedding.pkl' # TODO: update with actual dependencies when step is implemented
                 ],
                 'export_artifacts': [
-                    'chunks_for_embedding.pkl'
+                    'chunks_for_embedding.pkl' # TODO: update with actual dependencies when step is implemented
                 ]
             }
             

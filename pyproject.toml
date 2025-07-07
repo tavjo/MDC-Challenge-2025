@@ -9,13 +9,16 @@ dependencies = [
     "langchain>=0.3.26", # RecursiveCharacterTextSplitter
     "lxml>=6.0.0",
     "matplotlib>=3.10.3",
+    "networkx>=3.5",
     "numpy>=2.3.1",
     "pandas>=2.3.0",
     "pdfplumber>=0.11.7",
     "psutil>=7.0.0",
     "pydantic>=2.11.7",
+    "pyyaml>=6.0.2",
     "regex>=2024.11.6", # high-perf pattern engine
     "requests>=2.32.4",
+    "rich>=14.0.0",
     "scikit-learn>=1.7.0",
     #"sentence-transformers==2.*", # embeddings for similarity checks
     "tiktoken>=0.8.0", # exact GPT-token counts
