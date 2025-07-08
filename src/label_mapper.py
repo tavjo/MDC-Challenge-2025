@@ -20,6 +20,7 @@ class LabelMapper:
     - Missing: ~30% 
     - Primary: ~26%
     """
+    TEMP_SUFFIX = '.part'
     
     def __init__(self, data_dir: str = "Data"):
         """
@@ -33,6 +34,7 @@ class LabelMapper:
         self.document_inventory = None
         self.unique_articles_df = None
         self.file_availability_summary = None
+        # self.output_dir = os.path.join(data_dir, self.TEMP_SUFFIX)
         
     def load_labels(self, labels_file: str = "train_labels.csv") -> pd.DataFrame:
         """
@@ -286,14 +288,18 @@ class LabelMapper:
             return
         
         # Select relevant columns for conversion workflow
-        export_df = conversion_candidates[[
-            'article_id', 'pdf_path', 'label_count', 'has_primary', 'has_secondary'
-        ]].copy()
-        
+        # export_df = conversion_candidates[[
+            # 'article_id', 'pdf_path', 'xml_path', 'label_count', 'has_primary', 'has_secondary'
+        # ]].copy()
+
+        # add column for conversion status
+        export_df = self.document_inventory[['article_id', 'pdf_path', 'xml_path', 'label_count', 'has_primary', 'has_secondary','has_missing' ,'conversion_status']].copy()
+        export_df["convert_to_xml"] = np.where(export_df["conversion_status"] == "pdf_only", True, False)
         output_path = self.data_dir / output_file
+        output_path = Path(str(output_path) + self.TEMP_SUFFIX) # add suffix to output file name
         export_df.to_csv(output_path, index=False)
         
-        print(f"📝 Exported {len(export_df)} conversion candidates to {output_path}")
+        print(f"📝 Exported {len(conversion_candidates)} conversion candidates to {output_path}")
 
     def conduct_basic_checks(self, show_plots: bool = True) -> Dict:
         """
@@ -476,6 +482,7 @@ class LabelMapper:
             return
         
         output_path = self.data_dir / output_file
+        output_path = Path(str(output_path) + self.TEMP_SUFFIX) # add suffix to output file name
         with open(output_path, 'w') as f:
             f.write("# Articles Missing Both PDF and XML Files\n")
             f.write(f"# Generated: {pd.Timestamp.now()}\n")

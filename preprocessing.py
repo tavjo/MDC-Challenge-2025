@@ -40,10 +40,11 @@ import time
 import shutil
 from pydantic import BaseModel, Field, field_validator
 
-# Add current directory to path
-sys.path.append(str(Path(__file__).parent))
-
 from src.helpers import initialize_logging, timer_wrap
+
+PROJECT_ROOT = Path(__file__).parent
+# Add project root to path
+sys.path.append(str(PROJECT_ROOT))
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
@@ -84,7 +85,7 @@ class PerformanceMetrics(BaseModel):
     memory_usage: Dict[str, float] = Field(default_factory=dict, description="Memory usage statistics")
     cpu_usage: float = Field(default=0.0, description="CPU usage percentage")
     disk_usage: Dict[str, float] = Field(default_factory=dict, description="Disk usage statistics")
-    file_sizes: Dict[str, float] = Field(default_factory=dict, description="File sizes in bytes")
+    file_sizes: Dict[str, Dict[str, float]] = Field(default_factory=dict, description="File sizes in bytes (input_files and output_files)")
     throughput: Optional[float] = Field(None, description="Processing throughput (items/second)")
 
 
@@ -135,7 +136,8 @@ class PreprocessingPipeline:
     """
     Enhanced preprocessing pipeline with step management and flexible execution.
     """
-    
+    # Suffix for temporary output locations
+    TEMP_SUFFIX = '.part'
     # Step definitions with names, descriptions, and dependencies
     STEP_DEFINITIONS = {
         "pre_chunking_eda": {
@@ -221,8 +223,9 @@ class PreprocessingPipeline:
         """
         logger.info("Initializing Enhanced PreprocessingPipeline...")
         
-        self.data_dir = data_dir
+        self.data_dir = Path(PROJECT_ROOT / data_dir)
         self.config_file = config_file
+        self.report_dir = Path(PROJECT_ROOT / "reports")
         
         # Initialize step metadata
         self.step_metadata: Dict[str, StepMetadata] = {}
@@ -230,7 +233,7 @@ class PreprocessingPipeline:
         
         # Initialize pipeline state
         self.state = PipelineState()
-        self.state_file = Path(data_dir) / "pipeline_state.pkl"
+        self.state_file = Path(self.data_dir / "pipeline_state.pkl")
         
         # Initialize step parameters
         self.step_parameters: Dict[str, Dict[str, Any]] = {}
@@ -324,15 +327,15 @@ class PreprocessingPipeline:
             # Check for required subdirectories
             required_dirs = ['train', 'test']
             for dir_name in required_dirs:
-                dir_path = data_path / dir_name
-                if not dir_path.exists():
+                dir_path = str(data_path / dir_name)
+                if not Path(dir_path).exists():
                     logger.warning(f"Expected directory {dir_path} does not exist")
             
             # Check for basic files
-            basic_files = ['train/documents', 'test/documents']
+            basic_files = ['train/PDF','train/XML', 'test/PDF', 'test/XML', 'train_labels.csv', 'sample_submission.csv']
             for file_path in basic_files:
-                full_path = data_path / file_path
-                if not full_path.exists():
+                full_path = str(data_path / file_path)
+                if not Path(full_path).exists():
                     logger.warning(f"Expected path {full_path} does not exist")
             
             logger.info("Data directory structure validation passed")
@@ -361,22 +364,27 @@ class PreprocessingPipeline:
             # Define file dependencies for each step
             file_dependencies = {
                 'pre_chunking_eda': [
-                    'train/documents',
-                    'test/documents'
+                    'train/PDF',
+                    'train/XML',
+                    'train_labels.csv'
                 ],
                 'doc_conversion': [
-                    'train/documents',
-                    'test/documents'
+                    'conversion_candidates.csv',
+                    'train/PDF',
+                    'train/XML',
                 ],
                 'document_parsing': [
-                    'train/xml',
-                    'test/xml'
+                    'train/XML',
+                    'document_inventory.csv'
                 ],
                 'semantic_chunking': [
-                    'train/parsed/parsed_documents.pkl'
+                    'train/parsed/parsed_documents.pkl',
+                    'train/parsed/parsed_documents_summary.csv',
+                    'train/parsed/validation_stats.json'
                 ],
                 'vector_embeddings': [
-                    'chunks_for_embedding.pkl'
+                    'chunks_for_embedding.pkl',
+                    'chunks_for_embedding_summary.csv'
                 ],
                 'chunk_level_eda': [
                     'chunks_for_embedding.pkl' # TODO: update with actual dependencies when step is implemented
@@ -426,7 +434,7 @@ class PreprocessingPipeline:
             # Validate specific file formats based on step
             if step_id == 'semantic_chunking':
                 # Check if parsed_documents.pkl is a valid pickle file
-                pkl_path = data_path / 'train/parsed/parsed_documents.pkl'
+                pkl_path = str(data_path / 'train/parsed/parsed_documents.pkl')
                 if pkl_path.exists():
                     try:
                         with open(pkl_path, 'rb') as f:
@@ -438,7 +446,7 @@ class PreprocessingPipeline:
             
             elif step_id == 'document_parsing':
                 # Check if XML files exist and are readable
-                xml_dir = data_path / 'train/xml'
+                xml_dir = str(data_path / 'train/XML')
                 if xml_dir.exists():
                     xml_files = list(xml_dir.glob('*.xml'))
                     if not xml_files:
@@ -455,6 +463,25 @@ class PreprocessingPipeline:
                         except Exception as e:
                             logger.error(f"Error reading XML file {xml_file}: {e}")
                             return False
+            
+            elif step_id == 'doc_conversion':
+                # check if conversion_candidates.csv exists
+                cand_path = str(data_path / 'conversion_candidates.csv')
+                if not Path(cand_path).exists():
+                    logger.warning(f"Conversion candidates file {cand_path} does not exist")
+                    return False
+                # check if Data/train/PDF exists
+                pdf_path = str(data_path / 'train/PDF')
+                if not Path(pdf_path).exists():
+                    logger.warning(f"PDF directory {pdf_path} does not exist")
+                    return False
+            
+            elif step_id == "pre_chunking_eda":
+                # check if Data/train_labels.csv exists
+                labels_path = str(data_path / 'train_labels.csv')
+                if not Path(labels_path).exists():
+                    logger.warning(f"Labels file {labels_path} does not exist")
+                    return False
             
             logger.info(f"Input format validation passed for step {step_id}")
             return True
@@ -531,25 +558,29 @@ class PreprocessingPipeline:
             # Define output files/directories for each step
             step_outputs = {
                 'pre_chunking_eda': [
-                    'reports/pre_chunking_eda_*.md',
-                    'reports/pre_chunking_eda_*.json'
+                    f'conversion_candidates.csv{self.TEMP_SUFFIX}',
+                    f'document_inventory.csv{self.TEMP_SUFFIX}',
+                    str(self.report_dir / 'prechunking_eda_*.md'),
+                    str(self.report_dir / 'prechunking_eda_*.json')
                 ],
                 'doc_conversion': [
-                    'train/xml',
-                    'test/xml',
-                    'reports/doc_conversion_*.md',
-                    'reports/doc_conversion_*.json'
+                    f'document_inventory.csv{self.TEMP_SUFFIX}',
+                    str(f"train/XML/*.xml{self.TEMP_SUFFIX}"),
+                    str(self.report_dir / 'pdf_to_xml_conversion_*.md'),
+                    str(self.report_dir / 'pdf_to_xml_conversion_*.json')
                 ],
                 'document_parsing': [
-                    'train/parsed',
-                    'test/parsed',
-                    'reports/document_parsing_*.md',
-                    'reports/document_parsing_*.json'
+                    f"train/parsed/parsed_documents.pkl{self.TEMP_SUFFIX}",
+                    f"train/parsed/parsed_documents_summary.csv{self.TEMP_SUFFIX}",
+                    f"train/parsed/validation_stats.json{self.TEMP_SUFFIX}",
+                    str(self.report_dir / 'full_doc_parsing_*.md'),
+                    str(self.report_dir / 'full_doc_parsing_*.json')
                 ],
                 'semantic_chunking': [
-                    'chunks_for_embedding.pkl',
-                    'reports/semantic_chunking_*.md',
-                    'reports/semantic_chunking_*.json'
+                    f"chunks_for_embedding.pkl{self.TEMP_SUFFIX}",
+                    f"chunks_for_embedding_summary.csv{self.TEMP_SUFFIX}",
+                    str(self.report_dir / 'semantic_chunking_*.md'),
+                    str(self.report_dir / 'semantic_chunking_*.json')
                 ]
             }
             
@@ -558,10 +589,26 @@ class PreprocessingPipeline:
                 return True
             
             # Clean up output files/directories
+            # handle xml files
             for output_pattern in step_outputs[step_id]:
-                if '*' in output_pattern:
+                if '*.xml' in output_pattern:
                     # Handle glob patterns
-                    for path in Path('.').glob(output_pattern):
+                    # for path in Path('.').glob(output_pattern):
+                    for path in data_path.glob(output_pattern):
+                        if path.exists():
+                            if path.is_dir():
+                                shutil.rmtree(path)
+                            else:
+                                path.unlink()
+                            logger.info(f"Removed {path} during rollback")
+                # handle report files
+                elif str(self.report_dir) in output_pattern:
+                    # Extract the pattern from the absolute path
+                    pattern_path = Path(output_pattern)
+                    base_dir = pattern_path.parent
+                    pattern = pattern_path.name
+                    
+                    for path in base_dir.glob(pattern):
                         if path.exists():
                             if path.is_dir():
                                 shutil.rmtree(path)
@@ -881,7 +928,7 @@ class PreprocessingPipeline:
             logger.error(f"Unknown step: {step_id}")
             return False
         
-        # Check if already completed
+        # Skip if already done
         if not force and step_id in self.state.completed_steps:
             logger.info(f"Step {step_id} already completed, skipping")
             return True
@@ -889,166 +936,152 @@ class PreprocessingPipeline:
         # Validate prerequisites
         if not self.validate_step_prerequisites(step_id):
             return False
-        
-        # Enhanced validation before starting
         logger.info(f"Validating prerequisites for step {step_id}")
-        
-        # Validate data directory structure
         if not self.validate_data_directory_structure():
             logger.error(f"Data directory validation failed for step {step_id}")
             return False
-        
-        # Validate file dependencies
         if not self.validate_file_dependencies(step_id):
             logger.error(f"File dependency validation failed for step {step_id}")
             return False
-        
-        # Validate input format
         if not self.validate_step_input_format(step_id):
             logger.error(f"Input format validation failed for step {step_id}")
             return False
         
-        # Get current step metadata
         metadata = self.step_metadata[step_id]
-        
-        # Retry logic for failed steps
         max_retries = self.max_retries
         retry_count = metadata.retry_count
-        
+
         for attempt in range(retry_count, max_retries + 1):
             try:
-                # Clean up temporary files before starting
+                # Clean up any leftover temp files
                 self.cleanup_temporary_files()
                 
-                # Update step status
+                # Mark as running
                 metadata.status = StepStatus.RUNNING
                 metadata.start_time = datetime.now()
                 metadata.parameters = self.step_parameters[step_id].copy()
                 metadata.retry_count = attempt
-                
                 self.state.current_step = step_id
                 self._save_state()
                 
                 if attempt > 0:
-                    logger.info(f"Retrying step: {metadata.name} (attempt {attempt + 1}/{max_retries + 1})")
+                    logger.info(f"Retrying step: {metadata.name} (attempt {attempt+1}/{max_retries+1})")
                 else:
                     logger.info(f"Starting step: {metadata.name}")
                 
-                # Monitor resources before execution
+                # Monitor before
                 initial_resources = self.monitor_resources()
+                input_files       = self._get_step_input_files(step_id)
+                input_sizes       = self.get_file_sizes(input_files)
                 
-                # Track input file sizes
-                input_files = self._get_step_input_files(step_id)
-                input_file_sizes = self.get_file_sizes(input_files)
+                # === Execute step (writes to `.part` outputs) ===
+                result = self._execute_step_method(step_id)                                             
                 
-                # Execute the step
-                result = self._execute_step_method(step_id)
+                # === ATOMIC RENAME ON SUCCESS ===
+                if step_id == 'doc_conversion':
+                    # Move each .xml.part → .xml in-place, leave old files alone
+                    xml_dir = Path(self.data_dir) / 'train' / 'XML'
+                    for part in xml_dir.glob(f'*.xml{self.TEMP_SUFFIX}'):
+                        final = part.with_suffix('')   # drops the .part
+                        part.replace(final)
+                        logger.info(f"Moved {part.name} → {final.name}")
+                else:
+                    for out_path in self._get_step_output_files(step_id):
+                        temp_path  = Path(str(out_path))
+                        # sanity check --> make sure it has suffix
+                        if not str(out_path).endswith(self.TEMP_SUFFIX):
+                            logger.error(f"Output path {out_path} does not have suffix {self.TEMP_SUFFIX}")
+                            raise ValueError(f"Output path {out_path} does not have suffix {self.TEMP_SUFFIX}")
+                        final_path = Path(out_path.replace(self.TEMP_SUFFIX, ""))
+                        if temp_path.exists():
+                            temp_path.replace(final_path)
+                            logger.info(f"Atomically renamed {temp_path} → {final_path}")
                 
-                # Monitor resources after execution
-                final_resources = self.monitor_resources()
+                # Monitor after
+                final_resources  = self.monitor_resources()
+                output_files     = self._get_step_output_files(step_id)
+                output_sizes     = self.get_file_sizes(output_files)
                 
-                # Track output file sizes
-                output_files = self._get_step_output_files(step_id)
-                output_file_sizes = self.get_file_sizes(output_files)
-                
-                # Calculate performance metrics
+                # Finalize metadata
                 metadata.end_time = datetime.now()
                 metadata.duration = (metadata.end_time - metadata.start_time).total_seconds()
-                
-                # Create performance metrics
                 performance_metrics = PerformanceMetrics(
                     execution_time=metadata.duration,
                     memory_usage={
                         'initial_memory_percent': initial_resources.get('memory_percent', 0),
-                        'final_memory_percent': final_resources.get('memory_percent', 0),
-                        'memory_peak_mb': final_resources.get('process_memory_mb', 0)
+                        'final_memory_percent':   final_resources.get('memory_percent', 0),
+                        'memory_peak_mb':         final_resources.get('process_memory_mb', 0)
                     },
                     cpu_usage=final_resources.get('cpu_percent', 0),
                     disk_usage={
                         'initial_disk_percent': initial_resources.get('disk_percent', 0),
-                        'final_disk_percent': final_resources.get('disk_percent', 0)
+                        'final_disk_percent':   final_resources.get('disk_percent', 0)
                     },
                     file_sizes={
-                        'input_files': input_file_sizes,
-                        'output_files': output_file_sizes
+                        'input_files':  input_sizes,
+                        'output_files': output_sizes
                     }
                 )
-                
-                # Calculate throughput if applicable
                 if isinstance(result, dict) and 'items_processed' in result:
                     performance_metrics.throughput = self.calculate_throughput(
                         result['items_processed'], metadata.duration
                     )
                 
-                # Update metadata on success
-                metadata.status = StepStatus.COMPLETED
-                metadata.metrics = result if isinstance(result, dict) else {}
+                metadata.status              = StepStatus.COMPLETED
+                metadata.metrics             = result if isinstance(result, dict) else {}
                 metadata.performance_metrics = performance_metrics
-                metadata.error_message = None
-                metadata.error_type = None
+                metadata.error_message       = None
+                metadata.error_type          = None
                 
-                # Generate performance recommendations
-                recommendations = self.generate_performance_recommendations(performance_metrics)
-                if recommendations:
-                    logger.info(f"Performance recommendations for {step_id}: {recommendations}")
+                # Log recommendations
+                recs = self.generate_performance_recommendations(performance_metrics)
+                if recs:
+                    logger.info(f"Performance recommendations for {step_id}: {recs}")
                 
                 # Update state
                 if step_id not in self.state.completed_steps:
                     self.state.completed_steps.append(step_id)
                 if step_id in self.state.failed_steps:
                     self.state.failed_steps.remove(step_id)
-                
                 self.state.current_step = None
                 
-                # Create checkpoint
+                # Checkpoint & save
                 self.create_checkpoint(step_id)
-                
                 self._save_state()
-                
                 logger.info(f"Step {metadata.name} completed successfully in {metadata.duration:.2f} seconds")
                 return True
-                
+            
             except Exception as e:
-                # Categorize the error
+                # Error handling as before
                 error_type = self.categorize_error(e)
-                
-                # Update metadata on failure
-                metadata.end_time = datetime.now()
-                metadata.duration = (metadata.end_time - metadata.start_time).total_seconds()
-                metadata.status = StepStatus.FAILED
+                metadata.end_time     = datetime.now()
+                metadata.duration     = (metadata.end_time - metadata.start_time).total_seconds()
+                metadata.status       = StepStatus.FAILED
                 metadata.error_message = str(e)
-                metadata.error_type = error_type
+                metadata.error_type   = error_type
                 
-                logger.error(f"Step {metadata.name} failed (attempt {attempt + 1}/{max_retries + 1}): {e}")
+                logger.error(f"Step {metadata.name} failed (attempt {attempt+1}/{max_retries+1}): {e}")
                 
-                # Decide whether to retry based on error type
                 if error_type == ErrorType.FATAL:
-                    logger.error(f"Fatal error in step {step_id}, not retrying")
                     break
-                elif error_type == ErrorType.TRANSIENT and attempt < max_retries:
-                    logger.info(f"Transient error in step {step_id}, will retry after {self.retry_delay} seconds")
-                    time.sleep(self.retry_delay)
-                    continue
-                elif error_type == ErrorType.RECOVERABLE and attempt < max_retries:
-                    logger.info(f"Recoverable error in step {step_id}, attempting rollback and retry")
-                    self.rollback_step(step_id)
+                elif error_type in (ErrorType.TRANSIENT, ErrorType.RECOVERABLE) and attempt < max_retries:
+                    if error_type == ErrorType.RECOVERABLE:
+                        self.rollback_step(step_id)
+                    logger.info(f"Retrying after error ({error_type.name}) in {self.retry_delay}s")
                     time.sleep(self.retry_delay)
                     continue
                 else:
-                    logger.error(f"Max retries exceeded for step {step_id}")
                     break
-        
-        # If we get here, the step failed after all retries
-        # Update state
+
+        # Mark permanent failure
         if step_id not in self.state.failed_steps:
             self.state.failed_steps.append(step_id)
         if step_id in self.state.completed_steps:
             self.state.completed_steps.remove(step_id)
-        
         self.state.current_step = None
         self._save_state()
-        
         return False
+
     
     def _get_step_input_files(self, step_id: str) -> List[str]:
         """
@@ -1064,31 +1097,33 @@ class PreprocessingPipeline:
         
         input_files = {
             'pre_chunking_eda': [
-                str(data_path / 'train/documents'),
-                str(data_path / 'test/documents')
+                str(data_path / 'train/PDF'),
+                str(data_path / 'train/XML'),
+                str(data_path / 'train_labels.csv')
             ],
             'doc_conversion': [
-                str(data_path / 'train/documents'),
-                str(data_path / 'test/documents')
+                str(data_path / 'conversion_candidates.csv'),
+                str(data_path / 'train/PDF'),
+                str(data_path / 'train/XML'),
             ],
             'document_parsing': [
-                str(data_path / 'train/xml'),
-                str(data_path / 'test/xml')
+                str(data_path / 'train/XML'),
+                str(data_path / 'document_inventory.csv')
             ],
             'semantic_chunking': [
                 str(data_path / 'train/parsed/parsed_documents.pkl')
             ],
             'vector_embeddings': [
-                'chunks_for_embedding.pkl'
+                str(data_path / 'chunks_for_embedding.pkl')
             ],
             'chunk_level_eda': [
-                'chunks_for_embedding.pkl'
+                str(data_path / 'chunks_for_embedding.pkl')
             ],
             'qc': [
-                'chunks_for_embedding.pkl'
+                str(data_path / 'chunks_for_embedding.pkl')
             ],
             'export_artifacts': [
-                'chunks_for_embedding.pkl'
+                str(data_path / 'chunks_for_embedding.pkl')
             ]
         }
         
@@ -1108,35 +1143,30 @@ class PreprocessingPipeline:
         
         output_files = {
             'pre_chunking_eda': [
-                'reports'
+                str(data_path / f"conversion_candidates.csv{self.TEMP_SUFFIX}"),
+                str(data_path / f"document_inventory.csv{self.TEMP_SUFFIX}"),
+                # str(data_path / 'document_inventory.csv'),
             ],
             'doc_conversion': [
-                str(data_path / 'train/xml'),
-                str(data_path / 'test/xml'),
-                'reports'
+                str(data_path / f"document_inventory.csv{self.TEMP_SUFFIX}"),
+                str(data_path / 'train' / 'XML' / f"*.xml{self.TEMP_SUFFIX}"),
             ],
             'document_parsing': [
-                str(data_path / 'train/parsed'),
-                str(data_path / 'test/parsed'),
-                'reports'
+                str(data_path / f"train/parsed/parsed_documents.pkl{self.TEMP_SUFFIX}"),
+                str(data_path / f"train/parsed/parsed_documents_summary.csv{self.TEMP_SUFFIX}"),
+                str(data_path / f"train/parsed/validation_stats.json{self.TEMP_SUFFIX}"),
             ],
             'semantic_chunking': [
-                'chunks_for_embedding.pkl',
-                'reports'
+                str(data_path / f"chunks_for_embedding.pkl{self.TEMP_SUFFIX}"),
+                str(data_path / f"chunks_for_embedding_summary.csv{self.TEMP_SUFFIX}"),
             ],
             'vector_embeddings': [
-                'vector_embeddings.pkl',
-                'reports'
             ],
             'chunk_level_eda': [
-                'reports'
             ],
             'qc': [
-                'reports'
             ],
             'export_artifacts': [
-                'artifacts',
-                'reports'
             ]
         }
         
@@ -1559,15 +1589,40 @@ class PreprocessingPipeline:
         }
         
         return analysis
+    
+    def _convert_paths_to_strings(self, obj):
+        """
+        Recursively convert PosixPath objects to strings for JSON serialization.
+        
+        Args:
+            obj: Object to convert
+            
+        Returns:
+            Object with all Path objects converted to strings
+        """
+        if isinstance(obj, Path):
+            return str(obj)
+        elif isinstance(obj, dict):
+            return {key: self._convert_paths_to_strings(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_paths_to_strings(item) for item in obj]
+        elif isinstance(obj, tuple):
+            return tuple(self._convert_paths_to_strings(item) for item in obj)
+        else:
+            return obj
 
     def generate_consolidated_reports(self):
         """Generate and save consolidated reports."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        reports_dir = Path("reports")
+        reports_dir = Path(self.report_dir)
         reports_dir.mkdir(exist_ok=True)
         
         # Generate JSON summary
         json_summary = self.generate_consolidated_json_summary()
+
+        # Convert all Path objects to strings before JSON serialization
+        json_summary = self._convert_paths_to_strings(json_summary)
+
         json_file = reports_dir / f"preprocessing_pipeline_{timestamp}.json"
         with open(json_file, 'w') as f:
             json.dump(json_summary, f, indent=2)
@@ -1585,7 +1640,7 @@ class PreprocessingPipeline:
 
     def _update_report_index(self, json_file: Path, markdown_file: Path):
         """Update the report index file."""
-        index_file = Path("reports") / "report_index.md"
+        index_file = Path(self.report_dir) / "report_index.md"
         
         index_entry = f"""
 ## {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -1654,8 +1709,8 @@ class PreprocessingPipeline:
         
         # Merge parameters
         params = {
-            "input_path": f"{self.data_dir}/train/parsed/parsed_documents.pkl",
-            "output_path": "chunks_for_embedding.pkl",
+            "input_path": str(Path(self.data_dir) / "train/parsed/parsed_documents.pkl"),
+            "output_path": str(Path(self.data_dir) / "chunks_for_embedding.pkl"),
             "chunk_size": 200,
             "chunk_overlap": 20,
             "output_format": "all",
@@ -1854,14 +1909,23 @@ def main():
             semantic_params["chunk_overlap"] = args.chunk_overlap
         pipeline.update_step_parameters("semantic_chunking", semantic_params)
     
-    # Update common parameters
-    common_params = {
+    # Update parameters for each step with only the parameters they accept
+    
+    # Pre-chunking EDA accepts all common parameters including show_plots
+    pre_chunking_eda_params = {
         "output_format": args.output_format,
         "save_reports": args.save_reports,
         "show_plots": args.show_plots
     }
+    pipeline.update_step_parameters("pre_chunking_eda", pre_chunking_eda_params)
     
-    for step_id in ["pre_chunking_eda", "doc_conversion", "document_parsing", "semantic_chunking"]:
+    # Other steps only accept output_format and save_reports (not show_plots)
+    common_params = {
+        "output_format": args.output_format,
+        "save_reports": args.save_reports
+    }
+    
+    for step_id in ["doc_conversion", "document_parsing", "semantic_chunking"]:
         if step_id in pipeline.step_parameters:
             pipeline.update_step_parameters(step_id, common_params)
     

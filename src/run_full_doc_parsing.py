@@ -15,6 +15,8 @@ import os
 from .document_parser import parse_document, create_document_entry
 from .models import Document
 
+TEMP_SUFFIX = '.part'
+
 def load_document_inventory(inventory_path: str = "Data/document_inventory.csv") -> pd.DataFrame:
     """
     Step 1: Load document inventory.
@@ -173,7 +175,7 @@ def save_parsed_corpus(parsed_documents: List[Tuple[Document, Dict[str, Any]]],
     output_path.mkdir(parents=True, exist_ok=True)
     
     # Save main pickle file
-    pickle_path = output_path / "parsed_documents.pkl"
+    pickle_path = output_path / f"parsed_documents.pkl{TEMP_SUFFIX}"
     with open(pickle_path, 'wb') as f:
         pickle.dump(parsed_documents, f)
     
@@ -208,13 +210,13 @@ def save_parsed_corpus(parsed_documents: List[Tuple[Document, Dict[str, Any]]],
         })
     
     summary_df = pd.DataFrame(summary_data)
-    summary_path = output_path / "parsed_documents_summary.csv"
+    summary_path = output_path / f"parsed_documents_summary.csv{TEMP_SUFFIX}"
     summary_df.to_csv(summary_path, index=False)
     
     print(f"✅ Saved summary CSV: {summary_path}")
     
     # Save validation statistics
-    stats_path = output_path / "validation_stats.json"
+    stats_path = output_path / f"validation_stats.json{TEMP_SUFFIX}"
     import json
     with open(stats_path, 'w') as f:
         json.dump(validation_stats, f, indent=2)

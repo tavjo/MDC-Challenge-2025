@@ -47,13 +47,14 @@ from run_full_doc_parsing import (
 )
 from models import Document, Section
 
+TEMP_SUFFIX = '.part'
+
 
 class DocumentParsingReporter:
     """
     Captures and formats outputs from document parsing process for comprehensive reporting.
     Based on EDAReporter and ConversionReporter but specialized for document parsing workflows.
-    """
-    
+    """    
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
         self.start_time = datetime.now()

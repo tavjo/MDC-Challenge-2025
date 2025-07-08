@@ -436,7 +436,7 @@ def run_prechunking_eda(data_dir: str = "Data",
         reporter.add_generated_file(str(prob_file), "Articles missing both PDF and XML")
         
         # Export document inventory
-        inventory_file = Path(data_dir) / "document_inventory.csv"
+        inventory_file = Path(data_dir) / f"document_inventory.csv"
         inventory_df.to_csv(inventory_file, index=False)
         export_results["exports_performed"].append("document_inventory")
         export_results["file_locations"]["document_inventory"] = str(inventory_file)

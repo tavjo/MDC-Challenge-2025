@@ -27,6 +27,7 @@ import regex as re
 # Local imports
 from models import ChunkMetadata, Chunk, ChunkingResult, Document, Section
 from helpers import initialize_logging, timer_wrap
+from update_patterns import ENTITY_PATTERNS
 import os
 
 filename = os.path.basename(__file__)
@@ -34,39 +35,41 @@ logger = initialize_logging(filename)
 
 # TODO: Make sure all mentions of Section and Document objects are aligned with updated version of these models (Done --> remove comments after testing). 
 
+TEMP_SUFFIX = '.part'
+
 # --- Constants ---
 PRIORITY_SECTIONS = ["data_availability", "methods", "supplementary", "results"]
 
 # Entity patterns for citation recognition
-ENTITY_PATTERNS = {
-    # Existing patterns
-    'DOI': re.compile(r'\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+\b', re.IGNORECASE),
-    'GEO_Series': re.compile(r'\bGSE\d{3,6}\b'),
-    'GEO_Sample': re.compile(r'\bGSM\d{3,6}\b'),
-    'SRA_Run': re.compile(r'\bSRR\d{5,}\b'),
-    'PDB_ID': re.compile(r'\b[A-Za-z0-9]{4}\b'),
-    'PDB_DOI': re.compile(r'\b10\.2210/pdb[A-Za-z0-9]{4}/pdb\b', re.IGNORECASE),
-    'ArrayExpress': re.compile(r'\bE-[A-Z]+-\d+\b'),
-    'dbGaP': re.compile(r'\bphs\d{6}\b'),
-    'TCGA': re.compile(r'\bTCGA-[A-Z0-9-]+\b'),
-    'ENA_Project': re.compile(r'\bPRJ[EDN][A-Z]\d+\b'),
-    'ENA_Study': re.compile(r'\bERP\d{6,}\b'),
-    'ENA_Sample': re.compile(r'\bSAM[EDN][A-Z]?\d+\b'),
+# ENTITY_PATTERNS = {
+#     # Existing patterns
+#     'DOI': re.compile(r'\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+\b', re.IGNORECASE),
+#     'GEO_Series': re.compile(r'\bGSE\d{3,6}\b'),
+#     'GEO_Sample': re.compile(r'\bGSM\d{3,6}\b'),
+#     'SRA_Run': re.compile(r'\bSRR\d{5,}\b'),
+#     'PDB_ID': re.compile(r'\b[A-Za-z0-9]{4}\b'),
+#     'PDB_DOI': re.compile(r'\b10\.2210/pdb[A-Za-z0-9]{4}/pdb\b', re.IGNORECASE),
+#     'ArrayExpress': re.compile(r'\bE-[A-Z]+-\d+\b'),
+#     'dbGaP': re.compile(r'\bphs\d{6}\b'),
+#     'TCGA': re.compile(r'\bTCGA-[A-Z0-9-]+\b'),
+#     'ENA_Project': re.compile(r'\bPRJ[EDN][A-Z]\d+\b'),
+#     'ENA_Study': re.compile(r'\bERP\d{6,}\b'),
+#     'ENA_Sample': re.compile(r'\bSAM[EDN][A-Z]?\d+\b'),
     
-    # New additions
-    'SRA_Experiment': re.compile(r'\bSRX\d{5,}\b'),
-    'SRA_Project': re.compile(r'\bSRP\d{5,}\b'),
-    'SRA_Sample': re.compile(r'\bSRS\d{5,}\b'),
-    'SRA_Study': re.compile(r'\bSRA\d{5,}\b'),
-    'RefSeq_Chromosome': re.compile(r'\bNC_\d{6,}(?:\.\d+)?\b'),
-    'ENA_Run': re.compile(r'\bERR\d{6,}\b'),
-    'ENA_Experiment': re.compile(r'\bERX\d{6,}\b'),
-    'ENA_Sample2': re.compile(r'\bERS\d{6,}\b'),
-    'DDBJ_Run': re.compile(r'\bDRR\d{6,}\b'),
-    'DDBJ_Experiment': re.compile(r'\bDRX\d{6,}\b'),
-    'ENCODE_Assay': re.compile(r'\bENCSR[0-9A-Z]{6}\b'),
-    'PRIDE': re.compile(r'\bPXD\d{6,}\b'),
-}
+#     # New additions
+#     'SRA_Experiment': re.compile(r'\bSRX\d{5,}\b'),
+#     'SRA_Project': re.compile(r'\bSRP\d{5,}\b'),
+#     'SRA_Sample': re.compile(r'\bSRS\d{5,}\b'),
+#     'SRA_Study': re.compile(r'\bSRA\d{5,}\b'),
+#     'RefSeq_Chromosome': re.compile(r'\bNC_\d{6,}(?:\.\d+)?\b'),
+#     'ENA_Run': re.compile(r'\bERR\d{6,}\b'),
+#     'ENA_Experiment': re.compile(r'\bERX\d{6,}\b'),
+#     'ENA_Sample2': re.compile(r'\bERS\d{6,}\b'),
+#     'DDBJ_Run': re.compile(r'\bDRR\d{6,}\b'),
+#     'DDBJ_Experiment': re.compile(r'\bDRX\d{6,}\b'),
+#     'ENCODE_Assay': re.compile(r'\bENCSR[0-9A-Z]{6}\b'),
+#     'PRIDE': re.compile(r'\bPXD\d{6,}\b'),
+# }
 
 # --- Load & Filter Functions ---
 
@@ -501,6 +504,7 @@ def export_chunks_for_embedding(chunks: List[Chunk],
         List of output file paths
     """
     logger.info(f"Exporting {len(chunks)} chunks to {output_path}")
+    output_path = str(output_path) + TEMP_SUFFIX
     
     # Save main pickle file
     with open(output_path, "wb") as f:
@@ -514,7 +518,7 @@ def export_chunks_for_embedding(chunks: List[Chunk],
         summary_rows.append(row)
     
     summary_df = pd.DataFrame(summary_rows)
-    summary_path = output_path.replace(".pkl", "_summary.csv")
+    summary_path = output_path.replace(".pkl", f"_summary.csv{TEMP_SUFFIX}")
     summary_df.to_csv(summary_path, index=False)
     
     logger.info(f"✅ Exported chunks:")
@@ -522,7 +526,7 @@ def export_chunks_for_embedding(chunks: List[Chunk],
     logger.info(f"   Summary file: {summary_path}")
     logger.info(f"   Total chunks: {len(chunks):,}")
 
-    return [output_path, summary_path]
+    return [output_path.replace(TEMP_SUFFIX, ""), summary_path.replace(TEMP_SUFFIX, "")]
 
 
 # --- Main Pipeline Function ---

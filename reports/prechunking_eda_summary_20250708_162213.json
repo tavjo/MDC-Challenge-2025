@@ -1,0 +1,243 @@
+{
+  "metadata": {
+    "generated_at": "2025-07-08T16:22:13.779309",
+    "data_directory": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data",
+    "analysis_duration": "0:00:00.789972",
+    "analysis_steps_completed": 9
+  },
+  "summary_statistics": {
+    "Total Label Entries": 1028,
+    "Unique Articles": 523,
+    "Multi-label Articles": 76,
+    "PDF Files Available": "523",
+    "XML Files Available": "0",
+    "Full-text Coverage": "100.0%",
+    "Articles Needing Conversion": 523,
+    "Ready for Processing": 0,
+    "Secondary Labels": 449,
+    "Missing Labels": 309,
+    "Primary Labels": 270,
+    "Files Exported": 3,
+    "Analysis Steps Completed": 8,
+    "Total Analysis Time": "0:00:00.786513"
+  },
+  "detailed_sections": {
+    "analysis_start": {
+      "message": "Pre-chunking EDA analysis initiated",
+      "data_directory": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data",
+      "timestamp": "2025-07-08T16:22:12.991402"
+    },
+    "step_1_label_loading": {
+      "total_label_entries": 1028,
+      "unique_articles": 523,
+      "columns": [
+        "article_id",
+        "dataset_id",
+        "type"
+      ],
+      "label_file_loaded": "train_labels.csv",
+      "unique_articles_summary_created": 523
+    },
+    "step_2_unique_articles_analysis": {
+      "multi_label_entries": 505,
+      "unique_article_statistics": {
+        "articles_with_primary": "167",
+        "articles_with_secondary": "57",
+        "articles_with_missing": "309",
+        "multi_label_articles": 76
+      },
+      "label_entries_vs_unique_articles": {
+        "total_entries": 1028,
+        "unique_articles": 523,
+        "difference": 505
+      }
+    },
+    "step_3_document_inventory": {
+      "pdf_files_found": "523",
+      "xml_files_found": "0",
+      "articles_with_fulltext": "523",
+      "fulltext_coverage_percentage": 100.0,
+      "document_scanning_summary": {
+        "total_articles": 523,
+        "pdf_availability": "523 (100.0%)",
+        "xml_availability": "0 (0.0%)",
+        "fulltext_availability": "523 (100.0%)"
+      }
+    },
+    "step_4_conversion_workflow": {
+      "conversion_workflow_summary": {
+        "total_unique_articles": 523,
+        "pdf_available": "523",
+        "xml_available": "0",
+        "has_fulltext": "523",
+        "both_available": 0,
+        "pdf_only": 523,
+        "xml_only": 0,
+        "missing_both": 0,
+        "conversion_candidates": 523,
+        "problematic_articles": 0
+      },
+      "conversion_candidates_count": 523,
+      "conversion_priority_analysis": {
+        "articles_with_primary_needing_conversion": "167",
+        "articles_with_secondary_needing_conversion": "57",
+        "priority_candidates": 214
+      },
+      "workflow_categorization": {
+        "ready_for_processing": 0,
+        "needs_conversion": 523,
+        "cannot_process": 0
+      }
+    },
+    "step_5_quality_checks": {
+      "quality_check_summary": {
+        "duplicate_entries": "0",
+        "duplicate_article_entries": "505",
+        "null_counts": {
+          "article_id": 0,
+          "dataset_id": 0,
+          "type": 0
+        },
+        "class_distribution": {
+          "Secondary": 449,
+          "Missing": 309,
+          "Primary": 270
+        },
+        "class_percentages": {
+          "Secondary": 43.67704280155642,
+          "Missing": 30.058365758754864,
+          "Primary": 26.26459143968872
+        },
+        "file_availability": {
+          "total_unique_articles": 523,
+          "pdf_available": "523",
+          "xml_available": "0",
+          "has_fulltext": "523",
+          "both_available": 0,
+          "pdf_only": 523,
+          "xml_only": 0,
+          "missing_both": 0,
+          "conversion_candidates": 523,
+          "problematic_articles": 0
+        }
+      },
+      "duplicate_analysis": {
+        "duplicate_entries": "0",
+        "duplicate_article_entries": "505"
+      },
+      "null_value_analysis": {
+        "article_id": 0,
+        "dataset_id": 0,
+        "type": 0
+      },
+      "class_distribution": {
+        "Secondary": 449,
+        "Missing": 309,
+        "Primary": 270
+      },
+      "class_percentages": {
+        "Secondary": 43.67704280155642,
+        "Missing": 30.058365758754864,
+        "Primary": 26.26459143968872
+      },
+      "file_availability_check": {
+        "total_unique_articles": 523,
+        "pdf_available": "523",
+        "xml_available": "0",
+        "has_fulltext": "523",
+        "both_available": 0,
+        "pdf_only": 523,
+        "xml_only": 0,
+        "missing_both": 0,
+        "conversion_candidates": 523,
+        "problematic_articles": 0
+      }
+    },
+    "step_6_summary_statistics": {
+      "comprehensive_statistics": {
+        "total_label_entries": 1028,
+        "unique_articles": 523,
+        "unique_datasets": 720,
+        "class_distribution": {
+          "Secondary": 449,
+          "Missing": 309,
+          "Primary": 270
+        },
+        "articles_with_primary": "167",
+        "articles_with_secondary": "57",
+        "articles_with_missing": "309",
+        "multi_label_articles": 76,
+        "documents_with_fulltext": "523",
+        "pdf_availability": "523",
+        "xml_availability": "0",
+        "conversion_candidates": 523,
+        "problematic_articles": 0
+      },
+      "key_metrics": {
+        "total_label_entries": 1028,
+        "unique_articles": 523,
+        "unique_datasets": 720,
+        "conversion_candidates": 523,
+        "problematic_articles": 0
+      }
+    },
+    "step_7_enhanced_inventory_analysis": {
+      "conversion_status_distribution": {
+        "pdf_only": 523
+      },
+      "label_type_distribution": {
+        "Primary Only": 157,
+        "Secondary Only": 47,
+        "Missing Only": 309,
+        "Multiple Labels": 76
+      },
+      "priority_analysis_by_conversion_status": {
+        "has_primary": {
+          "pdf_only": 167
+        },
+        "has_secondary": {
+          "pdf_only": 57
+        },
+        "has_missing": {
+          "pdf_only": 309
+        },
+        "article_id": {
+          "pdf_only": 523
+        }
+      },
+      "enhanced_metrics": {
+        "total_articles_analyzed": 523,
+        "conversion_coverage": "523/523 articles need conversion"
+      }
+    },
+    "step_8_export_operations": {
+      "exports_performed": [
+        "conversion_candidates",
+        "problematic_articles",
+        "document_inventory"
+      ],
+      "file_locations": {
+        "conversion_candidates": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/conversion_candidates.csv",
+        "problematic_articles": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/problematic_articles.txt",
+        "document_inventory": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/document_inventory.csv"
+      }
+    }
+  },
+  "generated_files": [
+    {
+      "filepath": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/conversion_candidates.csv",
+      "description": "Articles needing PDF\u2192XML conversion",
+      "timestamp": "2025-07-08 16:22:13.750165"
+    },
+    {
+      "filepath": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/problematic_articles.txt",
+      "description": "Articles missing both PDF and XML",
+      "timestamp": "2025-07-08 16:22:13.750946"
+    },
+    {
+      "filepath": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/document_inventory.csv",
+      "description": "Complete document inventory",
+      "timestamp": "2025-07-08 16:22:13.775846"
+    }
+  ]
+}

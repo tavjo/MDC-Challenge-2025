@@ -14,13 +14,15 @@ from tqdm import tqdm
 import time
 from datetime import datetime
 
+TEMP_SUFFIX = '.part'
+
 def main():
     print("=== PDF to XML Conversion for MDC-Challenge-2025 ===")
     print(f"Started at: {datetime.now()}")
     
     # Step 1: Load & Validate Conversion Candidates
     print("\n📋 Step 1: Load & Validate Conversion Candidates")
-    cand = load_conversion_candidates()
+    cand, all_docs = load_conversion_candidates()
     
     # Step 2: Inventory Existing XML Files
     print("\n📋 Step 2: Inventory Existing XML Files")
@@ -35,7 +37,7 @@ def main():
     
     # Step 5: Generate Conversion Report
     print("\n📋 Step 5: Generate Conversion Report")
-    generate_conversion_report(log, cand)
+    generate_conversion_report(log, cand, all_docs)
     
     # Step 6: Quality Validation
     print("\n📋 Step 6: Quality Validation")
@@ -43,18 +45,25 @@ def main():
     
     print(f"\n✅ Conversion process completed at: {datetime.now()}")
 
-def load_conversion_candidates():
+def load_conversion_candidates(cand_path: Path = None):
     """Step 1: Load & Validate Conversion Candidates"""
-    cand = pd.read_csv("Data/conversion_candidates.csv")
+    if cand_path is None:
+        # Get the project root (parent of src directory)
+        project_root = Path(__file__).parent.parent
+        cand_path = project_root / "Data" / "conversion_candidates.csv"
     
-    # Expected: 124 rows based on analysis
-    assert len(cand) == 124, f"Expected 124 candidates, got {len(cand)}"
+    all_docs = pd.read_csv(cand_path)
+
+    # filter for rows where convert_to_xml is True
+    cand = all_docs[all_docs['convert_to_xml'] == True]
+    
+    # assert len(cand) == 124, f"Expected 124 candidates, got {len(cand)}"
     assert {'article_id', 'pdf_path'}.issubset(cand.columns), "Missing required columns"
     
     print(f"✅ Loaded {len(cand)} conversion candidates")
     print(f"   Columns: {list(cand.columns)}")
     
-    return cand
+    return cand, all_docs
 
 def inventory_existing_xml(cand):
     """Step 2: Inventory Existing XML Files"""
@@ -103,7 +112,7 @@ def execute_batch_conversion(todo):
             pdf_path = Path(pdf_path_str)
         
         # Use article_id for XML filename
-        xml_path = xml_dir / f"{row['article_id']}.xml"
+        xml_path = xml_dir / f"{row['article_id']}.xml{TEMP_SUFFIX}"
         
         try:
             source = convert_one(pdf_path, xml_path)
@@ -116,7 +125,8 @@ def execute_batch_conversion(todo):
                 'success': source != "failed",
                 'has_primary': row['has_primary'],
                 'has_secondary': row['has_secondary'],
-                'label_count': row['label_count']
+                'label_count': row['label_count'],
+                'has_missing': row['has_missing']
             })
         except Exception as e:
             log.append({
@@ -128,7 +138,8 @@ def execute_batch_conversion(todo):
                 'success': False,
                 'has_primary': row['has_primary'],
                 'has_secondary': row['has_secondary'],
-                'label_count': row['label_count']
+                'label_count': row['label_count'],
+                'has_missing': row['has_missing']
             })
         
         # Small delay to avoid overwhelming services
@@ -136,7 +147,7 @@ def execute_batch_conversion(todo):
     
     return log
 
-def generate_conversion_report(log, cand):
+def generate_conversion_report(log, cand, all_docs):
     """Step 5: Generate Conversion Report"""
     # Handle empty log case (when no new conversions were needed)
     if log:
@@ -145,28 +156,32 @@ def generate_conversion_report(log, cand):
         # Create empty DataFrame with expected columns
         conversion_log = pd.DataFrame(columns=[
             'article_id', 'pdf_path', 'xml_path', 'source', 'error', 
-            'success', 'has_primary', 'has_secondary', 'label_count',
-            'processing_time'
+            'success', 'has_primary', 'has_secondary', 'label_count', 'processing_time', 'has_missing'
+            #'processing_time', 'conversion_status', "convert_to_xml"
         ])
     
     # Get ALL existing XML files
     xml_dir = Path("Data/train/XML")
-    all_xml_files = list(xml_dir.glob("*.xml"))
+    all_xml_files = list(xml_dir.glob("*.xml")) + list(xml_dir.glob("*.xml.part"))
     
     # Create a lookup dictionary for conversion candidates metadata
     cand_dict = {row['article_id']: row for _, row in cand.iterrows()}
+    all_docs_dict = {row['article_id']: row for _, row in all_docs.iterrows()}
     
     # Create entries for ALL existing XML files
     existing_entries = []
     for xml_file in all_xml_files:
-        article_id = xml_file.stem
+        xml_file = Path(xml_file).stem if str(xml_file).endswith(TEMP_SUFFIX) else Path(xml_file)
+        print(xml_file)
+        article_id = Path(xml_file).stem #if str(xml_file).endswith(".xml") else xml_file.stem.split(".")[0]
+        print(article_id)
         
         # Check if this file was also processed in this run (shouldn't happen, but just in case)
         if article_id not in [entry['article_id'] for entry in log]:
             # Check if we have metadata for this file from conversion_candidates.csv
-            if article_id in cand_dict:
+            if article_id in all_docs_dict:
                 # File from conversion candidates - include full metadata
-                row = cand_dict[article_id]
+                row = all_docs_dict[article_id]
                 existing_entries.append({
                     'article_id': article_id,
                     'pdf_path': row['pdf_path'],
@@ -177,7 +192,8 @@ def generate_conversion_report(log, cand):
                     'has_primary': row['has_primary'],
                     'has_secondary': row['has_secondary'],
                     'label_count': row['label_count'],
-                    'processing_time': row['processing_time']
+                    'processing_time': None,
+                    'has_missing': row['has_missing']
                 })
             else:
                 # File NOT from conversion candidates - basic info only
@@ -191,7 +207,8 @@ def generate_conversion_report(log, cand):
                     'has_primary': None,  # No metadata available
                     'has_secondary': None,  # No metadata available
                     'label_count': None,  # No metadata available
-                    'processing_time': None  # No metadata available
+                    'processing_time': None,  # No metadata available
+                    'has_missing': None,
                 })
     
     # Combine conversion log with existing entries
@@ -275,8 +292,10 @@ def validate_conversions():
 def get_remaining_conversions():
     """Get list of PDFs that still need conversion (resumability)"""
     existing_xml = {p.stem for p in Path("Data/train/XML").glob("*.xml")}
-    all_candidates = pd.read_csv("Data/conversion_candidates.csv")
-    remaining = all_candidates[~all_candidates['article_id'].isin(existing_xml)]
+    new_xml = {p.stem for p in Path("Data/train/XML").glob("*.xml.part")}
+    all_docs = pd.read_csv("Data/conversion_candidates.csv")
+    all_candidates = all_docs[all_docs['convert_to_xml'] == True]
+    remaining = all_candidates[~all_candidates['article_id'].isin(existing_xml) & ~all_candidates['article_id'].isin(new_xml)]
     return remaining
 
 if __name__ == "__main__":

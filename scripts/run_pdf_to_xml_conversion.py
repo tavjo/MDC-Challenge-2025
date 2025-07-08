@@ -28,7 +28,12 @@ import pandas as pd
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
+# Add project root to path
+sys.path.append(str(Path(__file__).parent.parent))
+
 from helpers import initialize_logging, timer_wrap
+
+TEMP_SUFFIX = '.part'
 
 # Import existing conversion functions (without modification)
 sys.path.append(str(Path(__file__).parent.parent / "src"))
@@ -335,7 +340,7 @@ def run_pdf_to_xml_conversion(data_dir: str = "Data",
         logger.info("Step 1: Loading & validating conversion candidates...")
         step_start = time.time()
         
-        cand = load_conversion_candidates()
+        cand, all_docs = load_conversion_candidates()
         
         step1_results = {
             "total_candidates": len(cand),
@@ -425,7 +430,7 @@ def run_pdf_to_xml_conversion(data_dir: str = "Data",
                 else:
                     pdf_path = Path(pdf_path_str)
                 
-                xml_path = xml_dir / f"{row['article_id']}.xml"
+                xml_path = xml_dir / f"{row['article_id']}.xml{TEMP_SUFFIX}"
                 
                 try:
                     source = convert_one(pdf_path, xml_path)
@@ -434,7 +439,7 @@ def run_pdf_to_xml_conversion(data_dir: str = "Data",
                     log_entry = {
                         'article_id': row['article_id'],
                         'pdf_path': row['pdf_path'],
-                        'xml_path': str(xml_path),
+                        'xml_path': str(Path(xml_path).stem),
                         'source': source,
                         'error': None,
                         'success': source != "failed",
@@ -491,7 +496,7 @@ def run_pdf_to_xml_conversion(data_dir: str = "Data",
         step_start = time.time()
         
         # Use existing function to generate report
-        generate_conversion_report(log, cand)
+        generate_conversion_report(log, cand, all_docs)
         
         # Calculate coverage using existing function
         coverage = calculate_coverage_kpi(cand)
@@ -529,7 +534,7 @@ def run_pdf_to_xml_conversion(data_dir: str = "Data",
         }
         
         file_sizes = []
-        for xml_file in xml_dir.glob("*.xml"):
+        for xml_file in list(xml_dir.glob("*.xml")) + list(xml_dir.glob("*.xml.part")):
             size = xml_file.stat().st_size
             file_sizes.append(size)
             
@@ -556,7 +561,7 @@ def run_pdf_to_xml_conversion(data_dir: str = "Data",
         step_start = time.time()
         
         # Final statistics
-        total_xml = len(list((Path(data_dir) / "train" / "XML").glob("*.xml")))
+        total_xml = len(list((Path(data_dir) / "train" / "XML").glob("*.xml")) + list((Path(data_dir) / "train" / "XML").glob("*.xml.part")))
         total_candidates = len(cand)
         
         final_summary = {
