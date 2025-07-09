@@ -480,10 +480,13 @@ def run_full_document_parsing(data_dir: str = "Data",
         for idx, row in inventory_df.iterrows():
             doc_start = time.time()
             article_id = row['article_id']
-            xml_path = row['xml_path']
+            xml_filename = row['xml_path']
             source_type = row.get('source', None)
             
-            if pd.isna(xml_path) or not Path(xml_path).exists():
+            # Construct full path to XML file
+            xml_path = Path(data_dir) / "train" / "XML" / xml_filename
+            
+            if pd.isna(xml_filename) or not xml_path.exists():
                 logger.warning(f"Skipping {article_id}: XML file not found at {xml_path}")
                 failed_documents.append(article_id)
                 reporter.update_parsing_stats(
@@ -497,7 +500,7 @@ def run_full_document_parsing(data_dir: str = "Data",
                 # Use existing parsing logic
                 from document_parser import parse_document, create_document_entry
                 
-                sections = parse_document(Path(xml_path), source_type)
+                sections = parse_document(Path(xml_path))
                 
                 if sections:
                     # Create document entry using existing function

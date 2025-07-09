@@ -1,0 +1,6264 @@
+AAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ABS:
+  regex: ^A\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ABSD:
+  regex: ^[a-f0-9]{64}$
+  source: bioregistry
+  updated: '2025-07-08'
+ACEVIEW.WORM:
+  regex: ^[a-z0-9-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ADCAD:
+  regex: ^\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+ADDGENE:
+  regex: ^[0-9]{5}(-[a-zA-Z0-9-]{0,7})?$|^[0-9]{10}$
+  source: bioregistry
+  updated: '2025-07-08'
+ADO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ADW:
+  regex: ^[A-Z_a-z]+$
+  source: bioregistry
+  updated: '2025-07-08'
+AEO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+AEON:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+AERO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+AFFY.PROBESET:
+  regex: ^\d{4,}((_[asx])?_at)?$
+  source: bioregistry
+  updated: '2025-07-08'
+AFTOL.TAXONOMY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+AGILENT.PROBE:
+  regex: ^A_\d+_.+$
+  source: bioregistry
+  updated: '2025-07-08'
+AGRICOLA:
+  regex: ^IND\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+AGRKB:
+  regex: ^[1-9][0-9]{14}$
+  source: bioregistry
+  updated: '2025-07-08'
+AGRO:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+AGROVOC:
+  regex: ^[a-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+AISM:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ALLERGOME:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+AMOEBADB:
+  regex: ^EDI_\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+AMPHIBIAWEB.SPECIES:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+AMPHX:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ANTIBODYREGISTRY:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+ANTIFAM:
+  regex: ^ANF\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+ANTWEB:
+  regex: ^casent\d+(\-D\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ANZCTR:
+  regex: ^ACTRN\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+AOP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+AOP.EVENTS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+AOP.RELATIONSHIPS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+AOP.STRESSOR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+APD:
+  regex: ^\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+APHIDBASE.TRANSCRIPT:
+  regex: ^ACYPI\d{6}(-RA)?$
+  source: bioregistry
+  updated: '2025-07-08'
+APID.INTERACTIONS:
+  regex: ^([A-N,R-Z][0-9]([A-Z][A-Z, 0-9][A-Z, 0-9][0-9]){1,2})|([O,P,Q][0-9][A-Z,
+    0-9][A-Z, 0-9][A-Z, 0-9][0-9])(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+APO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+APOLLOSV:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+ARACHNOSERVER:
+  regex: ^AS\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+ARAPORT:
+  regex: ^AT.G[0-9]{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+ARDB:
+  regex: ^[A-Z_]{3}[0-9]{4,}$
+  source: bioregistry
+  updated: '2025-07-08'
+ARK:
+  regex: ^/*[0-9A-Za-z]+(?:/[\w/.=*+@\$-]*)?(?:\?.*)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ARO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ARRAYEXPRESS:
+  regex: ^[AEP]-\w{4}-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ARRAYEXPRESS.PLATFORM:
+  regex: ^[AEP]-\w{4}-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ARRAYMAP:
+  regex: ^[\w\-:,]{3,64}$
+  source: bioregistry
+  updated: '2025-07-08'
+ARXIV:
+  regex: ^(\w+(\-\w+)?(\.\w+)?\/?)?\d{4,7}(\.\d+(v\d+)?)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ASAP:
+  regex: ^[A-Za-z0-9-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ASCL:
+  regex: ^[0-9\.]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ASIN:
+  regex: ^[0-9]{10}$
+  source: bioregistry
+  updated: '2025-07-08'
+ASPGD.LOCUS:
+  regex: ^[A-Za-z_0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ASPGD.PROTEIN:
+  regex: ^[A-Za-z_0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ASTERACEAEGD.GENOME:
+  regex: ^\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+ASTERACEAEGD.PLANT:
+  regex: ^\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+ATC:
+  regex: ^[A-Z](\d+([A-Z]{1,2}(\d+)?)?)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ATCC:
+  regex: ^([a-zA-Z]+-)?\d+(\.\d)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ATCVET:
+  regex: ^Q[A-Z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ATFDB.FAMILY:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+ATO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ATOL:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+AUTDB:
+  regex: ^[A-Z]+[A-Z-0-9]{2,}$
+  source: bioregistry
+  updated: '2025-07-08'
+AUTHENTICUS:
+  regex: ^[A-Z]-[0-9A-Z]{3}-[0-9A-Z]{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+AUTHOREA.AUTHOR:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+BABELON:
+  regex: ^[a-z][a-z0-9_]+[a-z0-9]$
+  source: bioregistry
+  updated: '2025-07-08'
+BACDIVE:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BACMAP.BIOG:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BACMAP.MAP:
+  regex: ^\w+(\_)?\d+(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+BAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+BARTOC:
+  regex: ^[1-9][0-9]*$
+  source: bioregistry
+  updated: '2025-07-08'
+BBKG:
+  regex: ^[-\w]+(?:\/[-\w]+)(?:\/\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b)$
+  source: bioregistry
+  updated: '2025-07-08'
+BBTP:
+  regex: ^\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b$
+  source: bioregistry
+  updated: '2025-07-08'
+BCBC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BCGO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+BCIO:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+BCO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+BCRC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BCRJ:
+  regex: ^\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+BDGP.EST:
+  regex: ^\w+(\.)?(\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+BDGP.INSERTION:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+BDSC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BEETLEBASE:
+  regex: ^TC\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BEGDB:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BFO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+BGEE.FAMILY:
+  regex: ^(ENSFM|ENSGTV:)\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BGEE.GENE:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BGEE.ORGAN:
+  regex: ^(XAO|ZFA|EHDAA|EMAPA|EV|MA)\:\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BGEE.STAGE:
+  regex: ^(FBvd|XtroDO|HsapDO|MmusDO)\:\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIGG.COMPARTMENT:
+  regex: ^c|cm|cx|e|f|g|h|i|im|l|m|mm|n|p|r|s|u|um|v|w|x|y$
+  source: bioregistry
+  updated: '2025-07-08'
+BIGG.METABOLITE:
+  regex: ^[a-z_A-Z0-9]+(\[[c|cm|cx|e|f|g|h|i|im|l|m|mm|n|p|r|s|u|um|v|w|x|y]\])?$
+  source: bioregistry
+  updated: '2025-07-08'
+BIGG.MODEL:
+  regex: ^[a-z_A-Z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIGG.REACTION:
+  regex: ^[a-z_A-Z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BILA:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+BINDINGDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOCARTA.PATHWAY:
+  regex: ^([hm]\_)?\w+Pathway$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOCATALOGUE.SERVICE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOCOMPUTE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOCYC:
+  regex: ^[A-Z-0-9]+(\:)?[A-Za-z0-9+_.%-:]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIODEEP:
+  regex: ^\d{11}$
+  source: bioregistry
+  updated: '2025-07-08'
+BIODOLPHIN:
+  regex: ^BD\d[a-zA-Z0-9]+-[A-Za-z]-[A-Za-z]-[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOFACTOID:
+  regex: ^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOGRID:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOGRID.INTERACTION:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOKC:
+  regex: ^bkc[0-9]*$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOLEGEND:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOLINK:
+  regex: ^\S+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOMINDER:
+  regex: ^[a-z0-9\-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOMODELS.DB:
+  regex: ^((BIOMD|MODEL)\d{10})|(BMID\d{12})$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOMODELS.KISAO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOMODELS.TEDDY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOMODELS.VOCABULARY:
+  regex: ^[A-Za-z]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIONUMBERS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOPORTAL:
+  regex: ^(\d+)|(\w+)$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOPROJECT:
+  regex: ^PRJ[DEN][A-Z]\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOREGISTRY:
+  regex: ^[A-Za-z_][A-Za-z0-9\.\-_]*$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOREGISTRY.COLLECTION:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOREGISTRY.SCHEMA:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+BIORXIV:
+  regex: ^(\d{4}\.\d{2}\.\d{2}\.)?\d{6,8}(v\d{1,3})?$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOSAMPLE:
+  regex: ^SAM[NED](\w)?\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOSIMULATIONS:
+  regex: ^[a-zA-Z0-9_-]{3,}$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOSIMULATORS:
+  regex: ^[a-zA-Z0-9-_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOSTUDIES:
+  regex: ^S-[A-Z]{4}[\-\_A-Z\d]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOSYSTEMS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BIOTOOLS:
+  regex: ^[-A-Za-z0-9\_]*$
+  source: bioregistry
+  updated: '2025-07-08'
+BIRNLEX:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BITBUCKET:
+  regex: ^[0-9A-Za-z-_\.]+/[0-9A-Za-z-_\.]+$
+  source: bioregistry
+  updated: '2025-07-08'
+BITTERDB.CPD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BITTERDB.REC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BKO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BLASTRULE:
+  regex: ^NBR\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BMRB:
+  regex: ^(bmr|bmse|bmst)?[0-9]{1,6}$
+  source: bioregistry
+  updated: '2025-07-08'
+BMRB.RESTRAINT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BOLD.TAXONOMY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BPDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BRENDA:
+  regex: ^((\d+\.-\.-\.-)|(\d+\.\d+\.-\.-)|(\d+\.\d+\.\d+\.-)|(\d+\.\d+\.\d+\.\d+))$
+  source: bioregistry
+  updated: '2025-07-08'
+BRENDA.LIGAND:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BRENDA.LIGANDGROUP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BROAD:
+  regex: ^S\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BSPO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+BTO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+BUGBASE.EXPT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BUGBASE.PROTOCOL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+BYKDB:
+  regex: ^[A-Z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CABI:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CABRI:
+  regex: ^([A-Za-z]+)?(\_)?([A-Za-z-]+)\:([A-Za-z0-9 ]+)$
+  source: bioregistry
+  updated: '2025-07-08'
+CADSR:
+  regex: ^[0-9]*$
+  source: bioregistry
+  updated: '2025-07-08'
+CALOHA:
+  regex: ^TS-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CAMEO:
+  regex: ^[0-9\-_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CAO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CAPS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CARNEGIE.STAGE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CARO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CAS:
+  regex: ^\d{1,7}\-\d{2}\-\d$
+  source: bioregistry
+  updated: '2025-07-08'
+CASSPC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CATH:
+  regex: ^[1-6]\.[0-9]+\.[0-9]+\.[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CATH.DOMAIN:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+CATH.SUPERFAMILY:
+  regex: ^\d+(\.\d+(\.\d+(\.\d+)?)?)?$
+  source: bioregistry
+  updated: '2025-07-08'
+CATTLEQTLDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CAZY:
+  regex: ^(GT|GH|PL|CE|CBM)\d+(\_\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+CBA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CBIOPORTAL:
+  regex: ^[a-z0-9\_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CC:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+CCDC:
+  regex: ^\d{6,7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CCDS:
+  regex: ^CCDS\d+(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+CCF:
+  regex: ^\S+$
+  source: bioregistry
+  updated: '2025-07-08'
+CCO:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+CDAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CDD:
+  regex: ^(cd)?\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+CDNO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CDPD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CDT:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CEDS.ELEMENT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CELLIMAGE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CELLOPUB:
+  regex: ^CLPUB\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CELLOSAURUS:
+  regex: ^[A-Z0-9]{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+CELLREPO:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CELLXGENE.COLLECTION:
+  regex: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+CEMO:
+  regex: ^[0-9a-z_-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CEPH:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CGD:
+  regex: ^CAL\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CGNC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CGSC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHARPROT:
+  regex: ^CH_\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEBI:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMBL:
+  regex: ^CHEMBL\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMBL.CELL:
+  regex: ^CHEMBL\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMBL.COMPOUND:
+  regex: ^CHEMBL\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMBL.TARGET:
+  regex: ^CHEMBL\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMIDPLUS:
+  regex: ^\d+\-\d+\-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMINF:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMPRO.COMPETITOR:
+  regex: ^LDCM\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMPRO.PROBE:
+  regex: ^LDPC\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMPRO.TARGET:
+  regex: ^LDTP\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHEMSPIDER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHICKENQTLDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHICTR:
+  regex: ^ChiCTR(-[A-Z]+-)?\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CHMO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CIDO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CIENCIAVITAE:
+  regex: ^([0-9A-F]{4}-){2}[0-9A-F]{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+CIO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CIVIC.AID:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CIVIC.DID:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CIVIC.EID:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CIVIC.GID:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CIVIC.MPID:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CIVIC.SID:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CIVIC.TID:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CIVIC.VGID:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CIVIC.VID:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CL:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CLAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CLASSYFIRE:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CLB:
+  regex: ^[0-9]+(LR)?$
+  source: bioregistry
+  updated: '2025-07-08'
+CLDB:
+  regex: ^(cl|tum)\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CLINGEN.ALLELE:
+  regex: ^CA\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CLINGEN.CURATION:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+CLINICALTRIALS:
+  regex: ^NCT\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+CLINVAR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CLINVAR.RECORD:
+  regex: ^RCV\d+(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+CLINVAR.SUBMISSION:
+  regex: ^SCV\d+(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+CLINVAR.SUBMITTER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CLM:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CLO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CLYH:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CMECS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CMO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CMPO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CNCB.GWH:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+CNRS:
+  regex: ^(UMR|UMS|UMI|UPR|URA|USR|GDR|EA|FR|SNC|ERL|FRC|FRE|IFR|MOY|UPS)\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+COB:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+COCONUT:
+  regex: ^CNP\d{7}(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+CODELINK:
+  regex: ^GE\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+COEXISTENCE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+COG:
+  regex: ^COG\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+COL:
+  regex: ^[23456789BCDFGHJKLMNPQRSTVWXYZ]{1,6}$
+  source: bioregistry
+  updated: '2025-07-08'
+COL.TAIWAN:
+  regex: ^[1-9]\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+COLAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+COMBINE.SPECIFICATIONS:
+  regex: ^\w+(\-|\.|\w)*$
+  source: bioregistry
+  updated: '2025-07-08'
+COMPLEXPORTAL:
+  regex: ^CPX-[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+COMPTOX:
+  regex: ^DTXSID\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+COMPULYEAST:
+  regex: ^([A-N,R-Z][0-9][A-Z][A-Z, 0-9][A-Z, 0-9][0-9])|([O,P,Q][0-9][A-Z, 0-9][A-Z,
+    0-9][A-Z, 0-9][0-9])$
+  source: bioregistry
+  updated: '2025-07-08'
+CONFIDENT.EVENT:
+  regex: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+CONOSERVER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CONSO:
+  regex: ^CONSO\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+CORDIS.ARTICLE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CORDIS.PROJECT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CORIELL:
+  regex: ^[A-Z]{2}\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CORRDB:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CORUM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+COSMIC:
+  regex: ^[A-Z0-9][A-Z0-9-]*$
+  source: bioregistry
+  updated: '2025-07-08'
+COSMIC.CELL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+COVID19:
+  regex: ^\w+_COVID19_[-\w]+$
+  source: bioregistry
+  updated: '2025-07-08'
+COVOC:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_320:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_321:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_322:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_323:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_324:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_325:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_326:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_327:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_330:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_331:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_333:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_334:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_335:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_336:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_337:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_338:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_339:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_340:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_341:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_343:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_345:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_346:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_347:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_348:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_350:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_356:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_357:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_358:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_359:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_360:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_365:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_366:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_367:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CO_370:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CPC:
+  regex: ^([A-H,Y]|[A-H, Y]\d{2}|[A-H, Y]\d{2}[A-Z]|[A-H, Y]\d{2}[A-Z]\d{1,3}|[A-H,
+    Y]\d{2}[A-Z]\d{1,3}(\/)?\d{2,})$
+  source: bioregistry
+  updated: '2025-07-08'
+CPT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CREATIVEBIOLABS.ANTIBODY:
+  regex: ^[a-zA-Z]+-[a-zA-Z0-9()]+(-[a-zA-Z0-9]*)?$
+  source: bioregistry
+  updated: '2025-07-08'
+CREATIVEBIOLABS.PROTEIN:
+  regex: ^[a-zA-Z]+-[a-zA-Z0-9()]+(-[a-zA-Z0-9]*)?$
+  source: bioregistry
+  updated: '2025-07-08'
+CREDIT:
+  regex: ^(conceptualization|data-curation|formal-analysis|funding-acquisition|investigation|methodology|project-administration|resources|software|supervision|validation|visualization|writing-original-draft|writing-review-editing)$
+  source: bioregistry
+  updated: '2025-07-08'
+CRISPRDB:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CRO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CROP2ML:
+  regex: ^[0-9]{9}$
+  source: bioregistry
+  updated: '2025-07-08'
+CRYOEM:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CRYPTODB:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+CSA:
+  regex: ^[0-9][A-Za-z0-9]{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+CSD:
+  regex: ^[A-Z]{6}(\d{2})?$
+  source: bioregistry
+  updated: '2025-07-08'
+CST:
+  regex: ^[A-Za-z0-9_-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CST.AB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CSTR:
+  regex: ^\w{5}\.\d{2}\..*$
+  source: bioregistry
+  updated: '2025-07-08'
+CTCAE:
+  regex: ^E\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CTD.CHEMICAL:
+  regex: ^[CD]\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CTD.DISEASE:
+  regex: ^D\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CTD.GENE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CTENO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CTIS:
+  regex: ^\d{4}-\d+-\d+-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CTO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CTRI:
+  regex: ^CTRI/\d{4}/\d{2,3}/\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+CUBEDB:
+  regex: ^[A-Za-z_0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+CVDO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+CVX:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+D1ID:
+  regex: ^\S+$
+  source: bioregistry
+  updated: '2025-07-08'
+DAILYMED:
+  regex: ^[A-Za-z0-9-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DALIA.COMMUNITY:
+  regex: ^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+DALIA.OER:
+  regex: ^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+DANDI:
+  regex: ^\d{6}(\/\d+\.\d+\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+DARC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DASHR:
+  regex: ^(hsa-(let|mir)-\w+(-\w+)?)|(piR-\d+)|(chr\w+.tRNA\d+-\w+)|(chr\w+.tRNA\d+-\w+-tRF\d)|((SNORD|SNORA|ACA|HBII|HBI|U)(-)?\w+)|(HY\d\+(-L\d+)?)|((LSU|SSU|5S)(-rRNA_Hsa)?(-L\d+)?)$
+  source: bioregistry
+  updated: '2025-07-08'
+DASHR.EXPRESSION:
+  regex: ^(hsa-(let|mir)-\w+(-\w+)?)|(piR-\d+)|(chr\w+.tRNA\d+-\w+)|(chr\w+.tRNA\d+-\w+-tRF\d)|((SNORD|SNORA|ACA|HBII|HBI|U)(-)?\w+)|(HY\d\+(-L\d+)?)|((LSU|SSU|5S)(-rRNA_Hsa)?(-L\d+)?)$
+  source: bioregistry
+  updated: '2025-07-08'
+DATANATOR.GENE:
+  regex: ^K[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DATANATOR.METABOLITE:
+  regex: ^[A-Z\-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DATANATOR.REACTION:
+  regex: ^.*?--%3E.*?$
+  source: bioregistry
+  updated: '2025-07-08'
+DATF:
+  regex: ^AT[1-5]G\d{5}(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+DBD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DBEST:
+  regex: ^([A-Z]+)?\d+(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+DBG2INTRONS:
+  regex: ^\w{1,2}\.(\w{1,2}\.)?[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DBGAP:
+  regex: ^phs[0-9]{6}(.v\d+.p\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+DBMHC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DBPROBE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DBSNP:
+  regex: ^rs\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DC_CL:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+DDANAT:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+DDC:
+  regex: ^(([0-9][0-9]?|[0-9]{3}(-[0-9]{3})?|[0-9]{3}(-[0-9]{3}(:[0-9]+)?)?|[0-9]{3}\.[0-9]+(-[0-9]{3}\.[0-9]+(:[0-9]+)?)?|T[1-9][A-Z]?--[0-9]+(-T[1-9][A-Z]?--[0-9]+(:[0-9]+)?)?|[1-9][A-Z]?--[0-9]+(-[1-9][A-Z]?--[0-9]+(:[0-9]+)?)?)?)$
+  source: bioregistry
+  updated: '2025-07-08'
+DDINTER.DRUG:
+  regex: ^DDInter\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DDINTER.INTERACTION:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DDPHENO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+DEBIO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+DECIPHER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DEGRADOME:
+  regex: ^[AMCST][0-9x][0-9]$
+  source: bioregistry
+  updated: '2025-07-08'
+DEIMS.ACTIVITY:
+  regex: ^[0-9a-f\-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DEIMS.DATASET:
+  regex: ^[0-9a-f\-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DEIMS.LOCATION:
+  regex: ^[0-9a-f\-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DEIMS.NETWORK:
+  regex: ^[0-9a-f\-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DEIMS.SENSOR:
+  regex: ^[0-9a-f\-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DEIMS.SITE:
+  regex: ^[0-9a-f\-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DEIMS.TAXONOMY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DEPMAP:
+  regex: ^ACH-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DEPOD:
+  regex: ^[A-Z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DERMO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+DEV.GA4GHDOS:
+  regex: ^[a-zA-Z0-9\-:#\.]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DEVTOX:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DG.4503:
+  regex: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+DG.4DFC:
+  regex: ^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+DG.6VTS:
+  regex: ^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+DG.ANV0:
+  regex: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+DG.F82A1A:
+  regex: ^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+DG5B0D:
+  regex: ^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+DGGR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DGRC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DHBA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DIALNET.AUTHOR:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+DIALNET.JOURNAL:
+  regex: ^[1-9]\d{0,6}$
+  source: bioregistry
+  updated: '2025-07-08'
+DICOM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DICTYBASE.EST:
+  regex: ^DDB\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DICTYBASE.GENE:
+  regex: ^DDB_G\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DID:
+  regex: ^[a-z0-9]+:[A-Za-z0-9.\-:]+$
+  source: bioregistry
+  updated: '2025-07-08'
+DIDEO:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+DIP:
+  regex: ^DIP(\:)?\-\d{1,}[ENXS]$
+  source: bioregistry
+  updated: '2025-07-08'
+DISDRIV:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DISEASECLASS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+DISEASESDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DISPROT:
+  regex: ^DP\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+DISPROT.REGION:
+  regex: ^DP\d{5}r\d{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+DLXB:
+  regex: ^[A-Z0-9]{6,7}$
+  source: bioregistry
+  updated: '2025-07-08'
+DLXC:
+  regex: ^[A-Z0-9]{6,7}$
+  source: bioregistry
+  updated: '2025-07-08'
+DMBA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DOI:
+  regex: ^10.\d{2,9}/.*$
+  source: bioregistry
+  updated: '2025-07-08'
+DOID:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DOME:
+  regex: ^[a-z0-9]{10}$
+  source: bioregistry
+  updated: '2025-07-08'
+DOMMINO:
+  regex: ^[0-9][A-Za-z0-9]{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+DOOR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DOQCS.MODEL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DOQCS.PATHWAY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DPBO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DPV:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRAGONDB.ALLELE:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRAGONDB.DNA:
+  regex: ^\d\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRAGONDB.LOCUS:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRAGONDB.PROTEIN:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRKS:
+  regex: ^DRKS\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRON:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+DRSANV0:
+  regex: ^v2_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+DRSC:
+  regex: ^DRSC\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRUGBANK:
+  regex: ^DB\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+DRUGBANK.BIOENTITY:
+  regex: ^BE\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+DRUGBANK.CATEGORY:
+  regex: ^DBCAT\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRUGBANK.CONDITION:
+  regex: ^DBCOND\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRUGBANK.METABOLITE:
+  regex: ^DBMET\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRUGBANK.REACTION:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DRUGBANK.SALT:
+  regex: ^DBSALT\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+DRUGCENTRAL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DSM4:
+  regex: ^\d+\.\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DSM5:
+  regex: ^\d{3}\.\d{2}$
+  source: bioregistry
+  updated: '2025-07-08'
+DSMZ:
+  regex: ^(ACC|DSM|NC|PC|RT|AS|PV)-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DTO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+DUO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+EASYCHAIR.TOPIC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EBISC:
+  regex: ^E(S|D)i\d+-\w$
+  source: bioregistry
+  updated: '2025-07-08'
+EC:
+  regex: ^\d{1,2}(((\.\d{1,3}){1,3})|(\.\d+){2}\.[nB]\d{1,3}|\.-\.-\.-|\.\d{1,3}\.-\.-|\.\d{1,3}\.\d{1,3}\.-)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ECACC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ECG:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECHINOBASE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECHOBASE:
+  regex: ^EB\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECMDB:
+  regex: ^ECMDB\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECN:
+  regex: ^\d{3}-\d{3}-\d$
+  source: bioregistry
+  updated: '2025-07-08'
+ECO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ECOCORE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECOGENE:
+  regex: ^EG\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECOLIWIKI:
+  regex: ^[A-Za-z0-9-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECSO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECTO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ECYANO.ENTITY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECYANO.EXPERIMENT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECYANO.MODEL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ECYANO.RULE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EDAM:
+  regex: ^(data|topic|operation|format)\_\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+EDAM.DATA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EDAM.FORMAT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EDAM.OPERATION:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EDAM.TOPIC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EFO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+EGA.DATASET:
+  regex: ^EGAD\d{11}$
+  source: bioregistry
+  updated: '2025-07-08'
+EGA.STUDY:
+  regex: ^EGAS\d{11}$
+  source: bioregistry
+  updated: '2025-07-08'
+EGGNOG:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+EHDA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EHDAA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EHDAA2:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ELM:
+  regex: ^[A-Za-z_0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+EMAP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EMAPA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EMAPS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EMDB:
+  regex: ^EMD-\d{4,5}$
+  source: bioregistry
+  updated: '2025-07-08'
+EMOLECULES:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EMPIAR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EMSL.PROJECT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ENA.EMBL:
+  regex: ^[A-Z]+[0-9]+(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ENCODE:
+  regex: ^ENC[A-Za-z]{2}[0-9]{3}[A-Za-z]{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+ENM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ENSEMBL:
+  regex: ^((ENS[FPTG]\d{11}(\.\d+)?)|(FB\w{2}\d{7})|(Y[A-Z]{2}\d{3}[a-zA-Z](\-[A-Z])?)|([A-Z_a-z0-9]+(\.)?(t)?(\d+)?([a-z])?))$
+  source: bioregistry
+  updated: '2025-07-08'
+ENSEMBL.BACTERIA:
+  regex: ^((EB\w+)|([A-Z0-9]+\_[A-Z0-9]+))$
+  source: bioregistry
+  updated: '2025-07-08'
+ENSEMBL.FUNGI:
+  regex: ^[A-Z-a-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ENSEMBL.METAZOA:
+  regex: ^\w+(\.)?\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ENSEMBL.PLANT:
+  regex: ^\w+(\.\d+)?(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ENSEMBL.PROTIST:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+ENSEMBLGLOSSARY:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ENVIPATH:
+  regex: ^[\w^_]{8}-[\w^_]{4}-[\w^_]{4}-[\w^_]{4}-[\w^_]{12}\/[\w-]+\/[\w^_]{8}-[\w^_]{4}-[\w^_]{4}-[\w^_]{4}-[\w^_]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+ENVO:
+  regex: ^\d{7,8}$
+  source: bioregistry
+  updated: '2025-07-08'
+EO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+EOL:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+EOLIFE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+EPAWASTE:
+  regex: ^[FKPU]\d{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+EPD:
+  regex: ^[A-Z-_0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+EPIO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+EPSO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ERM:
+  regex: ^ERM[0-9]{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+ERO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ERV:
+  regex: ^[A-Za-z0-9\-\_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ESTDAB:
+  regex: ^\d{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+EU89H:
+  regex: ^[a-z0-9\-_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+EUBOPEN:
+  regex: ^EUB\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+EUCLINICALTRIALS:
+  regex: ^\d{4}\-\d{6}\-\d{2}$
+  source: bioregistry
+  updated: '2025-07-08'
+EUPATH:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+EUROPE.PIC:
+  regex: ^\d{9}$
+  source: bioregistry
+  updated: '2025-07-08'
+EV:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+EVR:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+EXAC.GENE:
+  regex: ^ENSG\d{11}$
+  source: bioregistry
+  updated: '2025-07-08'
+EXAC.TRANSCRIPT:
+  regex: ^ENST\d{11}$
+  source: bioregistry
+  updated: '2025-07-08'
+EXAC.VARIANT:
+  regex: ^\d{1,2}\-\d+\-[GATC]\-[GATC]$
+  source: bioregistry
+  updated: '2025-07-08'
+EXO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FACEBASE:
+  regex: ^FB\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+FAIRSHARING:
+  regex: ^(bsg-[dscp]?\d{6})|(FAIRsharing\.\w+)$
+  source: bioregistry
+  updated: '2025-07-08'
+FAIRSHARING.ORGANIZATION:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FAIRSHARING.USER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FANTA:
+  regex: ^FC(HS|MM)_\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FAO.ASFIS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FBBI:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FBBT:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+FBCV:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FBDV:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+FBOL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FBQL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FBRF:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FBSP:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+FBTC:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FCB:
+  regex: ^FCB\d{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+FDA.APPLICATION:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+FEMA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FIDEO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FISHBASE.SPECIES:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FIX:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FLOPO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FLOWREPOSITORY:
+  regex: ^FR\-FCM\-\w{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+FLU:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FLYBASE:
+  regex: ^FB\w{2}\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FLYBRAIN.NDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FMA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FOBI:
+  regex: ^\d{4,6}$
+  source: bioregistry
+  updated: '2025-07-08'
+FOODB.COMPOUND:
+  regex: ^FDB\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FOODB.FOOD:
+  regex: ^FOOD\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FOODON:
+  regex: ^[0-9]{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+FOSSILWORKS.JOURNAL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FOSSILWORKS.TAXON:
+  regex: ^[1-9]\d{0,5}$
+  source: bioregistry
+  updated: '2025-07-08'
+FOVT:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FPLX:
+  regex: ^[a-zA-Z0-9][A-Za-z0-9_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+FSNP:
+  regex: ^rs\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FTT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FUNCBASE.FLY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FUNCBASE.HUMAN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FUNCBASE.MOUSE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FUNCBASE.YEAST:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FUNDERREGISTRY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FUNGIDB:
+  regex: ^[A-Za-z_0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+FUNGORUM:
+  regex: ^[1-9]\d{0,5}$
+  source: bioregistry
+  updated: '2025-07-08'
+FYECO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+FYLER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+FYPO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+GA4GHDOS:
+  regex: ^[a-zA-Z0-9\-:#/\.]+$
+  source: bioregistry
+  updated: '2025-07-08'
+GABI:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+GALLONT:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+GARD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GATEWAY:
+  regex: ^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+GAZ:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+GBIF:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GCST:
+  regex: ^GCST\d{6}\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+GDC:
+  regex: ^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+GDSC:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+GEAR:
+  regex: ^[dp]\.[a-z0-9]{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+GECKO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+GEMET:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GENATLAS:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+GENECARDS:
+  regex: ^[A-Za-z-0-9_]+(\@)?$
+  source: bioregistry
+  updated: '2025-07-08'
+GENEDB:
+  regex: ^[\w\d\.-]*$
+  source: bioregistry
+  updated: '2025-07-08'
+GENEFARM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GENEPIO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+GENETREE:
+  regex: ^ENSGT\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GENEWIKI:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GENO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+GENPEPT:
+  regex: ^\w{3}\d{5}(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+GENPROP:
+  regex: ^GenProp\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GEO:
+  regex: ^G(PL|SM|SE|DS)\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GEOGEO:
+  regex: ^\d{9}$
+  source: bioregistry
+  updated: '2025-07-08'
+GEONAMES:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GIARDIADB:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+GITHUB:
+  regex: ^[a-zA-Z0-9-_]+(/[a-zA-Z0-9-_]+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+GITLAB:
+  regex: ^.*/.*$
+  source: bioregistry
+  updated: '2025-07-08'
+GLIDA.GPCR:
+  regex: ^[A-Z-_0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+GLIDA.LIGAND:
+  regex: ^L\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GLYCOEPITOPE:
+  regex: ^EP\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+GLYCOMEDB:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+GLYCONAVI:
+  regex: ^GN_[A-Za-z0-9_:]+$
+  source: bioregistry
+  updated: '2025-07-08'
+GLYCOPOST:
+  regex: ^GPST[0-9]{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+GLYCOSCIENCESDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GLYTOUCAN:
+  regex: ^G[0-9]{5}[A-Z]{2}$
+  source: bioregistry
+  updated: '2025-07-08'
+GMD:
+  regex: ^([0-9a-fA-F]){8}(-([0-9a-fA-F]){4}){3}-([0-9a-fA-F]){12}$
+  source: bioregistry
+  updated: '2025-07-08'
+GMD.ANALYTE:
+  regex: ^([0-9a-fA-F]){8}(-([0-9a-fA-F]){4}){3}-([0-9a-fA-F]){12}$
+  source: bioregistry
+  updated: '2025-07-08'
+GMD.GCMS:
+  regex: ^([0-9a-fA-F]){8}(-([0-9a-fA-F]){4}){3}-([0-9a-fA-F]){12}$
+  source: bioregistry
+  updated: '2025-07-08'
+GMD.PROFILE:
+  regex: ^([0-9a-fA-F]){8}(-([0-9a-fA-F]){4}){3}-([0-9a-fA-F]){12}$
+  source: bioregistry
+  updated: '2025-07-08'
+GMD.REF:
+  regex: ^([0-9a-fA-F]){8}(-([0-9a-fA-F]){4}){3}-([0-9a-fA-F]){12}$
+  source: bioregistry
+  updated: '2025-07-08'
+GMELIN:
+  regex: ^[1-9][0-9]{2,6}$
+  source: bioregistry
+  updated: '2025-07-08'
+GND:
+  regex: ^[0-9X\-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+GNO:
+  regex: ^(\d{8}|(\w+\d+\w+))$
+  source: bioregistry
+  updated: '2025-07-08'
+GNPIS:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+GNPS.TASK:
+  regex: ^[a-f0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+GO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+GO.ISSUE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GO.REF:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+GO.RULE:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+GOA:
+  regex: ^(([A-N,R-Z][0-9][A-Z][A-Z, 0-9][A-Z, 0-9][0-9])|([O,P,Q][0-9][A-Z, 0-9][A-Z,
+    0-9][A-Z, 0-9][0-9]))|(URS[0-9A-F]{10}(_[0-9]+){0,1})|(EBI-[0-9]+)$
+  source: bioregistry
+  updated: '2025-07-08'
+GOCHE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GOLD:
+  regex: ^[A-Z][a-z][0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+GOLD.GENOME:
+  regex: ^(Gi|Gc)\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GOLD.META:
+  regex: ^Gm\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GOLDBOOK:
+  regex: ^[A-Z]{1,2}\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+GOOGLE.PATENT:
+  regex: ^[A-Z]{2,4}\d+([A-Z])?([0-9])?$
+  source: bioregistry
+  updated: '2025-07-08'
+GOOGLE.SCHOLAR:
+  regex: ^[-_0-9A-Za-z]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+GOREL:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+GPCRDB:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+GPMDB:
+  regex: ^GPM\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GRAMENE.GENE:
+  regex: ^GR\:\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GRAMENE.GROWTHSTAGE:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+GRAMENE.PROTEIN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GRAMENE.QTL:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+GRAMENE.REFERENCE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GRAMENE.TAXONOMY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GRASSBASE:
+  regex: ^(imp|gen)\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+GREENGENES:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GRID:
+  regex: ^grid\.[0-9]+\.[a-f0-9]{1,2}$
+  source: bioregistry
+  updated: '2025-07-08'
+GRIN.TAXONOMY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GRSDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GSFA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GSSO:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+GTDB:
+  regex: ^[cdfgops]__\w+\S+$
+  source: bioregistry
+  updated: '2025-07-08'
+GTEX:
+  regex: ^\w.+$
+  source: bioregistry
+  updated: '2025-07-08'
+GUDMAP:
+  regex: ^[-0-9a-zA-Z]+(@[-0-9a-zA-Z]+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+GWASCENTRAL.MARKER:
+  regex: ^HGVM\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GWASCENTRAL.PHENOTYPE:
+  regex: ^HGVPM\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GWASCENTRAL.STUDY:
+  regex: ^HGVST\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GXA.EXPT:
+  regex: ^[AEP]-\w{4}-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+GXA.GENE:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+HAMAP:
+  regex: ^MF_\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HANCESTRO:
+  regex: ^\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+HAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+HAO.REF:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HATHITRUST:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HBA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HC.DIN:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+HC.NPN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HC.TRIAL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HCO:
+  regex: ^.+$
+  source: bioregistry
+  updated: '2025-07-08'
+HCVDB:
+  regex: ^M\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+HDL:
+  regex: ^\d+/.+$
+  source: bioregistry
+  updated: '2025-07-08'
+HDR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HEMONC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HEPRO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+HESA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HGMD:
+  regex: ^[A-Z_0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+HGNC:
+  regex: ^\d{1,5}$
+  source: bioregistry
+  updated: '2025-07-08'
+HGNC.GENEFAMILY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HGNC.GENEGROUP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HGNC.SYMBOL:
+  regex: ^[A-Za-z-0-9_]+(\@)?$
+  source: bioregistry
+  updated: '2025-07-08'
+HINV.LOCUS:
+  regex: ^HIX\d{7}(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+HINV.PROTEIN:
+  regex: ^HIP\d{9}(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+HINV.TRANSCRIPT:
+  regex: ^HIT\d{9}(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+HL7.V2CODESYSTEM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HL7.V3CODESYSTEM:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+HMDB:
+  regex: ^HMDB\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HMS.LINCS.ANTIBODY:
+  regex: ^8\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+HMS.LINCS.CELL:
+  regex: ^5\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+HMS.LINCS.COMPOUND:
+  regex: ^1\d{4}-\d{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+HMS.LINCS.DATASET:
+  regex: ^2\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+HOG:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+HOGENOM:
+  regex: ^[A-Z][A-Z0-9_]+\.PE\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HOIP:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+HOLOFOOD.ANIMAL:
+  regex: ^SAMEA\d{9}$
+  source: bioregistry
+  updated: '2025-07-08'
+HOLOFOOD.SAMPLE:
+  regex: ^SAMEA\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+HOM:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+HOMD.SEQ:
+  regex: ^SEQF\d+(?:\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+HOMD.TAXON:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HOMOLOGENE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HOSO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+HOVERGEN:
+  regex: ^HBG\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HP:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+HPA:
+  regex: ^ENSG\d{11}$
+  source: bioregistry
+  updated: '2025-07-08'
+HPATH:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HPM.PEPTIDE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HPM.PROTEIN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HPRD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HPSCREG:
+  regex: ^[A-Z]{2,6}(e|i)[A-Za-z0-9]{3}-[A-Z]{1,2}(-[A-Za-z0-9]{1,2})?$
+  source: bioregistry
+  updated: '2025-07-08'
+HSAPDV:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+HSDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+HSO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+HSSP:
+  regex: ^\w{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+HTN:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+HUBMAP.COLLECTION:
+  regex: ^[a-f0-9]{32}$
+  source: bioregistry
+  updated: '2025-07-08'
+HUBMAP.DATASET:
+  regex: ^[a-f0-9]{32}$
+  source: bioregistry
+  updated: '2025-07-08'
+HUBMAP.DONOR:
+  regex: ^[a-f0-9]{32}$
+  source: bioregistry
+  updated: '2025-07-08'
+HUBMAP.SAMPLE:
+  regex: ^[a-f0-9]{32}$
+  source: bioregistry
+  updated: '2025-07-08'
+HUGE:
+  regex: ^KIAA\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+IAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+IAO.ISSUE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ICD10:
+  regex: ^(([XVI]+)|([A-Z][0-9]+((-[A-Z][0-9]+)|(\.[0-9]))?))$
+  source: bioregistry
+  updated: '2025-07-08'
+ICD10CM:
+  regex: ^([A-Z][0-9][0-9AB]((-[A-Z][0-9][0-9AB])|(\.[0-9A-KXZ]([0-9A-EXYZ]([0-9A-HX][0-59A-HJKMNP-S]?)?)?)?))$
+  source: bioregistry
+  updated: '2025-07-08'
+ICD11:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+ICD11.CODE:
+  regex: ^[0-9A-Z]+(\.[0-9A-Z]+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ICD9:
+  regex: ^((\d\d\d|V\d\d|E[8-9]\d\d)(\.\d{1,2})?)|(\d{1,3}-\d{1,3})$
+  source: bioregistry
+  updated: '2025-07-08'
+ICD9CM:
+  regex: ^([\dA-Z]\d{2}(\.\d{1,3}|))|(\d{2}(\.\d{1,2}|))$
+  source: bioregistry
+  updated: '2025-07-08'
+ICDC:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+ICDO:
+  regex: ^[8-9]\d{3}(/[0-3])?$
+  source: bioregistry
+  updated: '2025-07-08'
+ICEBERG.CIME:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ICEBERG.ELEMENT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ICEBERG.FAMILY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ICEBERG.IME:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ICECHEM:
+  regex: ^\d{2,7}-\d{2}-\d|DTXSID\d{7,9}|[A-Z]{14}-[A-Z]{8}[SN][A-Z]-[A-Z]$
+  source: bioregistry
+  updated: '2025-07-08'
+ICEO:
+  regex: ^\d{7}(_\d)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ICEPO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ICF:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ICLC:
+  regex: ^\w{3}\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ICO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ICONCLASS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ICPD.PROJECT:
+  regex: ^PPJ_\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ICPD.STUDY:
+  regex: ^PST_\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IDEAL:
+  regex: ^IID\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IDO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+IDOCOVID19:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+IDODEN:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+IDOG:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IDOMAL:
+  regex: ^(5?)\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+IDOO:
+  regex: ^[0-9a-zA-Z]+$
+  source: bioregistry
+  updated: '2025-07-08'
+IDOT:
+  regex: ^[A-Za-z]+$
+  source: bioregistry
+  updated: '2025-07-08'
+IDPO:
+  regex: ^\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+IDR:
+  regex: ^[0-9]{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+IEDB.ASSAY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IEDB.EPITOPE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IEDB.MHC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IEDB.RECEPTOR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IEDB.REFERENCE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IEEE.AUTHOR:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+IEEE.DOCUMENT:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+IETF.LANGUAGE:
+  regex: ^\w{2,3}(-\w+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+IEV:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+IGSN:
+  regex: ^[A-Za-z]{2,4}[A-Za-z0-9.-]{1,71}$
+  source: bioregistry
+  updated: '2025-07-08'
+IHW:
+  regex: ^IHW\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ILLUMINA.PROBE:
+  regex: ^ILMN_\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IMEX:
+  regex: ^\d+(-\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+IMG.GENE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IMG.TAXON:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IMGT.HLA:
+  regex: ^[A-Z0-9*:]+$
+  source: bioregistry
+  updated: '2025-07-08'
+IMGT.LIGM:
+  regex: ^M\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IMR:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+IMSR.APB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IMSR_EM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+INATURALIST.OBSERVATION:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+INATURALIST.PLACE:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+INATURALIST.TAXON:
+  regex: ^[1-9]\d{0,6}$
+  source: bioregistry
+  updated: '2025-07-08'
+INATURALIST.USER:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+INCHI:
+  regex: ^InChI\=1S?\/[A-Za-z0-9\.]+(\+[0-9]+)?(\/[cnpqbtmsih][A-Za-z0-9\-\+\(\)\,\/\?\;\.]+)*$
+  source: bioregistry
+  updated: '2025-07-08'
+INCHIKEY:
+  regex: ^[A-Z]{14}\-[A-Z]{10}(\-[A-Z])?$
+  source: bioregistry
+  updated: '2025-07-08'
+INFORES:
+  regex: ^[a-z0-9-_.]+$
+  source: bioregistry
+  updated: '2025-07-08'
+INFORMALL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+INO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+INSDC:
+  regex: ^([A-Z]\d{5}|[A-Z]{2}\d{6}|[A-Z]{4,6}\d{8,10}|[A-J][A-Z]{2}\d{5})(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+INSDC.CDS:
+  regex: ^([A-Z]\d{5}|[A-Z]{2}\d{6}|[A-Z]{4}\d{8}|[A-J][A-Z]{2}\d{5})(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+INSDC.GCA:
+  regex: ^GCA_[0-9]{9}(\.[0-9]+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+INSDC.GCF:
+  regex: ^GCF_[0-9]{9}(\.[0-9]+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+INSDC.RUN:
+  regex: ^(E|D|S)RR[0-9]{6,}$
+  source: bioregistry
+  updated: '2025-07-08'
+INSDC.SRA:
+  regex: ^[SED]R[APRSXZ]\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+INTACT:
+  regex: ^EBI\-[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+INTACT.MOLECULE:
+  regex: ^EBI\-[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+INTEGBIO:
+  regex: ^nbdc\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+INTERLEX:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+INTERPRO:
+  regex: ^IPR\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+IRCT:
+  regex: ^IRCT\d+N\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IRD.SEGMENT:
+  regex: ^\w+(\_)?\d+(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+IREFWEB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IRO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ISBN:
+  regex: ^(ISBN)?(-13|-10)?[:]?[ ]?(\d{2,3}[ -]?)?\d{1,5}[ -]?\d{1,7}[ -]?\d{1,6}[
+    -]?(\d|X)$
+  source: bioregistry
+  updated: '2025-07-08'
+ISFINDER:
+  regex: ^IS\w+(\-\d)?$
+  source: bioregistry
+  updated: '2025-07-08'
+ISNI:
+  regex: ^[0-9]{15}[0-9X]{1}$
+  source: bioregistry
+  updated: '2025-07-08'
+ISO.3166:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ISRCTN:
+  regex: ^ISRCTN\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ISSN:
+  regex: ^\d{4}-\d{3}[\dX]$
+  source: bioregistry
+  updated: '2025-07-08'
+ITIS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ITMCTR:
+  regex: ^ITMCTR\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ITO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IUPHAR.FAMILY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IUPHAR.LIGAND:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+IUPHAR.RECEPTOR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+JAXMICE:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+JCGGDB:
+  regex: ^JCGG-STR\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+JCM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+JCRB:
+  regex: ^JCRB\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+JCSD:
+  regex: ^J\d{1,3}(\.\d{3})?(\.\d{1,3})?[A-Za-z]$
+  source: bioregistry
+  updated: '2025-07-08'
+JECFA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+JGI.PROPOSAL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+JRCT:
+  regex: ^jRCT\w?\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+JSTOR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+JWS:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+KAGGLE:
+  regex: ^[0-9a-zA-Z\-]+\/[0-9a-zA-Z\-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+KAKEN:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+KCRIS:
+  regex: ^KCT\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG:
+  regex: ^([CHDEGTMKR]\d+)|(\w+:[\w\d\.-]*)|([a-z]{3,5})|(\w{2,4}\d{5})$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.COMPOUND:
+  regex: ^C\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.DGROUP:
+  regex: ^DG\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.DISEASE:
+  regex: ^H\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.DRUG:
+  regex: ^D\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.ENVIRON:
+  regex: ^(ev\:)?E\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.GENES:
+  regex: ^\w+:[\w\d\.-]*$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.GENOME:
+  regex: ^(T0\d+|\w{3,5})$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.GLYCAN:
+  regex: ^G\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.METAGENOME:
+  regex: ^T3\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.MODULE:
+  regex: ^([a-z]{3,5}_)?M\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.ORTHOLOGY:
+  regex: ^K\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.PATHWAY:
+  regex: ^\w{2,4}\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.RCLASS:
+  regex: ^RC\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KEGG.REACTION:
+  regex: ^R\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+KESTRELO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+KNAPSACK:
+  regex: ^C\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+KUPO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+LABO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+LANGUAL:
+  regex: ^B\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LATTES:
+  regex: ^\d{16}$
+  source: bioregistry
+  updated: '2025-07-08'
+LBCTR:
+  regex: ^LBCTR\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LBO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+LCCN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LCSH:
+  regex: ^\w{1,2}\d{8,10}$
+  source: bioregistry
+  updated: '2025-07-08'
+LEI:
+  regex: ^[0-9A-Z]{4}[0-9A-Z]{14}[0-9A-Z]{2}$
+  source: bioregistry
+  updated: '2025-07-08'
+LEPAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+LGAI.CEDE:
+  regex: ^LGCEDe-S-\d{9}$
+  source: bioregistry
+  updated: '2025-07-08'
+LGIC:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+LICEBASE:
+  regex: ^[A-Za-z0-9\-\/]+$
+  source: bioregistry
+  updated: '2025-07-08'
+LIGANDBOOK:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+LIGANDBOX:
+  regex: ^(HTS|KSH)[0-9]{4}-[0-9]{8}|PDB_[0-9,A-Z]{2,3}|[CD][0-9]{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+LIGANDEXPO:
+  regex: ^(\w){3}$
+  source: bioregistry
+  updated: '2025-07-08'
+LINCS.CELL:
+  regex: ^(LCL|LDC|ES|LSC|LPC)-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LINCS.DATA:
+  regex: ^[EL]D[SG]-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LINCS.PROTEIN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LINCS.SMALLMOLECULE:
+  regex: ^LSM-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LINGUIST:
+  regex: ^[a-zA-Z0-9 +#'*]+$
+  source: bioregistry
+  updated: '2025-07-08'
+LINKEDIN:
+  regex: ^[\w0-9\-&_'’\.]+$
+  source: bioregistry
+  updated: '2025-07-08'
+LIPIDBANK:
+  regex: ^\w+\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LIPIDMAPS:
+  regex: ^LM(FA|GL|GP|SP|ST|PR|SL|PK)[0-9]{4}([0-9a-zA-Z]{4,6})?$
+  source: bioregistry
+  updated: '2025-07-08'
+LNCBOOK:
+  regex: ^HSALNG\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+LOINC:
+  regex: ^(\d|\w)+-\d$
+  source: bioregistry
+  updated: '2025-07-08'
+LONZA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LOOP:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+LOTUS:
+  regex: ^LTS\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+LPT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LRG:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LSPCI:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LTER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+LW:
+  regex: ^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+M4I:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+MA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MACIE:
+  regex: ^M\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+MAGGOT:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+MAIZEGDB.LOCUS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MAMO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MARKERDB:
+  regex: ^MDB\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+MASSBANK:
+  regex: ^MSBNK-[0-9a-zA-Z_]+-[A-Z0-9_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+MASSIVE:
+  regex: ^MSV\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MASTODON:
+  regex: ^[A-Za-z0-9_]+([A-Za-z0-9_\.]+[A-Za-z0-9_]+)?@[\d\w\.\-]+[0-9a-z]+$
+  source: bioregistry
+  updated: '2025-07-08'
+MAT:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MATRIXDB.ASSOCIATION:
+  regex: ^([A-N,R-Z][0-9][A-Z][A-Z, 0-9][A-Z, 0-9][0-9])_.*|([O,P,Q][0-9][A-Z, 0-9][A-Z,
+    0-9][A-Z, 0-9][0-9]_.*)|(GAG_.*)|(MULT_.*)|(PFRAG_.*)|(LIP_.*)|(CAT_.*)$
+  source: bioregistry
+  updated: '2025-07-08'
+MAVEDB:
+  regex: ^\S+$
+  source: bioregistry
+  updated: '2025-07-08'
+MAXO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MBA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MCO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MCRO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MDL:
+  regex: ^\w{4}\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+MDM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MEDDRA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MEDGEN:
+  regex: ^(CN)?\d{2,7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MEDGEN.CID:
+  regex: ^CN\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MEDIADIVE.INGREDIENT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MEDIADIVE.MEDIUM:
+  regex: ^\d+\w?$
+  source: bioregistry
+  updated: '2025-07-08'
+MEDIADIVE.SOLUTION:
+  regex: ^S\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MEDLINEPLUS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MERCKINDEX.REACTION:
+  regex: ^r\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MEROPS.ENTRY:
+  regex: ^[SCTAGMNUIX]{1,2}\d{2}\.([AB]\d{2}|\d{3})$
+  source: bioregistry
+  updated: '2025-07-08'
+MEROPS.FAMILY:
+  regex: ^[SCTAGMNU]\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MESH:
+  regex: ^(C|D|M)\d{6,9}$
+  source: bioregistry
+  updated: '2025-07-08'
+MESH.2012:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+MESH.2013:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+METABOLIGHTS:
+  regex: ^MTBLS\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+METACYC.COMPOUND:
+  regex: ^[A-Za-z0-9+_.%-:]+$
+  source: bioregistry
+  updated: '2025-07-08'
+METACYC.REACTION:
+  regex: ^[A-Za-z0-9+_.%-:]+$
+  source: bioregistry
+  updated: '2025-07-08'
+METANETX.CHEMICAL:
+  regex: ^(MNXM\d+|BIOMASS|WATER)$
+  source: bioregistry
+  updated: '2025-07-08'
+METANETX.COMPARTMENT:
+  regex: ^(MNX[CD]\d+|BOUNDARY|IN|OUT)$
+  source: bioregistry
+  updated: '2025-07-08'
+METANETX.REACTION:
+  regex: ^(MNXR\d+|EMPTY)$
+  source: bioregistry
+  updated: '2025-07-08'
+METATLAS:
+  regex: ^(MAM\d{5}\w)|(MAR\d{5})$
+  source: bioregistry
+  updated: '2025-07-08'
+METATLAS.METABOLITE:
+  regex: ^MAM\d{5}\w$
+  source: bioregistry
+  updated: '2025-07-08'
+METATLAS.REACTION:
+  regex: ^MAR\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+METLIN:
+  regex: ^\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+MEX:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MF:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MFMO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MFO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MFOEM:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+MFOMD:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MGE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MGI:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MGNIFY.ANALYSIS:
+  regex: ^MGYA\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MGNIFY.PROJ:
+  regex: ^[A-Z]+[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+MGNIFY.SAMP:
+  regex: ^[A-Z]+[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+MGNIFYGENOME:
+  regex: ^MGYG\d{9}(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+MGNIFYPROTEIN:
+  regex: ^MGYP\d{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+MGNIFYSTUDY:
+  regex: ^MGYS\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+MI:
+  regex: ^\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+MIAPA:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MIBIG:
+  regex: ^BGC\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MICRO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MICROSCOPE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MICROSPORIDIA:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+MIMODB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MINID:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+MINID.TEST:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+MINT:
+  regex: ^\d{1,7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MIPMOD:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+MIR:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+MIRBASE:
+  regex: ^MI\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MIRBASE.MATURE:
+  regex: ^MIMAT\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MIREX:
+  regex: ^\d+(\w+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+MIRGENEDB:
+  regex: ^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)+$
+  source: bioregistry
+  updated: '2025-07-08'
+MIRIAM:
+  regex: ^[0-9a-z_:\.-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+MIRIAM.COLLECTION:
+  regex: ^000\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+MIRIAM.RESOURCE:
+  regex: ^001\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+MIRNEST:
+  regex: ^MNEST\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MIRO:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+MIRTARBASE:
+  regex: ^MIRT\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+MITE:
+  regex: ^MITE\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MIXS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MLC:
+  regex: ^[0-9a-zA-Z\.\-\_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+MMDB:
+  regex: ^\d{1,5}$
+  source: bioregistry
+  updated: '2025-07-08'
+MMMP.BIOMAPS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MMO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MMP.CAT:
+  regex: ^MMP\d+.\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MMP.DB:
+  regex: ^MMP\d+.\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MMP.FUN:
+  regex: ^MMP\d+.\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MMP.REF:
+  regex: ^MMP\d+.\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MMRRC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MMSL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MMUSDV:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MO:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+MOBIDB:
+  regex: ^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$
+  source: bioregistry
+  updated: '2025-07-08'
+MOD:
+  regex: ^\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+MODELDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MODELDB.CONCEPT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MOID:
+  regex: ^[a-zA-Z0-9]+\.[a-f0-9]{24}$
+  source: bioregistry
+  updated: '2025-07-08'
+MOLBASE:
+  regex: ^(\d{1,7}\-\d{2}\-\d)|([A-Za-z0-9\+\-\_]+)$
+  source: bioregistry
+  updated: '2025-07-08'
+MOLBASE.SHEFFIELD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MOLBIC.CELLLINE:
+  regex: ^CL\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MOLBIC.COMPOUND:
+  regex: ^CP\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MOLBIC.PROTEIN:
+  regex: ^PT\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MOLMEDB:
+  regex: ^[m,M]{2}[0-9]{5}[0-9]*$
+  source: bioregistry
+  updated: '2025-07-08'
+MONDO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MONDO.ISSUE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MOP:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MORPHEUS:
+  regex: ^M[0-9]{4,}$
+  source: bioregistry
+  updated: '2025-07-08'
+MOSAIC:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+MP:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MPATH:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MPID:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MPIO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MRO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MSIGDB:
+  regex: ^M\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MSIO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+MTH:
+  regex: ^U\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MULTICELLDS.CELL_LINE:
+  regex: ^MCDS_L_[a-zA-Z0-9]{1,10}$
+  source: bioregistry
+  updated: '2025-07-08'
+MULTICELLDS.COLLECTION:
+  regex: ^MCDS_C_[a-zA-Z0-9]{1,10}$
+  source: bioregistry
+  updated: '2025-07-08'
+MULTICELLDS.SNAPSHOT:
+  regex: ^MCDS_S_[a-zA-Z0-9]{1,10}$
+  source: bioregistry
+  updated: '2025-07-08'
+MVX:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+MW.PROJECT:
+  regex: ^PR[0-9]{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+MW.STUDY:
+  regex: ^ST[0-9]{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+MYCO.LEPRA:
+  regex: ^ML\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+MYCO.MARINUM:
+  regex: ^MMAR\_\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MYCO.SMEG:
+  regex: ^MSMEG\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+MYCO.TUBER:
+  regex: ^Rv\d{4}(A|B|c)?$
+  source: bioregistry
+  updated: '2025-07-08'
+MYCOBANK:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+MZSPEC:
+  regex: ^.+$
+  source: bioregistry
+  updated: '2025-07-08'
+NANDO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NAPDI:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+NAPP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NARCIS:
+  regex: ^oai\:cwi\.nl\:\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NASAOSDR.BIOSPECIMEN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NASAOSDR.EXPERIMENT:
+  regex: ^OS-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NASAOSDR.HARDWARE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NASAOSDR.MISSION:
+  regex: ^.+$
+  source: bioregistry
+  updated: '2025-07-08'
+NASAOSDR.PAYLOAD:
+  regex: ^.+$
+  source: bioregistry
+  updated: '2025-07-08'
+NASAOSDR.STUDY:
+  regex: ^OSD-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NASAOSDR.SUBJECT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NASC:
+  regex: ^(\w+)?\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NBN:
+  regex: ^(urn|URN):(nbn|NBN)(:[A-Za-z_0-9]+)*.+$
+  source: bioregistry
+  updated: '2025-07-08'
+NBO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+NBRC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCATS.BIOPLANET:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCBI.ASSEMBLY:
+  regex: ^[a-zA-Z0-9_\.]+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCBI.GC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCBI.GENOME:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCBIBOOK:
+  regex: ^NBK\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCBIDRS:
+  regex: ^[0-9a-fA-F]{32}$
+  source: bioregistry
+  updated: '2025-07-08'
+NCBIGENE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCBIGI:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCBIORTHOLOG:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCBIPROTEIN:
+  regex: ^\w+_?\d+(.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+NCBITAXON:
+  regex: ^(\d+)|([a-zA-Z_]+)$
+  source: bioregistry
+  updated: '2025-07-08'
+NCIM:
+  regex: ^C\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCIT:
+  regex: ^[CRPA]\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NCRO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+NDC:
+  regex: ^\d+\-\d+\-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NDDF:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+NDFRT:
+  regex: ^N[0-9]{10}$
+  source: bioregistry
+  updated: '2025-07-08'
+NEMO:
+  regex: ^[a-z]{3}-[a-km-z0-9]{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+NEUROLEX:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NEUROMORPHO:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+NEURONAMES:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NEURONDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NEUROVAULT.COLLECTION:
+  regex: ^[1-9][0-9]*$
+  source: bioregistry
+  updated: '2025-07-08'
+NEUROVAULT.IMAGE:
+  regex: ^[1-9][0-9]*$
+  source: bioregistry
+  updated: '2025-07-08'
+NEXTDB:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+NEXTPROT:
+  regex: ^NX_\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+NEXTPROT.FAMILY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NFDI.CORE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NGBO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+NGL:
+  regex: ^GLDS-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NIAEST:
+  regex: ^\w\d{4}\w\d{2}(\-[35])?$
+  source: bioregistry
+  updated: '2025-07-08'
+NIF.EXT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NIF.STD:
+  regex: ^BAMSC\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NIHREPORTER.PROJECT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLFFF:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.ANAT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.BR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.CELL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.CHEM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.DYS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.FUNC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.INV:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.MOL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.OEN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.ORG:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.QUAL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.RES:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NLX.SUB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NMDC:
+  regex: ^.{2,}$
+  source: bioregistry
+  updated: '2025-07-08'
+NMR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NMRSHIFTDB2:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+NOAA:
+  regex: ^[a-z]+(\-[a-z]+)*$
+  source: bioregistry
+  updated: '2025-07-08'
+NOAA.CAMEO:
+  regex: ^\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+NOMEN:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+NONCODEV3:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NONCODEV4.GENE:
+  regex: ^NONHSAG\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+NONCODEV4.RNA:
+  regex: ^NONHSAT\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+NORD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NORINE:
+  regex: ^NOR\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NPASS:
+  regex: ^NPC\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NPATLAS:
+  regex: ^NPA\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+NPO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NRFC:
+  regex: ^NRFC\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NSC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NSF.AWARD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NSRRC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NUCC.CHARACTERISTIC:
+  regex: ^\d(\d|\w)$
+  source: bioregistry
+  updated: '2025-07-08'
+NUCC.TAXONOMY:
+  regex: ^\d{3}\w(\w|\d_)\d{4}X$
+  source: bioregistry
+  updated: '2025-07-08'
+NUCLEARDB:
+  regex: ^\w+\_\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+NUCLEOTIDE:
+  regex: ^[a-zA-Z0-9_\.]+$
+  source: bioregistry
+  updated: '2025-07-08'
+NXR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+NZTCS:
+  regex: ^[1-9]\d{3,7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OAE:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OARCS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OBA:
+  regex: ^(VT)?\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OBAN:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+OBCI:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OBCS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OBI:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OBIB:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OBOINOWL:
+  regex: ^[\w-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+OBV:
+  regex: ^AC[0-9]{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+OCC:
+  regex: ^[a-z][a-z]/[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+OCCO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OCI:
+  regex: ^0[1-9]+0[0-9]+-0[1-9]+0[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+OCID:
+  regex: ^[0-9]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+OCLC:
+  regex: ^[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ODAM:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ODAMEXPLORER:
+  regex: ^[A-Za-z][A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+ODC.SCI:
+  regex: ^[0-9]*$
+  source: bioregistry
+  updated: '2025-07-08'
+ODC.TBI:
+  regex: ^[0-9]*$
+  source: bioregistry
+  updated: '2025-07-08'
+ODOR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OECD.TEMPLATE:
+  regex: ^\d+\.\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OGG:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OGI:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OGMS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OGSF:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OHD:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OHMI:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OHPI:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OID:
+  regex: ^[\d.]+$
+  source: bioregistry
+  updated: '2025-07-08'
+OLATDV:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OMA.GRP:
+  regex: ^[A-Z]+$
+  source: bioregistry
+  updated: '2025-07-08'
+OMA.HOG:
+  regex: ^[0-9]{7}(\.[0-9a-z.]+)?(_[0-9]+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+OMA.PROTEIN:
+  regex: ^[A-Z0-9]{5}\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OMIA:
+  regex: ^\d{6}(-\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+OMIA.VARIANT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OMIABIS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OMID:
+  regex: ^[a-z][a-z]/06[1-9]*0[1-9][0-9]*$
+  source: bioregistry
+  updated: '2025-07-08'
+OMIM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OMIM.PS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OMIT:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OMO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OMON:
+  regex: ^\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+OMOP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OMP:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OMRSE:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+OMX.DATASET:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ONE:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ONS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ONTIE:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ONTOAVIDA:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+ONTONEO:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+OOSTT:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+OPB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OPENALEX:
+  regex: ^[WAICV]\d{2,}$
+  source: bioregistry
+  updated: '2025-07-08'
+OPENWEMI:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+OPL:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OPM:
+  regex: ^[0-9][A-Za-z0-9]{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+OPMI:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OPRLM:
+  regex: ^\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+ORCID:
+  regex: ^\d{4}-\d{4}-\d{4}-\d{3}(\d|X)$
+  source: bioregistry
+  updated: '2025-07-08'
+ORDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ORIDB.SACCH:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ORIDB.SCHIZO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ORNASEQ:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ORPHANET:
+  regex: ^C?\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ORPHANET.ORDO:
+  regex: ^C?\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ORTHODB:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+ORYZABASE.GENE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ORYZABASE.MUTANT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ORYZABASE.REFERENCE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ORYZABASE.STAGE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ORYZABASE.STRAIN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OSF:
+  regex: ^[a-z0-9]{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+OSTI.ARTICLE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OTL:
+  regex: ^A[A-Z]+\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+OTOL:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+OVAE:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+OWLSTAR:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+P3DB.PROTEIN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+P3DB.SITE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PACTR:
+  regex: ^PACTR\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PALEODB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PANTHER.FAMILY:
+  regex: ^PTHR\d{5}(\:SF\d{1,3})?$
+  source: bioregistry
+  updated: '2025-07-08'
+PANTHER.NODE:
+  regex: ^PTN\d{9}$
+  source: bioregistry
+  updated: '2025-07-08'
+PANTHER.PATHWAY:
+  regex: ^P\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+PANTHER.PTHCMP:
+  regex: ^(G|P|U|C|S)\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+PASS2:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PATHBANK:
+  regex: ^(SMP|PW)\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PATHGUIDE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PATHWAYCOMMONS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PATO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PAV:
+  regex: ^[a-z][a-zA-Z]+$
+  source: bioregistry
+  updated: '2025-07-08'
+PAXDB.ORGANISM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PAXDB.PROTEIN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PAZAR:
+  regex: ^TF\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+PBA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PCL:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PCO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PDB:
+  regex: ^[0-9][A-Za-z0-9]{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+PDB-CCD:
+  regex: ^\w{1,3}$
+  source: bioregistry
+  updated: '2025-07-08'
+PDB.LIGAND:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+PDC.STUDY:
+  regex: ^PDC\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PDRO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PDUMDV:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PECO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PED:
+  regex: ^PED\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+PED.ENSEMBLE:
+  regex: ^PED\d{5}e\d{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+PEFF:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PENNSIEVE:
+  regex: ^N:package:[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+PEPHUB:
+  regex: ^[A-Za-z0-9_\-]+(/[A-Za-z0-9_\-]+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+PEPTIDEATLAS:
+  regex: ^PAp[0-9]{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+PEPTIDEATLAS.DATASET:
+  regex: ^PASS\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+PEROXIBASE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PESTICIDEINFO:
+  regex: ^PRI\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+PFAM:
+  regex: ^PF\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+PFAM.CLAN:
+  regex: ^CL\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PFR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PGS:
+  regex: ^PGS[0-9]{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+PGX:
+  regex: ^\w{3,15}[-_]\w[\w.-]{3,128}$
+  source: bioregistry
+  updated: '2025-07-08'
+PHAGEDIVE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHARMACODB.DATASET:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHARMACODB.TISSUE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHARMGKB.DISEASE:
+  regex: ^PA\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHARMGKB.DRUG:
+  regex: ^PA\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHARMGKB.GENE:
+  regex: ^PA\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHARMGKB.PATHWAYS:
+  regex: ^PA\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHARMGKB.VARIANT:
+  regex: ^PA\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHENOLEXPLORER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHENX:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHIPO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PHOSPHOPOINT.KINASE:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHOSPHOPOINT.PROTEIN:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHOSPHOSITE.CURATION:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHOSPHOSITE.PROTEIN:
+  regex: ^\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+PHOSPHOSITE.RESIDUE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHOSPHOSITE.SITEGROUP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHYLOMEDB:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+PHYTOZOME.LOCUS:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+PID.PATHWAY:
+  regex: ^\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b$
+  source: bioregistry
+  updated: '2025-07-08'
+PIGQTLDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PII:
+  regex: ^((S\d{4}-\d{4}\(\d{2}\)\d{5})|(B\d-\d{3}-\d{5}-\d/\d{5}))-[\d|X]$
+  source: bioregistry
+  updated: '2025-07-08'
+PINA:
+  regex: ^([A-N,R-Z][0-9][A-Z][A-Z, 0-9][A-Z, 0-9][0-9])|([O,P,Q][0-9][A-Z, 0-9][A-Z,
+    0-9][A-Z, 0-9][0-9])$
+  source: bioregistry
+  updated: '2025-07-08'
+PIROPLASMA:
+  regex: ^TA\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PIRSF:
+  regex: ^PIRSF\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+PKDB:
+  regex: ^PKDB[0-9]{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+PLANA:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PLANP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PLANTTFDB:
+  regex: ^[A-Z][a-z]{2}_([A-Za-z]{3}[0-9]{6})|([A-Za-z0-9\._\-#]*)$
+  source: bioregistry
+  updated: '2025-07-08'
+PLANT_REACTOME:
+  regex: ^R-[A-Z]{3}-\d+(-\d+)?(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+PLASMODB:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+PLOS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PMAP.CUTDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PMAP.SUBSTRATEDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PMC:
+  regex: ^PMC\d+(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+PMDB:
+  regex: ^PM\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PMP:
+  regex: ^([A-N,R-Z][0-9][A-Z][A-Z, 0-9][A-Z, 0-9][0-9])|([O,P,Q][0-9][A-Z, 0-9][A-Z,
+    0-9][A-Z, 0-9][0-9])$
+  source: bioregistry
+  updated: '2025-07-08'
+PMR:
+  regex: ^[a-z0-9]{32,32}$
+  source: bioregistry
+  updated: '2025-07-08'
+PMR.WORKSPACE:
+  regex: ^[a-zA-Z0-9_\-]+(/.*?)?$
+  source: bioregistry
+  updated: '2025-07-08'
+PO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+POCKETOME:
+  regex: ^[A-Za-z_0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+POLBASE:
+  regex: ^[A-Za-z-0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+POMBASE:
+  regex: ^S\w+(\.)?\w+(\.)?$
+  source: bioregistry
+  updated: '2025-07-08'
+PORO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PPDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PPO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PPR:
+  regex: ^PPR\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PR:
+  regex: ^(?:\d{9}|[OPQ][0-9][A-Z0-9]{3}[0-9](?:-\d+)?|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2}(?:-\d+)?)$
+  source: bioregistry
+  updated: '2025-07-08'
+PRIDE:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PRIDE.PROJECT:
+  regex: ^P(X|R|A)D\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+PRINTS:
+  regex: ^PR\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+PROBESANDDRUGS:
+  regex: ^PD\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+PROBONTO:
+  regex: ^(c|k)\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PROCO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PRODOM:
+  regex: ^PD\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PROGLYC:
+  regex: ^[A-Z]C\d{1,3}$
+  source: bioregistry
+  updated: '2025-07-08'
+PROSITE:
+  regex: ^PS\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+PROTCLUSTDB:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+PROTEOMICSDB.PEPTIDE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PROTEOMICSDB.PROTEIN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PROTONET.CLUSTER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PROTONET.PROTEINCARD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PSCDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PSDO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PSEUDOMONAS:
+  regex: ^P\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+PSIPAR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PSO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PSSKB:
+  regex: ^[A-Za-z0-9_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+PUBCHEM.BIOASSAY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PUBCHEM.CELL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PUBCHEM.CLASSIFICATION:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PUBCHEM.COMPOUND:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PUBCHEM.ELEMENT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PUBCHEM.SUBSTANCE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PUBLONS.RESEARCHER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PUBMED:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+PW:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+PX:
+  regex: ^(R)?PXD\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+PYPI:
+  regex: ^[a-zA-Z_][a-zA-Z0-9\-_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+QB:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+QTLDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+QUALO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+RADLEX:
+  regex: ^RID\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+RAID:
+  regex: ^102?\.\d+\/.+$
+  source: bioregistry
+  updated: '2025-07-08'
+RAPDB.LOCUS:
+  regex: ^Os\S+g\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+RAPDB.TRANSCRIPT:
+  regex: ^Os\S+t\d{7}-\d{2}$
+  source: bioregistry
+  updated: '2025-07-08'
+RBK:
+  regex: ^[-0-9a-zA-Z]+(@[-0-9a-zA-Z]+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+RBO:
+  regex: ^\d{6,8}$
+  source: bioregistry
+  updated: '2025-07-08'
+RCB:
+  regex: ^RCB\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+RDBSB:
+  regex: ^OENC\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+RDO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+RE3DATA:
+  regex: ^r3d\d{9,9}$
+  source: bioregistry
+  updated: '2025-07-08'
+REACTOME:
+  regex: ^R-[A-Z]{3}-\d+(-\d+)?(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+REAXYS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+REBASE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+REBEC:
+  regex: ^RBR-\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+REFSEQ:
+  regex: ^(((AC|AP|NC|NG|NM|NP|NR|NT|NW|WP|XM|XP|XR|YP|ZP)_\d+)|(NZ_[A-Z]{2,4}\d+))(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+REO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+REPEATSDB.PROTEIN:
+  regex: ^[OPQopq][0-9][A-Za-z0-9]{3}[0-9]|[A-Na-nR-Zr-z][0-9]([A-Za-z][A-Za-z0-9]{2}[0-9]){1,2}$
+  source: bioregistry
+  updated: '2025-07-08'
+REPEATSDB.STRUCTURE:
+  regex: ^[0-9][A-Za-z0-9]{3}[A-Za-z0-9][A-Za-z0-9]?[0-9]?[0-9]?$
+  source: bioregistry
+  updated: '2025-07-08'
+REPEC:
+  regex: ^\d+-\d+(-[A-Z])?$
+  source: bioregistry
+  updated: '2025-07-08'
+RESEARCHGATE.PROFILE:
+  regex: ^[0-9A-Za-z_-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+RESID:
+  regex: ^AA\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+REX:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+RFAM:
+  regex: ^RF\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+RFC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+RGD:
+  regex: ^\d{4,}$
+  source: bioregistry
+  updated: '2025-07-08'
+RGD.QTL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+RGD.STRAIN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+RHEA:
+  regex: ^\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+RIBOCENTRE:
+  regex: ^[a-zA-Z0-9-]+$
+  source: bioregistry
+  updated: '2025-07-08'
+RICEGAP:
+  regex: ^LOC\_Os\d{1,2}g\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+RICENETDB.COMPOUND:
+  regex: ^OSC\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+RICENETDB.GENE:
+  regex: ^LOC\_Os\d{1,2}g\d{5}\.\d$
+  source: bioregistry
+  updated: '2025-07-08'
+RICENETDB.MIRNA:
+  regex: ^osa-miR\d{3,5}[a-z]{0,1}$
+  source: bioregistry
+  updated: '2025-07-08'
+RICENETDB.PROTEIN:
+  regex: ^LOC\_Os\d{1,2}g\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+RICENETDB.REACTION:
+  regex: ^OSR\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+RISM:
+  regex: ^[a-z]+/[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+RNACENTRAL:
+  regex: ^URS[0-9A-F]{10}(\_\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+RNALOOPS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+RNAMOD:
+  regex: ^\d{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+RNAMODS:
+  regex: ^\d{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+RNAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+RO:
+  regex: ^(HOM)?\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ROLEO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ROR:
+  regex: ^0[a-hj-km-np-tv-z|0-9]{6}[0-9]{2}$
+  source: bioregistry
+  updated: '2025-07-08'
+ROUGE:
+  regex: ^m\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+RPCEC:
+  regex: ^RPCEC\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+RRID:
+  regex: ^[a-zA-Z]+.+$
+  source: bioregistry
+  updated: '2025-07-08'
+RRRC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+RS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+RTECS:
+  regex: ^AB\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+RUNBIOSIMULATIONS:
+  regex: ^[0-9a-z]{24,24}$
+  source: bioregistry
+  updated: '2025-07-08'
+RXNO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+RXNORM:
+  regex: ^[0-9]{1,7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SABIORK.COMPOUND:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SABIORK.EC:
+  regex: ^((\d+)|(\d+\.\d+)|(\d+\.\d+\.\d+)|(\d+\.\d+\.\d+\.\d+))$
+  source: bioregistry
+  updated: '2025-07-08'
+SABIORK.KINETICRECORD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SABIORK.REACTION:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SALK:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+SALMON:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SAO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SASAP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SASBDB:
+  regex: ^[Ss][Aa][Ss][A-Za-z0-9]{3}[0-9]$
+  source: bioregistry
+  updated: '2025-07-08'
+SBO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SCANCERRNA:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SCDO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SCHEM:
+  regex: ^A\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+SCIFLECTION:
+  regex: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+SCIPROFILES:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+SCOMP:
+  regex: ^C\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+SCOP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SCOPUS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SCOPUS.PUBLICATION:
+  regex: ^[1-9]\d{0,11}$
+  source: bioregistry
+  updated: '2025-07-08'
+SCOPUS.WORK:
+  regex: ^2-s2\.0-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SCR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SCRETF:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+SDBS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SDDO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SDGIO:
+  regex: ^\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+SDIS:
+  regex: ^D\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+SEDML.FORMAT:
+  regex: ^[a-z]+(\..*?)?$
+  source: bioregistry
+  updated: '2025-07-08'
+SEDML.LANGUAGE:
+  regex: ^[a-z]+(\..*?)?$
+  source: bioregistry
+  updated: '2025-07-08'
+SEED.COMPOUND:
+  regex: ^cpd\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SEED.REACTION:
+  regex: ^rxn\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SEED.SUBSYSTEM:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+SEINET:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SEMION:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SENSO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SEP:
+  regex: ^\d{5,6}$
+  source: bioregistry
+  updated: '2025-07-08'
+SEPIO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SFAM:
+  regex: ^F\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+SGD:
+  regex: ^((S\d+$)|(Y[A-Z]{2}\d{3}[a-zA-Z](\-[A-Z])?))$
+  source: bioregistry
+  updated: '2025-07-08'
+SGD.PATHWAYS:
+  regex: ^PWY\w{2}\-\d{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+SGN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SHARELOC:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+SHARKIPEDIA.SPECIES:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SHARKIPEDIA.TRAIT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SHARKIPEDIA.TREND:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SHEEPQTLDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SHEX:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+SIBO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SIDER.DRUG:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SIDER.EFFECT:
+  regex: ^C\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SIGNALING-GATEWAY:
+  regex: ^A\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+SIGNOR:
+  regex: ^SIGNOR\-[A-Z]+\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SIGNOR.RELATION:
+  regex: ^SIGNOR-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SILVA.TAXON:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SIO:
+  regex: ^\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+SIREN:
+  regex: ^F\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SISU:
+  regex: ^[0-9]+:[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+SITEX:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SKIP:
+  regex: ^SKIP\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SKM:
+  regex: ^rx[0-9]{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+SLCTR:
+  regex: ^SLCTR/\d{4}/\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SLKBASE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SLM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SMART:
+  regex: ^SM\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+SMC.BGC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SMC.SOURCE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SMID:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SMILES:
+  regex: ^[A-Za-z0-9+\-\*=#$:().>/\\\[\]%]+$
+  source: bioregistry
+  updated: '2025-07-08'
+SMPDB:
+  regex: ^SMP\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SNOMEDCT:
+  regex: ^(\w+)?\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SNP2TFBS:
+  regex: ^rs[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+SO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SOYBASE:
+  regex: ^\w+(\-)?\w+(\-)?\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+SPARCDRS:
+  regex: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+SPD:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SPDX:
+  regex: ^[0-9A-Za-z\-.\+]+$
+  source: bioregistry
+  updated: '2025-07-08'
+SPHN:
+  regex: ^\S+$
+  source: bioregistry
+  updated: '2025-07-08'
+SPIKE.MAP:
+  regex: ^spike\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+SPLASH:
+  regex: ^splash\d[A-Z-a-z0-9]-[A-Za-z0-9]+-[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+SPP:
+  regex: ^10.\w{4}/\w{10}$
+  source: bioregistry
+  updated: '2025-07-08'
+SRAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SSBD.DATASET:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SSBD.PROJECT:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SSRN.AUTHOR:
+  regex: ^[1-9]\d{0,6}$
+  source: bioregistry
+  updated: '2025-07-08'
+SSSOM:
+  regex: ^[A-Za-z_]+$
+  source: bioregistry
+  updated: '2025-07-08'
+STAP:
+  regex: ^[0-9][A-Za-z0-9]{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+STATO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+STITCH:
+  regex: ^\w{14}$
+  source: bioregistry
+  updated: '2025-07-08'
+STOREDB:
+  regex: ^(STUDY|FILE|DATASET)\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+STOREDB.DATASET:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+STOREDB.FILE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+STOREDB.STUDY:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+STREPTOMEDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+STRING:
+  regex: ^([A-N,R-Z][0-9][A-Z][A-Z, 0-9][A-Z, 0-9][0-9])|([O,P,Q][0-9][A-Z, 0-9][A-Z,
+    0-9][A-Z, 0-9][0-9])|([0-9][A-Za-z0-9]{3})$
+  source: bioregistry
+  updated: '2025-07-08'
+STY:
+  regex: ^T\d{3}$
+  source: bioregistry
+  updated: '2025-07-08'
+SUBTILIST:
+  regex: ^BG\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SUBTIWIKI:
+  regex: ^BSU\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+SUGARBIND:
+  regex: ^[A-Za-z]+\/[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+SUPFAM:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+SWH:
+  regex: ^[1-9]:(cnt|dir|rel|rev|snp):[0-9a-f]+(;(origin|visit|anchor|path|lines)=\S+)*$
+  source: bioregistry
+  updated: '2025-07-08'
+SWISS-MODEL:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+SWISSREGULON:
+  regex: ^[A-Za-z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+SWO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SYMP:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+SYNAPSE:
+  regex: ^[0-9]*\.*[0-9]*$
+  source: bioregistry
+  updated: '2025-07-08'
+SYNBIP.BTS:
+  regex: ^st\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SYNBIP.EPITOPE:
+  regex: ^mt\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SYNBIP.PSS:
+  regex: ^ps\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+SYNBIP.SBP:
+  regex: ^sbp\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+T3DB:
+  regex: ^T3D\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+T4FS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+TADS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+TAIR.GENE:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+TAIR.LOCUS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TAIR.PROTEIN:
+  regex: ^\d{10}$
+  source: bioregistry
+  updated: '2025-07-08'
+TAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+TARBASE:
+  regex: ^[a-z]{3}\-(mir|let|lin)\-\w+(\-\w+\-\w+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+TAXRANK:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+TCB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TCDB:
+  regex: ^\d+(\.[A-Z])?(\.\d+)?(\.\d+)?(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+TCTR:
+  regex: ^TCTR\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TGD:
+  regex: ^TTHERM\_\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TGMA:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+TGN:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TH:
+  regex: ^H\d\.\d{2}\.\d{2}\.\d\.\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+THEILER:
+  regex: ^\d+[a-d]?$
+  source: bioregistry
+  updated: '2025-07-08'
+THERMOFISHER:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+TIGRFAM:
+  regex: ^TIGR\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TKG:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TNGB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+TOGOVAR:
+  regex: ^tgv[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+TOL:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TOPDB:
+  regex: ^[A-Z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+TOPFIND:
+  regex: ^([A-N,R-Z][0-9][A-Z][A-Z, 0-9][A-Z, 0-9][0-9])|([O,P,Q][0-9][A-Z, 0-9][A-Z,
+    0-9][A-Z, 0-9][0-9])$
+  source: bioregistry
+  updated: '2025-07-08'
+TOXOPLASMA:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+TRANS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+TRANSYT:
+  regex: ^T[A-Z]\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+TREEBASE:
+  regex: ^TB[1,2]?:[A-Z][a-z]?\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TREEFAM:
+  regex: ^\w{1,2}\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TRICDB:
+  regex: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+  source: bioregistry
+  updated: '2025-07-08'
+TRICHDB:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+TRITRYPDB:
+  regex: ^\w+(\.)?\w+(\.)?\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+TSC:
+  regex: ^SD\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TTD.DRUG:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+TTD.TARGET:
+  regex: ^t\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TTO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+TXPO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+UBERON:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UBERON.ISSUE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UBIO.NAMEBANK:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UCAS:
+  regex: ^\w\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UKPRN:
+  regex: ^[1-9]\d*$
+  source: bioregistry
+  updated: '2025-07-08'
+UMBBD.COMPOUND:
+  regex: ^c\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UMBBD.ENZYME:
+  regex: ^e\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UMBBD.PATHWAY:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+UMBBD.REACTION:
+  regex: ^r\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UMBBD.RULE:
+  regex: ^bt\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UMINCTR:
+  regex: ^UMIN\d+$|^C\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UMLS:
+  regex: ^C\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UMLS.AUI:
+  regex: ^A\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNESCO.THESAURUS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNICARBDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNICHEM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIGENE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNII:
+  regex: ^[A-Z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIMOD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPARC:
+  regex: ^UPI[A-F0-9]{10}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPATHWAY.COMPOUND:
+  regex: ^UPC\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPATHWAY.REACTION:
+  regex: ^UCR\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT:
+  regex: ^([A-N,R-Z][0-9]([A-Z][A-Z, 0-9][A-Z, 0-9][0-9]){1,2})|([O,P,Q][0-9][A-Z,
+    0-9][A-Z, 0-9][A-Z, 0-9][0-9])(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.ARBA:
+  regex: ^ARBA\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.CHAIN:
+  regex: ^PRO_[0-9]{10}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.DISEASE:
+  regex: ^DI-\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.ISOFORM:
+  regex: ^([A-N,R-Z][0-9][A-Z][A-Z, 0-9][A-Z, 0-9][0-9])|([O,P,Q][0-9][A-Z, 0-9][A-Z,
+    0-9][A-Z, 0-9][0-9])(\-\d+)$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.JOURNAL:
+  regex: ^\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.KEYWORD:
+  regex: ^KW-\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.LOCATION:
+  regex: ^SL-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.MNEMONIC:
+  regex: ^[A-Z0-9]{1,10}_[A-Z0-9]{1,5}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.PROTEOME:
+  regex: ^UP\d{9}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.PTM:
+  regex: ^PTM-\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.RESOURCE:
+  regex: ^DB-\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.TISSUE:
+  regex: ^TS-\d{4}$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIPROT.VAR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNIREF:
+  regex: ^UniRef(100|90|50)_([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}|UPI[A-F0-9]{10})$
+  source: bioregistry
+  updated: '2025-07-08'
+UNISTS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+UNITE:
+  regex: ^UDB\d{6}$
+  source: bioregistry
+  updated: '2025-07-08'
+UO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+UPA:
+  regex: ^(UCR|UCY|UER|ULS|UPA|UPC|UPX)\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+URDBMS.SYNDROMEFINDER:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+USDA.CVB.PCN:
+  regex: ^[A-Z0-9]{4}\.[A-Z0-9]{2}$
+  source: bioregistry
+  updated: '2025-07-08'
+USPTO:
+  regex: ^(\d{1,2},?\d{3},?\d{3}|(PP|RE|AI|RX)\d{2},?\d{3}|(D|T|H|X)\d{3},?\d{3})$
+  source: bioregistry
+  updated: '2025-07-08'
+UTRDB:
+  regex: ^([3-5][A-Z])\w+[^A-Z][0-9]$
+  source: bioregistry
+  updated: '2025-07-08'
+VAC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VALIDATORDB:
+  regex: ^[A-Za-z0-9\/]+$
+  source: bioregistry
+  updated: '2025-07-08'
+VANDF:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VARIO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VBASE2:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+VBO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+VBO.ISSUE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VBRC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VCELL:
+  regex: ^\d{5,}$
+  source: bioregistry
+  updated: '2025-07-08'
+VDRC:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VECTORBASE:
+  regex: ^\D{4}\d{6}(\-\D{2})?$
+  source: bioregistry
+  updated: '2025-07-08'
+VEGBANK:
+  regex: ^VB\.[A-Za-z][A-Za-z]\..*$
+  source: bioregistry
+  updated: '2025-07-08'
+VENOM:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VFB:
+  regex: ^[0-9a-zA-Z]{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+VFDB.GENE:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+VFDB.GENUS:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+VGNC:
+  regex: ^\d{1,9}$
+  source: bioregistry
+  updated: '2025-07-08'
+VHOG:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+VIAF:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VIBSO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+VIDO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+VIOLINNET:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VIPR:
+  regex: ^[A-Za-z 0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+VIRALZONE:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VIRSIRNA:
+  regex: ^virsi\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VMHGENE:
+  regex: ^[0-9]+\.[0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+VMHMETABOLITE:
+  regex: ^[a-zA-Z0-9_\(\_\)\[\]]+$
+  source: bioregistry
+  updated: '2025-07-08'
+VMHREACTION:
+  regex: ^[a-zA-Z0-9_\(\_\)\[\]]+$
+  source: bioregistry
+  updated: '2025-07-08'
+VO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+VOC4CAT:
+  regex: ^\d{7,}$
+  source: bioregistry
+  updated: '2025-07-08'
+VSAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+VSDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+VSO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+VT:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+VTO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+VUID:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+WB.RNAI:
+  regex: ^WBRNAi\d{8}$
+  source: bioregistry
+  updated: '2025-07-08'
+WBBT:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+WBLS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+WBPHENOTYPE:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+WEBELEMENTS:
+  regex: ^\w+$
+  source: bioregistry
+  updated: '2025-07-08'
+WIKIDATA:
+  regex: ^(Q|P|E|L)\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+WIKIDATA.PROPERTY:
+  regex: ^P\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+WIKIGENES:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+WIKIPATHWAYS:
+  regex: ^WP\d{1,5}(\_r\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+WIKIPEDIA.EN:
+  regex: ^\S+$
+  source: bioregistry
+  updated: '2025-07-08'
+WORFDB:
+  regex: ^\w+(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+WORMBASE:
+  regex: ^(CE[0-9]{5}|WB[A-Z][a-z]+\d+)$
+  source: bioregistry
+  updated: '2025-07-08'
+WORMPEP:
+  regex: ^CE\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+WORMS:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+WOS.RESEARCHER:
+  regex: ^[A-Z]{1,3}-\d{4}-(19|20)\d\d$
+  source: bioregistry
+  updated: '2025-07-08'
+WWF.ECOREGION:
+  regex: ^AT\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+XAO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+XCO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+XENBASE:
+  regex: ^XB\-\w+\-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+XIMBIO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+XLMOD:
+  regex: ^\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+XMETDB:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+XPO:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+YDPM:
+  regex: ^Y[A-Z]{2}\d+[CW]$
+  source: bioregistry
+  updated: '2025-07-08'
+YEASTINTRON:
+  regex: ^[A-Z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+YETFASCO:
+  regex: ^\w+\_\d+(\.\d+)?$
+  source: bioregistry
+  updated: '2025-07-08'
+YID:
+  regex: ^[A-Z0-9]+$
+  source: bioregistry
+  updated: '2025-07-08'
+YMDB:
+  regex: ^YMDB\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+YRCPDR:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ZEA:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ZECO:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ZENODO.RECORD:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ZFA:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ZFIN:
+  regex: ^ZDB\-\w+\-\d+\-\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ZFS:
+  regex: ^\d{7}$
+  source: bioregistry
+  updated: '2025-07-08'
+ZINC:
+  regex: ^(ZINC)?\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+ZP:
+  regex: ^\d+$
+  source: bioregistry
+  updated: '2025-07-08'
+_3DMET:
+  regex: ^B\d{5}$
+  source: bioregistry
+  updated: '2025-07-08'
+_4DN.BIOSOURCE:
+  regex: ^4DN[A-Z]{2}[A-Z0-9]{7}$
+  source: bioregistry
+  updated: '2025-07-08'

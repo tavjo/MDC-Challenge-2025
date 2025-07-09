@@ -12,8 +12,8 @@ from typing import Dict, Any, List, Tuple
 from datetime import datetime
 import os
 
-from .document_parser import parse_document, create_document_entry
-from .models import Document
+from document_parser import parse_document, create_document_entry
+from models import Document
 
 TEMP_SUFFIX = '.part'
 
@@ -54,7 +54,9 @@ def process_all_documents(inventory_df: pd.DataFrame) -> List[Tuple[Document, Di
     
     for idx, row in inventory_df.iterrows():
         article_id = row['article_id']
-        xml_path = row['xml_path']
+        xml_path = os.path.join("Data/train/XML", row['xml_path'])
+        print(xml_path)
+        
         source_type = row.get('source', None)
         
         if pd.isna(xml_path) or not Path(xml_path).exists():
@@ -144,15 +146,28 @@ def validate_parsed_corpus(parsed_documents: List[Tuple[Document, Dict[str, Any]
     print(f"\n📊 Validation Results:")
     print(f"   Total documents: {total}")
     print(f"   Validation passed: {validation_stats['validation_passed']} ({success_rate:.1%})")
-    print(f"   Has methods: {validation_stats['has_methods']} ({validation_stats['has_methods']/total:.1%})")
-    print(f"   Has results: {validation_stats['has_results']} ({validation_stats['has_results']/total:.1%})")
-    print(f"   Has data availability: {validation_stats['has_data_availability']} ({validation_stats['has_data_availability']/total:.1%})")
-    print(f"   Key sections coverage: {validation_stats['key_sections_coverage']} ({validation_stats['key_sections_coverage']/total:.1%})")
-    print(f"   Sufficient content: {validation_stats['sufficient_content']} ({validation_stats['sufficient_content']/total:.1%})")
     
-    print(f"\n📊 Format Breakdown:")
-    for format_type, count in validation_stats['format_breakdown'].items():
-        print(f"   {format_type}: {count} ({count/total:.1%})")
+    if total > 0:
+        print(f"   Has methods: {validation_stats['has_methods']} ({validation_stats['has_methods']/total:.1%})")
+        print(f"   Has results: {validation_stats['has_results']} ({validation_stats['has_results']/total:.1%})")
+        print(f"   Has data availability: {validation_stats['has_data_availability']} ({validation_stats['has_data_availability']/total:.1%})")
+        print(f"   Key sections coverage: {validation_stats['key_sections_coverage']} ({validation_stats['key_sections_coverage']/total:.1%})")
+        print(f"   Sufficient content: {validation_stats['sufficient_content']} ({validation_stats['sufficient_content']/total:.1%})")
+        
+        print(f"\n📊 Format Breakdown:")
+        for format_type, count in validation_stats['format_breakdown'].items():
+            print(f"   {format_type}: {count} ({count/total:.1%})")
+    else:
+        print(f"   Has methods: {validation_stats['has_methods']} (0.0%)")
+        print(f"   Has results: {validation_stats['has_results']} (0.0%)")
+        print(f"   Has data availability: {validation_stats['has_data_availability']} (0.0%)")
+        print(f"   Key sections coverage: {validation_stats['key_sections_coverage']} (0.0%)")
+        print(f"   Sufficient content: {validation_stats['sufficient_content']} (0.0%)")
+        
+        print(f"\n📊 Format Breakdown:")
+        for format_type, count in validation_stats['format_breakdown'].items():
+            print(f"   {format_type}: {count} (0.0%)")
+        print("   ⚠️  No documents processed - check file paths and XML availability")
     
     # Check success criteria from checklist
     success_threshold = 0.90  # 90% success rate target
@@ -170,14 +185,14 @@ def save_parsed_corpus(parsed_documents: List[Tuple[Document, Dict[str, Any]]],
     """
     Step 4: Save the parsed corpus and summary.
     """
-    parsed_documents = [doc for doc, _ in parsed_documents]
+    docs = [doc for doc, _ in parsed_documents]
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
     # Save main pickle file
     pickle_path = output_path / f"parsed_documents.pkl{TEMP_SUFFIX}"
     with open(pickle_path, 'wb') as f:
-        pickle.dump(parsed_documents, f)
+        pickle.dump(docs, f)
     
     print(f"✅ Saved parsed corpus: {pickle_path}")
 
@@ -251,7 +266,10 @@ def main():
         print(f"\n✅ Step 5 completed successfully at: {datetime.now()}")
         print(f"📊 Final Results:")
         print(f"   Total processed: {len(parsed_documents)}")
-        print(f"   Success rate: {validation_stats['validation_passed']/len(parsed_documents):.1%}")
+        if len(parsed_documents) > 0:
+            print(f"   Success rate: {validation_stats['validation_passed']/len(parsed_documents):.1%}")
+        else:
+            print(f"   Success rate: 0.0%")
         print(f"   Output saved to: Data/train/parsed/")
         
     except Exception as e:

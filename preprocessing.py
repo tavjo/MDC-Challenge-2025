@@ -435,7 +435,7 @@ class PreprocessingPipeline:
             if step_id == 'semantic_chunking':
                 # Check if parsed_documents.pkl is a valid pickle file
                 pkl_path = str(data_path / 'train/parsed/parsed_documents.pkl')
-                if pkl_path.exists():
+                if Path(pkl_path).exists():
                     try:
                         with open(pkl_path, 'rb') as f:
                             data = pickle.load(f)
@@ -447,8 +447,8 @@ class PreprocessingPipeline:
             elif step_id == 'document_parsing':
                 # Check if XML files exist and are readable
                 xml_dir = str(data_path / 'train/XML')
-                if xml_dir.exists():
-                    xml_files = list(xml_dir.glob('*.xml'))
+                if Path(xml_dir).exists():
+                    xml_files = list(Path(xml_dir).glob('*.xml'))
                     if not xml_files:
                         logger.warning(f"No XML files found in {xml_dir}")
                         return False

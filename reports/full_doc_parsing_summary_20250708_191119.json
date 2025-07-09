@@ -1,0 +1,215 @@
+{
+  "metadata": {
+    "generated_at": "2025-07-08T19:11:19.622612",
+    "data_directory": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data",
+    "parsing_duration": "0:00:00.135258",
+    "parsing_steps_completed": 6
+  },
+  "summary_statistics": {
+    "Total Documents in Inventory": 3,
+    "TEI Files Available": 3,
+    "JATS Files Available": 0,
+    "Successfully Parsed Documents": 3,
+    "Failed Documents": 0,
+    "Parsing Success Rate": "100.0%",
+    "Validation Success Rate": "0.0%",
+    "Key Sections Coverage": "0.0%",
+    "Output Files Generated": 3,
+    "Section Type Diversity": 1,
+    "Total Processing Time": "0.07s",
+    "Average Processing Time": "0.02s",
+    "Parsing Steps Completed": 5
+  },
+  "parsing_metrics": {
+    "total_processed": 3,
+    "successful_parses": 3,
+    "failed_parses": 0,
+    "tei_successes": 3,
+    "jats_successes": 0,
+    "unknown_format_attempts": 0,
+    "processing_times": [
+      0.03775978088378906,
+      0.020667314529418945,
+      0.01621079444885254
+    ],
+    "memory_usage": [
+      119.16796875,
+      120.00390625,
+      120.5390625
+    ],
+    "errors_by_type": {},
+    "sections_by_type": {
+      "abstract": 3
+    },
+    "validation_failures": [
+      {
+        "doi": "10.1002_2017jc013030",
+        "reason": "validation_failed",
+        "details": {
+          "doi": "10.1002_2017jc013030",
+          "section_count": 1,
+          "has_sections": true,
+          "has_methods": false,
+          "has_results": false,
+          "has_data_availability": false,
+          "key_sections_present": false,
+          "total_char_length": 1697,
+          "clean_text_length": 1697,
+          "has_sufficient_content": true,
+          "section_types": [
+            "abstract"
+          ],
+          "validation_passed": false
+        }
+      },
+      {
+        "doi": "10.1002_anie.201916483",
+        "reason": "validation_failed",
+        "details": {
+          "doi": "10.1002_anie.201916483",
+          "section_count": 1,
+          "has_sections": true,
+          "has_methods": false,
+          "has_results": false,
+          "has_data_availability": false,
+          "key_sections_present": false,
+          "total_char_length": 799,
+          "clean_text_length": 799,
+          "has_sufficient_content": false,
+          "section_types": [
+            "abstract"
+          ],
+          "validation_passed": false
+        }
+      },
+      {
+        "doi": "10.1002_anie.202005531",
+        "reason": "validation_failed",
+        "details": {
+          "doi": "10.1002_anie.202005531",
+          "section_count": 1,
+          "has_sections": true,
+          "has_methods": false,
+          "has_results": false,
+          "has_data_availability": false,
+          "key_sections_present": false,
+          "total_char_length": 678,
+          "clean_text_length": 678,
+          "has_sufficient_content": false,
+          "section_types": [
+            "abstract"
+          ],
+          "validation_passed": false
+        }
+      }
+    ]
+  },
+  "performance_metrics": {
+    "average_processing_time": 0.024879296620686848,
+    "total_processing_time": 0.07463788986206055,
+    "fastest_parsing": 0.01621079444885254,
+    "slowest_parsing": 0.03775978088378906,
+    "processing_rate": 40.194062366237134,
+    "average_memory_mb": 119.90364583333333,
+    "peak_memory_mb": 120.5390625,
+    "min_memory_mb": 119.16796875
+  },
+  "detailed_sections": {
+    "parsing_start": {
+      "message": "Document parsing process initiated",
+      "data_directory": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data",
+      "timestamp": "2025-07-08T19:11:19.489928"
+    },
+    "step_1_load_inventory": {
+      "total_documents": 3,
+      "columns": [
+        "article_id",
+        "pdf_path",
+        "xml_path",
+        "source",
+        "error",
+        "success",
+        "processing_time",
+        "has_primary",
+        "has_secondary",
+        "label_count"
+      ],
+      "inventory_file_loaded": "document_inventory.csv",
+      "validation_passed": true,
+      "step_duration": 0.019495725631713867,
+      "tei_files_available": 3,
+      "jats_files_available": 0,
+      "format_distribution": "TEI: 3, JATS: 0"
+    },
+    "step_2_document_processing": {
+      "total_processed": 3,
+      "successful_parses": 3,
+      "failed_parses": 0,
+      "success_rate": 1.0,
+      "step_duration": 0.0822908878326416
+    },
+    "step_3_corpus_validation": {
+      "validation_statistics": {
+        "total_documents": 3,
+        "valid_documents": 0,
+        "has_methods": 0,
+        "has_results": 0,
+        "has_data_availability": 0,
+        "key_sections_coverage": 0,
+        "sufficient_content": 1,
+        "format_breakdown": {
+          "TEI": 3,
+          "JATS": 0,
+          "UNKNOWN": 0
+        },
+        "validation_passed": 0
+      },
+      "validation_success_rate": 0.0,
+      "key_sections_coverage": 0.0,
+      "step_duration": 0.0003898143768310547
+    },
+    "step_4_save_corpus": {
+      "corpus_saved": true,
+      "output_directory": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/train/parsed",
+      "files_generated": 3,
+      "step_duration": 0.013334989547729492
+    },
+    "step_5_performance_analysis": {
+      "performance_metrics": {
+        "average_processing_time": 0.024879296620686848,
+        "total_processing_time": 0.07463788986206055,
+        "fastest_parsing": 0.01621079444885254,
+        "slowest_parsing": 0.03775978088378906,
+        "processing_rate": 40.194062366237134,
+        "average_memory_mb": 119.90364583333333,
+        "peak_memory_mb": 120.5390625,
+        "min_memory_mb": 119.16796875
+      },
+      "format_distribution": {
+        "TEI": 3,
+        "JATS": 0,
+        "Unknown": 0
+      },
+      "section_type_diversity": 1,
+      "validation_issues": 3,
+      "step_duration": 2.1696090698242188e-05
+    }
+  },
+  "generated_files": [
+    {
+      "filepath": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/train/parsed/parsed_documents.pkl",
+      "description": "Parsed documents pickle file",
+      "timestamp": "2025-07-08 19:11:19.615218"
+    },
+    {
+      "filepath": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/train/parsed/parsed_documents_summary.csv",
+      "description": "Document parsing summary CSV",
+      "timestamp": "2025-07-08 19:11:19.615248"
+    },
+    {
+      "filepath": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/train/parsed/validation_stats.json",
+      "description": "Validation statistics JSON",
+      "timestamp": "2025-07-08 19:11:19.615266"
+    }
+  ]
+}

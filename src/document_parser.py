@@ -14,9 +14,9 @@ import hashlib
 import re
 from datetime import datetime
 
-from .xml_format_detector import detect_xml_format, setup_namespaces
-from .section_mapping import map_tei_section_type, map_jats_section_type, is_key_section
-from .models import Document, Section
+from xml_format_detector import detect_xml_format, setup_namespaces
+from section_mapping import map_tei_section_type, map_jats_section_type, is_key_section
+from models import Document, Section
 
 
 def extract_text_content(element) -> str:
@@ -350,7 +350,7 @@ def validate_document(sections: List[Section], doi: str) -> Dict[str, Any]:
             validation['has_data_availability'] = True
     
     # Clean text length (strip XML tags)
-    clean_text = ' '.join(section['text'] for section in sections)
+    clean_text = ' '.join(section.text for section in sections)
     validation['clean_text_length'] = len(clean_text)
     
     # Key sections check: methods AND (results OR data_availability)
