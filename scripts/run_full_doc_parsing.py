@@ -33,19 +33,22 @@ from typing import Dict, List, Any, Optional, Tuple
 import pandas as pd
 
 # Add src to path for imports
-sys.path.append(str(Path(__file__).parent.parent / "src"))
+# sys.path.append(str(Path(__file__).parent.parent / "src"))
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_root)
 
-from helpers import initialize_logging, timer_wrap
+from src.helpers import initialize_logging, timer_wrap
 
 # Import existing parsing functions (without modification)
-sys.path.append(str(Path(__file__).parent.parent / "src"))
-from run_full_doc_parsing import (
+# sys.path.append(str(Path(__file__).parent.parent / "src"))
+from src.run_full_doc_parsing import (
     load_document_inventory,
     # process_all_documents,
     validate_parsed_corpus,
     save_parsed_corpus
 )
-from models import Document, Section
+from src.models import Document
 
 TEMP_SUFFIX = '.part'
 
@@ -482,6 +485,8 @@ def run_full_document_parsing(data_dir: str = "Data",
             article_id = row['article_id']
             xml_filename = row['xml_path']
             source_type = row.get('source', None)
+            if pd.isna(source_type):
+                source_type = None
             
             # Construct full path to XML file
             xml_path = Path(data_dir) / "train" / "XML" / xml_filename
@@ -498,7 +503,7 @@ def run_full_document_parsing(data_dir: str = "Data",
             
             try:
                 # Use existing parsing logic
-                from document_parser import parse_document, create_document_entry
+                from src.document_parser import parse_document, create_document_entry
                 
                 sections = parse_document(Path(xml_path))
                 

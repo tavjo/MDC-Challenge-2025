@@ -1,14 +1,14 @@
 # Full Document Parsing Comprehensive Report
 
-**Generated:** 2025-07-08 19:11:19
+**Generated:** 2025-07-09 12:52:09
 **Data Directory:** `/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data`
-**Parsing Duration:** 0:00:00.133955
+**Parsing Duration:** 0:00:00.113430
 
 ## Executive Summary
 
 - **Total Documents in Inventory:** 3
-- **TEI Files Available:** 3
-- **JATS Files Available:** 0
+- **TEI Files Available:** 0
+- **JATS Files Available:** 3
 - **Successfully Parsed Documents:** 3
 - **Failed Documents:** 0
 - **Parsing Success Rate:** 100.0%
@@ -24,12 +24,12 @@
 
 - **average_processing_time:** 0.02s
 - **total_processing_time:** 0.07s
-- **fastest_parsing:** 0.01621079444885254
-- **slowest_parsing:** 0.03775978088378906
-- **processing_rate:** 40.19 docs/sec
-- **average_memory_mb:** 119.9MB
-- **peak_memory_mb:** 120.5MB
-- **min_memory_mb:** 119.2MB
+- **fastest_parsing:** 0.0162203311920166
+- **slowest_parsing:** 0.03175806999206543
+- **processing_rate:** 43.65 docs/sec
+- **average_memory_mb:** 116.1MB
+- **peak_memory_mb:** 118.2MB
+- **min_memory_mb:** 114.1MB
 
 ## Format Distribution
 
@@ -53,28 +53,18 @@
 
 **message:** Document parsing process initiated
 **data_directory:** /Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data
-**timestamp:** 2025-07-08T19:11:19.489928
+**timestamp:** 2025-07-09T12:52:09.394226
 
 ## Step 1 Load Inventory
 
 **total_documents:** 3
-**columns:**
-  - article_id
-  - pdf_path
-  - xml_path
-  - source
-  - error
-  - success
-  - processing_time
-  - has_primary
-  - has_secondary
-  - label_count
+**columns:** ['article_id', 'pdf_path', 'xml_path', 'source', 'error', 'success', 'has_primary', 'has_secondary', 'label_count', 'processing_time', 'has_missing']
 **inventory_file_loaded:** document_inventory.csv
 **validation_passed:** True
-**step_duration:** 0.019495725631713867
-**tei_files_available:** 3
-**jats_files_available:** 0
-**format_distribution:** TEI: 3, JATS: 0
+**step_duration:** 0.015882015228271484
+**tei_files_available:** 0
+**jats_files_available:** 3
+**format_distribution:** TEI: 0, JATS: 3
 
 ## Step 2 Document Processing
 
@@ -82,7 +72,7 @@
 **successful_parses:** 3
 **failed_parses:** 0
 **success_rate:** 1.0
-**step_duration:** 0.0822908878326416
+**step_duration:** 0.07614588737487793
 
 ## Step 3 Corpus Validation
 
@@ -98,33 +88,33 @@
   - validation_passed: 0
 **validation_success_rate:** 0.0
 **key_sections_coverage:** 0.0
-**step_duration:** 0.0003898143768310547
+**step_duration:** 0.0002589225769042969
 
 ## Step 4 Save Corpus
 
 **corpus_saved:** True
 **output_directory:** /Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/train/parsed
 **files_generated:** 3
-**step_duration:** 0.013334989547729492
+**step_duration:** 0.006273984909057617
 
 ## Step 5 Performance Analysis
 
 **performance_metrics:**
-  - average_processing_time: 0.024879296620686848
-  - total_processing_time: 0.07463788986206055
-  - fastest_parsing: 0.01621079444885254
-  - slowest_parsing: 0.03775978088378906
-  - processing_rate: 40.194062366237134
-  - average_memory_mb: 119.90364583333333
-  - peak_memory_mb: 120.5390625
-  - min_memory_mb: 119.16796875
+  - average_processing_time: 0.022908449172973633
+  - total_processing_time: 0.0687253475189209
+  - fastest_parsing: 0.0162203311920166
+  - slowest_parsing: 0.03175806999206543
+  - processing_rate: 43.65201644377374
+  - average_memory_mb: 116.10546875
+  - peak_memory_mb: 118.17578125
+  - min_memory_mb: 114.12890625
 **format_distribution:**
   - TEI: 3
   - JATS: 0
   - Unknown: 0
 **section_type_diversity:** 1
 **validation_issues:** 3
-**step_duration:** 2.1696090698242188e-05
+**step_duration:** 2.002716064453125e-05
 
 ## Generated Files
 

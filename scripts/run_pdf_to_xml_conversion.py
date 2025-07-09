@@ -29,15 +29,16 @@ import pandas as pd
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 # Add project root to path
-sys.path.append(str(Path(__file__).parent.parent))
+PROJECT_ROOT = str(Path(__file__).parent.parent)
+sys.path.append(PROJECT_ROOT)
 
-from helpers import initialize_logging, timer_wrap
+from src.helpers import initialize_logging, timer_wrap
 
 TEMP_SUFFIX = '.part'
 
 # Import existing conversion functions (without modification)
 sys.path.append(str(Path(__file__).parent.parent / "src"))
-from pdf_to_xml_conversion import (
+from src.pdf_to_xml_conversion import (
     load_conversion_candidates,
     inventory_existing_xml,
     convert_one,
@@ -414,8 +415,8 @@ def run_pdf_to_xml_conversion(data_dir: str = "Data",
             
             # Enhanced batch conversion with progress tracking
             log = []
-            xml_dir = Path(data_dir) / "train" / "XML"
-            xml_dir.mkdir(exist_ok=True)
+            # xml_dir = Path(data_dir) / "train" / "XML"
+            # xml_dir.mkdir(exist_ok=True)
             
             from tqdm import tqdm
             
@@ -429,8 +430,12 @@ def run_pdf_to_xml_conversion(data_dir: str = "Data",
                     pdf_path = Path(data_dir) / pdf_path
                 else:
                     pdf_path = Path(pdf_path_str)
+
+                xml_dir = pdf_path.parent / "XML"
+                xml_dir.mkdir(exist_ok=True)
                 
                 xml_path = xml_dir / f"{row['article_id']}.xml{TEMP_SUFFIX}"
+                print(xml_path)
                 
                 try:
                     source = convert_one(pdf_path, xml_path)
@@ -439,7 +444,7 @@ def run_pdf_to_xml_conversion(data_dir: str = "Data",
                     log_entry = {
                         'article_id': row['article_id'],
                         'pdf_path': row['pdf_path'],
-                        'xml_path': str(Path(xml_path).stem),
+                        'xml_path': str(xml_path).replace(TEMP_SUFFIX, ''),
                         'source': source,
                         'error': None,
                         'success': source != "failed",

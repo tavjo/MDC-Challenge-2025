@@ -1,39 +1,31 @@
 # PDF to XML Conversion Comprehensive Report
 
-**Generated:** 2025-07-08 17:30:43
-**Data Directory:** `/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data`
-**Conversion Duration:** 0:00:12.645544
+**Generated:** 2025-07-09 11:52:29
+**Data Directory:** `/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/`
+**Conversion Duration:** 0:00:00.047775
 
 ## Executive Summary
 
 - **Total Conversion Candidates:** 3
-- **Existing XML Files:** 0
-- **Files Needing Conversion:** 3
-- **PDFs Ready for Conversion:** 3
-- **Successful Conversions:** 3
+- **Existing XML Files:** 3
+- **Files Needing Conversion:** 0
+- **PDFs Ready for Conversion:** 0
+- **Successful Conversions:** 0
 - **Failed Conversions:** 0
-- **Coverage KPI:** 0.00%
+- **Coverage KPI:** 100.00%
 - **Quality Issues:** 0
 - **Final XML Coverage:** 3/3
 - **Conversion Session Complete:** True
-- **Total Processing Time:** 12.24s
-- **Average Processing Time:** 4.08s
+- **Total Processing Time:** 0.00s
+- **Average Processing Time:** N/A
 - **Conversion Steps Completed:** 7
-
-## Conversion Performance
-
-- **average_processing_time:** 4.08s
-- **total_processing_time:** 12.24s
-- **fastest_conversion:** 2.333095073699951
-- **slowest_conversion:** 6.939269781112671
-- **processing_rate:** 0.25 files/sec
 
 ## Conversion Start
 
 **message:** PDF to XML conversion process initiated
-**data_directory:** /Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data
+**data_directory:** /Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/
 **grobid_url:** http://localhost:8070
-**timestamp:** 2025-07-08T17:30:30.519530
+**timestamp:** 2025-07-09T11:52:29.460065
 
 ## Step 1 Load Candidates
 
@@ -50,57 +42,57 @@
   - convert_to_xml
 **candidate_file_loaded:** conversion_candidates.csv
 **validation_passed:** True
-**step_duration:** 0.007143974304199219
+**step_duration:** 0.0074808597564697266
 
 ## Step 2 Inventory Xml
 
-**existing_xml_files:** 0
-**files_needing_conversion:** 3
-**conversion_coverage:** 0/3 (0.0%)
-**step_duration:** 0.002283811569213867
+**existing_xml_files:** 3
+**files_needing_conversion:** 0
+**conversion_coverage:** 3/3 (100.0%)
+**step_duration:** 0.0024776458740234375
 
 ## Step 3 Preconversion Validation
 
 **pdf_validation:**
-  - valid_pdfs: 3
+  - valid_pdfs: 0
   - missing_pdfs: 0
   - invalid_paths: []
-**conversion_readiness:** 3/3 PDFs ready for conversion
+**conversion_readiness:** 0/0 PDFs ready for conversion
 **priority_analysis:**
-  - high_priority: 1
+  - high_priority: 0
   - medium_priority: 0
-  - low_priority: 2
-**step_duration:** 0.005141019821166992
+  - low_priority: 0
+**step_duration:** 0.0036051273345947266
 
 ## Step 4 Batch Conversion
 
-**total_processed:** 3
-**successful_conversions:** 3
+**total_processed:** 0
+**successful_conversions:** 0
 **failed_conversions:** 0
 **conversion_sources:**
-  - grobid: 3
+  - grobid: 0
   - pdfplumber: 0
-**step_duration:** 12.596540927886963
+**step_duration:** 0.0019178390502929688
 
 ## Step 5 Generate Report
 
 **conversion_log_generated:** True
 **document_inventory_updated:** True
-**coverage_kpi:** 0.0
-**coverage_meets_threshold:** False
-**step_duration:** 0.013370275497436523
+**coverage_kpi:** 1.0
+**coverage_meets_threshold:** True
+**step_duration:** 0.011888265609741211
 
 ## Step 6 Quality Validation
 
 **quality_validation_completed:** True
 **quality_metrics:**
-  - total_xml_files: 0
+  - total_xml_files: 3
   - small_files: 0
   - large_files: 0
   - average_file_size: 151197.33333333334
   - file_size_distribution: {}
 **validation_issues:** 0
-**step_duration:** 0.0018868446350097656
+**step_duration:** 0.0017688274383544922
 
 ## Step 7 Finalization
 
@@ -108,12 +100,12 @@
 **total_xml_files_available:** 3
 **final_coverage:** 1.0
 **conversion_session_statistics:**
-  - files_processed: 3
-  - successful_conversions: 3
+  - files_processed: 0
+  - successful_conversions: 0
   - failed_conversions: 0
-  - total_processing_time: 12.23847770690918
-  - average_processing_time: 4.079492568969727
-**step_duration:** 0.001583099365234375
+  - total_processing_time: 0
+  - average_processing_time: 0
+**step_duration:** 0.0011560916900634766
 
 ## Generated Files
 

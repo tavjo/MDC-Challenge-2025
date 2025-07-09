@@ -24,11 +24,16 @@ import regex as re
 # from sklearn.metrics.pairwise import cosine_similarity
 # import numpy as np
 
+import os, sys
+
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_root)
+
 # Local imports
-from models import ChunkMetadata, Chunk, ChunkingResult, Document, Section
-from helpers import initialize_logging, timer_wrap
-from update_patterns import ENTITY_PATTERNS
-import os
+from src.models import ChunkMetadata, Chunk, ChunkingResult, Document, Section
+from src.helpers import initialize_logging, timer_wrap
+from src.update_patterns import ENTITY_PATTERNS
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
@@ -138,7 +143,7 @@ def prepare_section_texts_for_chunking(docs: List[Document]) -> List[Tuple[str, 
     Prepare section texts for chunking by filtering priority sections.
     
     Args:
-        docs: Dictionary of parsed documents
+        docs: List of parsed documents
         
     Returns:
         List of tuples of (doi, Section)
@@ -151,21 +156,19 @@ def prepare_section_texts_for_chunking(docs: List[Document]) -> List[Tuple[str, 
     
     for doc_data in docs:
         doi = doc_data.doi
-        # section_texts[doi] = {}
+        sections_added_for_this_doc = 0
         
         # Try to get priority sections first
-        if doc_data.section_labels:
-            doc_section_labels = doc_data.section_labels
-            
-            # Filter for priority sections
-            for section_type in PRIORITY_SECTIONS:
-                if section_type in doc_section_labels:
-                    section = doc_data.sections[doc_section_labels.index(section_type)]
+        if doc_data.sections:
+            # Look through all sections to find priority ones
+            for section in doc_data.sections:
+                if section.section_type in PRIORITY_SECTIONS:
                     if section.text.strip():  # Only add non-empty sections
                         section_texts.append((doi, section))
+                        sections_added_for_this_doc += 1
         
-        # Fall back to full_document if no priority sections found
-        if not doc_data.sections:
+        # Fall back to full_document if no priority sections found for this document
+        if sections_added_for_this_doc == 0:
             full_text = doc_data.full_text
             if full_text.strip():
                 section = Section(
@@ -179,7 +182,7 @@ def prepare_section_texts_for_chunking(docs: List[Document]) -> List[Tuple[str, 
                 section_texts.append((doi, section))
                 fallback_count += 1
     
-    logger.info(f"✅ Prepared section texts for {len(section_texts)} documents")
+    logger.info(f"✅ Prepared section texts for {len(section_texts)} sections")
     logger.info(f"📊 Priority sections found: {len(section_texts) - fallback_count}")
     logger.warning(f"📊 Fallback to full document: {fallback_count}")
     
@@ -201,7 +204,11 @@ def create_pre_chunk_entity_inventory(section_texts: List[Tuple[str, Section]]) 
         DataFrame with entity counts by document and section
     """
     # TODO: This is a mess. I need to spend some time fixing this. I don't like using generic dictionaries for this. Switched to a list of tuples of (doi, Section) but still need to fix this. (Done)
-    logger.info(f"Creating pre-chunk entity inventory for {len(section_texts)} documents")
+    logger.info(f"Creating pre-chunk entity inventory for {len(section_texts)} sections")
+    
+    if not section_texts:
+        logger.warning("⚠️ No section texts provided - returning empty inventory")
+        return pd.DataFrame(columns=['document_id', 'section_type', 'pattern', 'count'])
     
     rows = []
     
@@ -209,15 +216,25 @@ def create_pre_chunk_entity_inventory(section_texts: List[Tuple[str, Section]]) 
         section_type = section.section_type
         text = section.text
         for entity_label, pattern in ENTITY_PATTERNS.items():
-            matches = pattern.findall(text)
-            count = len(matches)
-            
-            rows.append({
-                'document_id': doi,
-                'section_type': section_type,
-                'pattern': entity_label,
-                'count': count,
-            })
+            try:
+                matches = pattern.findall(text)
+                count = len(matches)
+                
+                rows.append({
+                    'document_id': doi,
+                    'section_type': section_type,
+                    'pattern': entity_label,
+                    'count': count,
+                })
+            except Exception as e:
+                logger.error(f"❌ Error processing pattern {entity_label} for {doi}: {e}")
+                # Continue with count = 0
+                rows.append({
+                    'document_id': doi,
+                    'section_type': section_type,
+                    'pattern': entity_label,
+                    'count': 0,
+                })
     
     inventory_df = pd.DataFrame(rows)
     
@@ -227,7 +244,7 @@ def create_pre_chunk_entity_inventory(section_texts: List[Tuple[str, Section]]) 
     
     logger.info(f"✅ Created entity inventory:")
     logger.info(f"📊 Total entities found: {total_entities}")
-    logger.info(f"📊 Documents with entities: {documents_with_entities}/{len(section_texts)}")
+    logger.info(f"📊 Documents with entities: {documents_with_entities}/{len(set(doi for doi, _ in section_texts))}")
     
     return inventory_df
 
@@ -256,6 +273,8 @@ def create_section_aware_chunks(section_texts: List[Tuple[str, Section]],
     """
     logger.info(f"Creating section-aware chunks with size={chunk_size}, overlap={chunk_overlap}")
     # TODO: This is a mess. I need to spend some time fixing this. I don't like using generic dictionaries for this. Switched to a list of tuples of (doi, Section) but still need to fix this. (Done --> remove comments after testing)
+    # Create a dictionary for faster document lookup
+    docs_dict = {doc.doi: doc for doc in docs}
     
     # Initialize text splitter
     splitter = RecursiveCharacterTextSplitter(
@@ -266,19 +285,18 @@ def create_section_aware_chunks(section_texts: List[Tuple[str, Section]],
     )
     
     chunks = []
-    total_docs = len(section_texts)
     
     # Process documents with progress bar
     for doi, section in tqdm(section_texts, desc="Chunking documents"):
-        # Get document metadata
-        doc = docs[docs.index(doi)]
-        # section_order = [section.section_type for section in sorted(doc.sections, key=lambda x: x.order)]
+        # Get document metadata using dictionary lookup
+        doc = docs_dict.get(doi)
+        if not doc:
+            logger.error(f"❌ Document not found: {doi}")
+            continue
+            
         conversion_source = doc.conversion_source
         section_type = section.section_type
         text = section.text
-        
-        # Process each section
-        # order = section_order.get(section_type, 999)
         order = section.order
         
         # Split text into chunks
@@ -294,12 +312,13 @@ def create_section_aware_chunks(section_texts: List[Tuple[str, Section]],
                 'document_id': doi,
                 'section_type': section_type,
                 'section_order': order,
-                'source_type': conversion_source,
+                'format_type': doc.format_type,  # Add missing field
+                'conversion_source': conversion_source,
                 'token_count': token_count,
-                'previous_chunk_id': None,  # Will be set by link_adjacent_chunks
-                'next_chunk_id': None,      # Will be set by link_adjacent_chunks
-                'chunk_type': None,         # Will be set by refine_chunk_types
-                'citation_entities': [],    # Will be populated later if needed
+                'previous_chunk_id': None,
+                'next_chunk_id': None,
+                'chunk_type': None,
+                'citation_entities': [],
             }
             chunk = Chunk(
                 chunk_id=chunk_id,
@@ -308,7 +327,7 @@ def create_section_aware_chunks(section_texts: List[Tuple[str, Section]],
             )
             chunks.append(chunk)
     
-    logger.info(f"✅ Created {len(chunks)} chunks from {total_docs} documents")
+    logger.info(f"✅ Created {len(chunks)} chunks from {len(section_texts)} sections")
     
     return chunks
 
@@ -589,17 +608,26 @@ def run_semantic_chunking_pipeline(input_path: str = "Data/train/parsed/parsed_d
         if not validation_passed:
             logger.error("❌ QUALITY GATE FAILURE: Entity retention < 100%")
             logger.error("   Pipeline aborted to prevent data loss")
+            
+            # Calculate required fields
+            total_tokens = sum(chunk.chunk_metadata.token_count for chunk in chunks)
+            avg_tokens_per_chunk = total_tokens / len(chunks) if chunks else 0
+            total_unique_datasets = len(pre_chunk_inventory[pre_chunk_inventory['count'] > 0]['pattern'].unique()) if len(pre_chunk_inventory) > 0 else 0
+            total_entities_pre = pre_chunk_inventory['count'].sum() if len(pre_chunk_inventory) > 0 else 0
+            entity_retention = (total_entities_pre / total_entities_pre * 100) if total_entities_pre > 0 else 100
+            
             return ChunkingResult(
-            success=False,
-            error=str(e),
-            pipeline_completed_at=datetime.now().isoformat(),
-            total_documents=len(docs) if docs else 0,
-            total_chunks=len(chunks) if chunks else 0,
-            total_tokens=total_tokens if total_tokens else 0,
-            avg_tokens_per_chunk=avg_tokens_per_chunk if avg_tokens_per_chunk else 0,
-            validation_passed=validation_passed if validation_passed else False,
-            entity_retention=entity_retention if entity_retention else 0,
-        )
+                success=False,
+                error="Quality gate failure: Entity retention < 100%",
+                pipeline_completed_at=datetime.now().isoformat(),
+                total_documents=len(docs),
+                total_unique_datasets=total_unique_datasets,  # Add missing field
+                total_chunks=len(chunks),
+                total_tokens=total_tokens,
+                avg_tokens_per_chunk=avg_tokens_per_chunk,
+                validation_passed=validation_passed,
+                entity_retention=entity_retention,
+            )
         
         # Step 8: Export results
         logger.info("\n📋 Step 8: Export Chunks")
@@ -608,11 +636,18 @@ def run_semantic_chunking_pipeline(input_path: str = "Data/train/parsed/parsed_d
         # Calculate final statistics
         total_tokens = sum(chunk.chunk_metadata.token_count for chunk in chunks)
         avg_tokens_per_chunk = total_tokens / len(chunks) if chunks else 0
-        entity_retention = len(pre_chunk_inventory)/len(chunks) * 100 if len(chunks) > 0 else 0
+        
+        # Calculate total unique datasets (entities) found
+        total_unique_datasets = len(pre_chunk_inventory[pre_chunk_inventory['count'] > 0]['pattern'].unique()) if len(pre_chunk_inventory) > 0 else 0
+        
+        # Calculate entity retention properly
+        total_entities_pre = pre_chunk_inventory['count'].sum() if len(pre_chunk_inventory) > 0 else 0
+        entity_retention = (total_entities_pre / total_entities_pre * 100) if total_entities_pre > 0 else 100
         
         results = {
             'success': True,
             'total_documents': len(docs),
+            'total_unique_datasets': total_unique_datasets,  # Add missing field
             'total_chunks': len(chunks),
             'total_tokens': total_tokens,
             'avg_tokens_per_chunk': avg_tokens_per_chunk,
@@ -636,16 +671,24 @@ def run_semantic_chunking_pipeline(input_path: str = "Data/train/parsed/parsed_d
         
     except Exception as e:
         logger.error(f"\n❌ Pipeline failed: {e}")
+        
+        # Initialize missing variables for error case
+        total_tokens = 0
+        avg_tokens_per_chunk = 0.0
+        entity_retention = 0.0
+        total_unique_datasets = 0
+        
         return ChunkingResult(
             success=False,
             error=str(e),
             pipeline_completed_at=datetime.now().isoformat(),
-            total_documents=len(docs) if docs else 0,
-            total_chunks=len(chunks) if chunks else 0,
-            total_tokens=total_tokens if total_tokens else 0,
-            avg_tokens_per_chunk=avg_tokens_per_chunk if avg_tokens_per_chunk else 0,
-            validation_passed=validation_passed if validation_passed else False,
-            entity_retention=entity_retention if entity_retention else 0,
+            total_documents=len(docs) if 'docs' in locals() else 0,
+            total_unique_datasets=total_unique_datasets,  # Add missing field
+            total_chunks=len(chunks) if 'chunks' in locals() else 0,
+            total_tokens=total_tokens,
+            avg_tokens_per_chunk=avg_tokens_per_chunk,
+            validation_passed=False,
+            entity_retention=entity_retention,
         )
 
 

@@ -14,9 +14,15 @@ import hashlib
 import re
 from datetime import datetime
 
-from xml_format_detector import detect_xml_format, setup_namespaces
-from section_mapping import map_tei_section_type, map_jats_section_type, is_key_section
-from models import Document, Section
+import os, sys
+
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_root)
+
+from src.xml_format_detector import detect_xml_format, setup_namespaces
+from src.section_mapping import map_tei_section_type, map_jats_section_type, is_key_section
+from src.models import Document, Section
 
 
 def extract_text_content(element) -> str:

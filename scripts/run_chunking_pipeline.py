@@ -39,11 +39,14 @@ except ImportError:
     PSUTIL_AVAILABLE = False
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_root)
 
-from helpers import initialize_logging, timer_wrap
-from semantic_chunking import run_semantic_chunking_pipeline
-from models import ChunkingResult
+from src.helpers import initialize_logging, timer_wrap
+from src.semantic_chunking import run_semantic_chunking_pipeline
+from src.models import ChunkingResult
 
 
 class ChunkingReporter:

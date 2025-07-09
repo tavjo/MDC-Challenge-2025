@@ -16,6 +16,8 @@ from datetime import datetime
 
 TEMP_SUFFIX = '.part'
 
+PROJECT_ROOT = str(Path(__file__).parent.parent)
+
 def main():
     print("=== PDF to XML Conversion for MDC-Challenge-2025 ===")
     print(f"Started at: {datetime.now()}")
@@ -161,7 +163,8 @@ def generate_conversion_report(log, cand, all_docs):
         ])
     
     # Get ALL existing XML files
-    xml_dir = Path("Data/train/XML")
+    # pdf_path = all_docs['pdf_path'][0]
+    xml_dir = Path(os.path.join(PROJECT_ROOT, "Data/train/XML"))
     all_xml_files = list(xml_dir.glob("*.xml")) + list(xml_dir.glob("*.xml.part"))
     
     # Create a lookup dictionary for conversion candidates metadata
@@ -171,9 +174,9 @@ def generate_conversion_report(log, cand, all_docs):
     # Create entries for ALL existing XML files
     existing_entries = []
     for xml_file in all_xml_files:
-        xml_file = Path(xml_file).stem if str(xml_file).endswith(TEMP_SUFFIX) else Path(xml_file)
+        # xml_file = Path(xml_file).stem if str(xml_file).endswith(TEMP_SUFFIX) else Path(xml_file)
         print(xml_file)
-        article_id = Path(xml_file).stem #if str(xml_file).endswith(".xml") else xml_file.stem.split(".")[0]
+        article_id = Path(xml_file).stem if not str(xml_file).endswith(TEMP_SUFFIX) else Path(str(xml_file).replace(TEMP_SUFFIX, '')).stem
         print(article_id)
         
         # Check if this file was also processed in this run (shouldn't happen, but just in case)

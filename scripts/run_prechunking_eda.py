@@ -24,10 +24,13 @@ from typing import Dict, List, Any, Optional
 import pandas as pd
 
 # Add src to path for imports
-sys.path.append(str(Path(__file__).parent.parent / "src"))
+# sys.path.append(str(Path(__file__).parent.parent / "src"))
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_root)
 
-from label_mapper import LabelMapper
-from helpers import initialize_logging, timer_wrap
+from src.label_mapper import LabelMapper
+from src.helpers import initialize_logging, timer_wrap
 
 
 class EDAReporter:

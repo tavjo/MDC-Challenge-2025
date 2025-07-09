@@ -10,10 +10,14 @@ import pickle
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 from datetime import datetime
-import os
+import os, sys
 
-from document_parser import parse_document, create_document_entry
-from models import Document
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_root)
+
+from src.document_parser import parse_document, create_document_entry
+from src.models import Document
 
 TEMP_SUFFIX = '.part'
 
@@ -54,10 +58,12 @@ def process_all_documents(inventory_df: pd.DataFrame) -> List[Tuple[Document, Di
     
     for idx, row in inventory_df.iterrows():
         article_id = row['article_id']
-        xml_path = os.path.join("Data/train/XML", row['xml_path'])
+        xml_path = row['xml_path'] #os.path.join("Data/train/XML", row['xml_path'])
         print(xml_path)
         
         source_type = row.get('source', None)
+        if pd.isna(source_type):
+            source_type = None
         
         if pd.isna(xml_path) or not Path(xml_path).exists():
             print(f"⚠️  Skipping {article_id}: XML file not found at {xml_path}")
@@ -208,7 +214,7 @@ def save_parsed_corpus(parsed_documents: List[Tuple[Document, Dict[str, Any]]],
             'doi': doc['doi'],
             'format_type': doc.get('format_type', 'UNKNOWN'),
             'source_type': doc.get('source_type', None),
-            'conversion_source': doc.get('conversion_source', 'unknown'),  # 🆕 NEW
+            'conversion_source': doc.get('conversion_source', 'UNKNOWN'),  # 🆕 NEW
             'section_count': doc['section_count'],
             'section_order': sec_order,
             'total_char_length': doc['total_char_length'],

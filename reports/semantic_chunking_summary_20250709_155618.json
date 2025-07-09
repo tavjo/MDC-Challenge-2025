@@ -1,0 +1,109 @@
+{
+  "metadata": {
+    "generated_at": "2025-07-09T15:56:18.933399",
+    "data_directory": "Data",
+    "chunking_duration": "0:00:00.456968",
+    "chunking_steps_completed": 4
+  },
+  "summary_statistics": {
+    "Configuration Validation": "PASSED",
+    "Pipeline Success": true,
+    "Total Chunks Created": 3,
+    "Entity Retention Rate": "100.0%",
+    "Quality Score": "GOOD",
+    "Total Processing Time": "0.43s",
+    "Average Tokens per Chunk": "261.0",
+    "Chunking Steps Completed": 3
+  },
+  "chunking_metrics": {
+    "total_processed_docs": 3,
+    "successful_chunks": 3,
+    "failed_validations": 0,
+    "processing_times": [
+      0.4302248954772949
+    ],
+    "memory_usage": [
+      170.9609375
+    ],
+    "token_distribution": [],
+    "chunk_types": {},
+    "section_coverage": {},
+    "entity_retention_rate": 100.0,
+    "quality_gates_passed": true
+  },
+  "performance_metrics": {
+    "average_processing_time": 0.4302248954772949,
+    "total_processing_time": 0.4302248954772949,
+    "fastest_processing": 0.4302248954772949,
+    "slowest_processing": 0.4302248954772949,
+    "processing_rate": 2.3243657224684595,
+    "average_memory_mb": 170.9609375,
+    "peak_memory_mb": 170.9609375,
+    "min_memory_mb": 170.9609375
+  },
+  "detailed_sections": {
+    "chunking_start": {
+      "message": "Semantic chunking process initiated",
+      "input_path": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/train/parsed/parsed_documents.pkl",
+      "output_path": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/chunks_for_embedding.pkl",
+      "parameters": {
+        "chunk_size": 300,
+        "chunk_overlap": 30,
+        "min_chars": 500
+      },
+      "timestamp": "2025-07-09T15:56:18.479689"
+    },
+    "step_1_configuration": {
+      "input_validation": "passed",
+      "input_file_exists": true,
+      "configuration": {
+        "chunk_size": 300,
+        "chunk_overlap": 30,
+        "min_chars": 500,
+        "overlap_ratio": 0.1
+      },
+      "step_duration": 0.0002269744873046875
+    },
+    "step_2_core_chunking": {
+      "pipeline_success": true,
+      "total_documents": 3,
+      "total_chunks": 3,
+      "total_tokens": 783,
+      "avg_tokens_per_chunk": 261.0,
+      "validation_passed": true,
+      "entity_retention": 100.0,
+      "step_duration": 0.4302248954772949
+    },
+    "step_3_quality_analysis": {
+      "quality_gates": {
+        "entity_retention_passed": true,
+        "token_distribution_analysis": {
+          "avg_tokens_per_chunk": 261.0,
+          "optimal_range": "160-220 tokens",
+          "acceptable_range": "130-270 tokens",
+          "status": "acceptable"
+        },
+        "processing_efficiency": {
+          "processing_time": 0.4302248954772949,
+          "chunks_per_second": 6.973097167405378,
+          "documents_per_second": 6.973097167405378
+        }
+      },
+      "recommendations": [],
+      "overall_quality_score": "good",
+      "step_duration": 1.6689300537109375e-05
+    }
+  },
+  "generated_files": [
+    {
+      "filepath": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/chunks_for_embedding.pkl",
+      "description": "Chunks for embedding (pickle)",
+      "timestamp": "2025-07-09 15:56:18.919059"
+    },
+    {
+      "filepath": "/Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/chunks_for_embedding_summary.csv",
+      "description": "Chunking summary (CSV)",
+      "timestamp": "2025-07-09 15:56:18.919072"
+    }
+  ]
+}

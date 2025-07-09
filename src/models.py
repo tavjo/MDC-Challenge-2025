@@ -24,7 +24,7 @@ class ChunkMetadata(BaseModel):
     next_chunk_id: Optional[str] = None
     chunk_type: Optional[str] = None          # "body", "header", "caption"
     format_type: Literal["TEI", "JATS", "UNKNOWN"] = Field(..., description="XML Format of the document")
-    conversion_source: Optional[Literal["GROBID", "PDFPLUMBER"]] = Field(None, description="Source of the document")
+    conversion_source: Optional[Literal["GROBID", "PDFPLUMBER", 'UNKNOWN']] = Field(None, description="Source of the document")
     token_count: Optional[int] = None
     citation_entities: Optional[List[str]] = []  # Entities found in this chunk
 
@@ -40,7 +40,7 @@ class Document(BaseModel):
     clean_text_length: int = Field(..., description="Total number of characters in the document after cleaning")
     format_type: Literal["TEI", "JATS", "UNKNOWN"] = Field(..., description="XML Format of the document")
     source_type: Optional[str] = Field(None, description="Source type of the document")
-    conversion_source: Optional[Literal["GROBID", "PDFPLUMBER"]] = Field(None, description="Source of the document")
+    conversion_source: Optional[Literal["GROBID", "PDFPLUMBER","UNKNOWN"]] = Field(None, description="Source of the document")
     # sections_with_text: int = Field(..., description="Number of sections with text in the document")
     parsed_timestamp: str = Field(..., description="Timestamp of when the document was parsed")
     validated: bool = Field(..., description="Whether the document has been validated")
