@@ -45,37 +45,6 @@ TEMP_SUFFIX = '.part'
 # --- Constants ---
 PRIORITY_SECTIONS = ["data_availability", "methods", "supplementary", "results"]
 
-# Entity patterns for citation recognition
-# ENTITY_PATTERNS = {
-#     # Existing patterns
-#     'DOI': re.compile(r'\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+\b', re.IGNORECASE),
-#     'GEO_Series': re.compile(r'\bGSE\d{3,6}\b'),
-#     'GEO_Sample': re.compile(r'\bGSM\d{3,6}\b'),
-#     'SRA_Run': re.compile(r'\bSRR\d{5,}\b'),
-#     'PDB_ID': re.compile(r'\b[A-Za-z0-9]{4}\b'),
-#     'PDB_DOI': re.compile(r'\b10\.2210/pdb[A-Za-z0-9]{4}/pdb\b', re.IGNORECASE),
-#     'ArrayExpress': re.compile(r'\bE-[A-Z]+-\d+\b'),
-#     'dbGaP': re.compile(r'\bphs\d{6}\b'),
-#     'TCGA': re.compile(r'\bTCGA-[A-Z0-9-]+\b'),
-#     'ENA_Project': re.compile(r'\bPRJ[EDN][A-Z]\d+\b'),
-#     'ENA_Study': re.compile(r'\bERP\d{6,}\b'),
-#     'ENA_Sample': re.compile(r'\bSAM[EDN][A-Z]?\d+\b'),
-    
-#     # New additions
-#     'SRA_Experiment': re.compile(r'\bSRX\d{5,}\b'),
-#     'SRA_Project': re.compile(r'\bSRP\d{5,}\b'),
-#     'SRA_Sample': re.compile(r'\bSRS\d{5,}\b'),
-#     'SRA_Study': re.compile(r'\bSRA\d{5,}\b'),
-#     'RefSeq_Chromosome': re.compile(r'\bNC_\d{6,}(?:\.\d+)?\b'),
-#     'ENA_Run': re.compile(r'\bERR\d{6,}\b'),
-#     'ENA_Experiment': re.compile(r'\bERX\d{6,}\b'),
-#     'ENA_Sample2': re.compile(r'\bERS\d{6,}\b'),
-#     'DDBJ_Run': re.compile(r'\bDRR\d{6,}\b'),
-#     'DDBJ_Experiment': re.compile(r'\bDRX\d{6,}\b'),
-#     'ENCODE_Assay': re.compile(r'\bENCSR[0-9A-Z]{6}\b'),
-#     'PRIDE': re.compile(r'\bPXD\d{6,}\b'),
-# }
-
 # --- Load & Filter Functions ---
 
 @timer_wrap

@@ -13,6 +13,7 @@ dependencies = [
     "numpy>=2.3.1",
     "pandas>=2.3.0",
     "pdfplumber>=0.11.7",
+    "pi-heif>=1.0.0",
     "psutil>=7.0.0",
     "pydantic>=2.11.7",
     "pyyaml>=6.0.2",
@@ -23,4 +24,5 @@ dependencies = [
     #"sentence-transformers==2.*", # embeddings for similarity checks
     "tiktoken>=0.8.0", # exact GPT-token counts
     "tqdm>=4.67.1",
+    "unstructured[all]>=0.18.3",
 ]

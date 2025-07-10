@@ -1,59 +1,69 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Literal, Any
+from typing import List, Optional, Dict, Literal, Any, Union
 from datetime import datetime
 import pandas as pd
 
 class Section(BaseModel):
-    # page_start: int
-    # page_end: int
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
     text: str
     section_type: str  # "methods", "results", "data_availability","unknown" etc.
     # section_label: str
     subsections: Optional[List[str]] = []
     order: int
     char_length: int
-    sec_level: int
-    original_type: str
+    sec_level: Optional[int] = None
+    original_type: Optional[str] = None
+
+class CitationEntity(BaseModel):
+    data_citation: str = Field(..., description="Data citation from text")
+    doc_id: str = Field(..., description="DOI of the document where the data citation is found")
+    pages: Optional[List[int]] = Field(None, description="List of page numbers where the data citation is mentioned.")
+    # page_start: Optional[int] = Field(None, description="Page number where the data citation is found")
+    # page_end: Optional[int] = Field(None, description="Second page number where the data citation is found, if it spans multiple pages")
 
 class ChunkMetadata(BaseModel):
     chunk_id: str
     document_id: str  # DOI from step 5
-    section_type: Optional[str] = None        # Primary section containing this chunk
-    section_order: Optional[int] = None       # Order within document sections
+    # section_type: Optional[str] = None        # Primary section containing this chunk
+    # section_order: Optional[int] = None       # Order within document sections
     previous_chunk_id: Optional[str] = None
     next_chunk_id: Optional[str] = None
-    chunk_type: Optional[str] = None          # "body", "header", "caption"
-    format_type: Literal["TEI", "JATS", "UNKNOWN"] = Field(..., description="XML Format of the document")
-    conversion_source: Optional[Literal["GROBID", "PDFPLUMBER", 'UNKNOWN']] = Field(None, description="Source of the document")
-    token_count: Optional[int] = None
-    citation_entities: Optional[List[str]] = []  # Entities found in this chunk
+    # chunk_type: Optional[str] = None          # "body", "header", "caption"
+    # format_type: Optional[Literal["TEI", "JATS", "UNKNOWN"]] = Field(None, description="XML Format of the document")
+    # conversion_source: Optional[Literal["GROBID", "PDFPLUMBER", 'UNKNOWN']] = Field(None, description="Source of the document")
+    token_count: int = Field(..., description="Number of tokens in the chunk")
+    citation_entities: Optional[List[CitationEntity]] = Field(None, description="Citation entities found in this chunk")  # Entities found in this chunk
 
 class Document(BaseModel):
     doi: str = Field(..., description="DOI or unique identifier of the document")
     has_dataset_citation: Optional[bool] = Field(None, description="Whether the document has 1 or more dataset citation")
-    full_text: str = Field(..., description="Full text of the document")
-    section_labels: List[str] = Field(..., description="List of section labels in the document")
-    sections: List[Section] = Field(..., description="List of sections in the document")
-    section_count: int = Field(..., description="Number of sections in the document")
+    full_text: Union[str, List[str]] = Field(..., description="Full text of the document")
+    # section_labels: Optional[List[str]] = Field(None, description="List of section labels in the document")
+    # sections: Optional[List[Section]] = Field(None, description="List of sections in the document")
+    # section_count: int = Field(0, description="Number of sections in the document")
     # section_order: List[int] = Field(..., description="Order of sections in the document")
     total_char_length: int = Field(..., description="Total number of characters in the document")
     clean_text_length: int = Field(..., description="Total number of characters in the document after cleaning")
-    format_type: Literal["TEI", "JATS", "UNKNOWN"] = Field(..., description="XML Format of the document")
-    source_type: Optional[str] = Field(None, description="Source type of the document")
-    conversion_source: Optional[Literal["GROBID", "PDFPLUMBER","UNKNOWN"]] = Field(None, description="Source of the document")
+    # format_type: Optional[Literal["TEI", "JATS", "UNKNOWN"]] = Field(None, description="XML Format of the document")
+    # source_type: Optional[str] = Field(None, description="Source type of the document")
+    # conversion_source: Optional[Literal["GROBID", "PDFPLUMBER","UNKNOWN"]] = Field(None, description="Source of the document")
     # sections_with_text: int = Field(..., description="Number of sections with text in the document")
     parsed_timestamp: str = Field(..., description="Timestamp of when the document was parsed")
     validated: bool = Field(..., description="Whether the document has been validated")
     total_chunks: Optional[int] = Field(None, description="Total number of chunks in the document")
     total_tokens: Optional[int] = Field(None, description="Total number of tokens in the document")
     avg_tokens_per_chunk: Optional[float] = Field(None, description="Average number of tokens per chunk in the document")
-    xml_hash: str = Field(..., description="Hash of the XML file")
-    file_path: str = Field(..., description="Path to the XML file")
+    file_hash: str = Field(..., description="Hash of the document file")
+    file_path: str = Field(..., description="Path to the document file")
+    citation_entities: Optional[List[CitationEntity]] = Field(None, description="List of citation entities found in the document")
+    n_pages: Optional[int] = Field(None, description="Number of pages in the document")
 
 class Chunk(BaseModel):
     chunk_id: str
     text: str
     score: Optional[float] = None       # similarity score (added later)
+    # label: Literal["PRIMARY", "SECONDARY", "MISSING", "UNKNOWN"] = Field(..., description="Label of the dataset citation within the chunk if any citation is found")
     chunk_metadata: ChunkMetadata
     
     def __str__(self):
@@ -84,28 +94,31 @@ class Dataset(BaseModel):
     dataset_url: Optional[str] = Field(None, description="Dataset URL")
     total_char_length: int = Field(..., description="Total number of characters")
     clean_text_length: int = Field(..., description="Total number of characters after cleaning")
-    format_type: Literal["TEI", "JATS", "UNKNOWN"] = Field(..., description="XML Format of the document")
-    conversion_source: Optional[Literal["GROBID", "PDFPLUMBER"]] = Field(None, description="Source of the document")
-    dataset_type: Optional[str] = Field(None, description="Dataset Type: main target of the classification task")
+    # format_type: Literal["TEI", "JATS", "UNKNOWN"] = Field(..., description="XML Format of the document")
+    # conversion_source: Optional[Literal["GROBID", "PDFPLUMBER"]] = Field(None, description="Source of the document")
+    dataset_type: Optional[Literal["PRIMARY", "SECONDARY"]] = Field(None, description="Dataset Type: main target of the classification task")
+    text: str = Field(..., description= "Text in the document where the dataset citation is found") 
 
 class FirstClassifierInput(BaseModel):
     """Input for classifier to determine if a document has a dataset citation"""
     doc: Document = Field(..., description="Document to be classified")
-    embeddings: List[float] = Field(..., description="Embeddings of the document")
+    embeddings: List[float] = Field(..., description="Embeddings of the text within the document potentially containing dataset citations")
     UMAP_1: Optional[float] = Field(None, description="UMAP 1 dimension")
     UMAP_2: Optional[float] = Field(None, description="UMAP 2 dimension")
     PC_1: Optional[float] = Field(None, description="PC 1 dimension")
     PC_2: Optional[float] = Field(None, description="PC 2 dimension")
+    has_data_citation: bool = Field(..., description="Whether the document has a dataset citation: first classifer target variable")
 
 
 class SecondClassifierInput(BaseModel):
     """Input for classifer that predicts the type of dataset citation"""
     dataset: Dataset = Field(..., description="Dataset to be classified")
-    embeddings: List[float] = Field(..., description="Embeddings of the dataset")
+    embeddings: List[float] = Field(..., description="Embeddings of the text containing the dataset citation")
     UMAP_1: Optional[float] = Field(None, description="UMAP 1 dimension")
     UMAP_2: Optional[float] = Field(None, description="UMAP 2 dimension")
     PC_1: Optional[float] = Field(None, description="PC 1 dimension")
     PC_2: Optional[float] = Field(None, description="PC 2 dimension")
+    has_primary: bool = Field(..., description="Whether the dataset citation is a primary dataset citation. Since there are only 2 classes at this stage, anything else is a secondary dataset citation.")
 
 class PreprocessingReport(BaseModel):
     """Report of the preprocessing pipeline"""

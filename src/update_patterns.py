@@ -44,8 +44,39 @@ DEFAULT_PATTERNS = {
         'PRIDE': re.compile(r'\bPXD\d{6,}\b'),
         'WIKIDATA': re.compile(r'^(Q|P|E|L)\d+$'),
         'OCID': re.compile(r'^[0-9]{12}$'),
-        'DOID': re.compile(r'^\d+$')
+        'DOID': re.compile(r'^\d+$'),
+
+        # from train labels
+        ## small-molecule & protein resources
+        "ChEMBL": re.compile(r"\bCHEMBL\d+\b"), # ✔ CHEMBL2031
+        "InterPro": re.compile(r"\bIPR\d{6}\b"), # ✔ IPR000001
+        "Pfam": re.compile(r"\bPF\d{5}(?:\.\d+)?\b"),# now allows optional version, e.g. PF00001.21
+        "UniProt": re.compile(r"\b(?:[A-NR-Z][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]{4}[A-Z0-9]{5})\b"),# 6- & 10-char formats
+        "CATH": re.compile(r"\b\d+\.\d+\.\d+\.\d+\b"), # 1.10.8.10
+        "KEGG": re.compile(r"\bK\d{5}\b"), # K00001
+        "dbSNP": re.compile(r"\brs\d+\b"),# rs12345
+
+        ## sequence & genome repositories
+        "Ensembl": re.compile(r"\bENS[A-Z]{0,5}[GTRP]\d{11}\b"),#ENSG00000139618, ENSMUSG00000064341
+        "RefSeq_mRNA": re.compile(r"\bNM_\d{6,}(?:\.\d+)?\b"),# NM_000546.6
+        "RefSeq_Protein": re.compile(r"\bNP_\d{6,}(?:\.\d+)?\b"),# NP_000537.3
+        "RefSeq_Genome": re.compile(r"\b[A-Z]{2}_\d{6,}(?:\.\d+)?\b"),# NC_000001.11
+        "GenBank": re.compile(r"\b[A-Z]{1,2}\d{5,8}(?:\.\d+)?\b"),# M10051, AF231982.1
+        "DDBJ": re.compile(r"\bD\d{5}(?:-\d+)?(?:\.\d+)?\b"),# D12345-2
+        "GISAID": re.compile(r"\bEPI_ISL_\d+\b"),# EPI_ISL_402124
+        
+        ## imaging, proteomics, models
+        "EMPIAR": re.compile(r"\bEMPIAR-\d{5,}\b"),# EMPIAR-10028
+        "PRIDE": re.compile(r"\bPXD\d{6}\b"),# PXD000001
+        "ExpressionAtlas": re.compile(r"\bE-PROT-\d+\b"),# E-PROT-17
+        "BioModels": re.compile(r"\bMODEL\d{10,13}\b"),# MODEL1402200001
+        
+        ## antibodies, cell lines, others
+        "HPA_Antibody": re.compile(r"\bHPA\d{6}\b"),# HPA002830
+        "CAB_Antibody": re.compile(r"\bCAB\d{6}\b"),# CAB004270
+        "Cellosaurus": re.compile(r"\bCVCL_[A-Z0-9]{4,}\b"),# CVCL_00000000
     }
+
 
 @timer_wrap
 def download_bioregistry_data(url: str = REG_URL):
@@ -85,7 +116,6 @@ def load_bioregistry_data(local_path: str = "artifacts/bioregistry_data.json") -
     print(f"Wrote {len(patterns)} patterns.")
     return patterns
 
-
 @timer_wrap
 def load_entity_patterns(local_path="artifacts/entity_patterns.yaml") -> dict[str, re.Pattern]:
     try:
@@ -99,14 +129,48 @@ def load_entity_patterns(local_path="artifacts/entity_patterns.yaml") -> dict[st
         raw = yaml.safe_load(text)
         compiled = {k: re.compile(v["regex"], re.IGNORECASE) for k, v in raw.items()}
         logger.info(f"Loaded {len(compiled)} patterns from {local_path}")
-        # Check if any of the default patterns are in the compiled patterns
-        for k, v in DEFAULT_PATTERNS.items():
-            if k in compiled:
-                logger.info(f"Default pattern {k} is in the compiled patterns. Updating it.")
-                compiled[k] = v
         return compiled
+    except Exception as e:
+        logger.error(f"Unable to load entity patterns from {local_path}. Falling back to baked-in patterns.")
+
+@timer_wrap
+def get_patterns_from_train_labels(compiled: dict[str, re.Pattern],labels_file: str = "Data/train_labels.csv") -> dict[str, re.Pattern]:
+    """
+    Get patterns from train labels file.
+    """
+    import pandas as pd
+    labels_df = pd.read_csv(labels_file)
+    get_unique_dataset_ids = labels_df[labels_df["dataset_id"] != "Missing"]["dataset_id"].unique()
+    new_patterns = {}
+    # determine if any of the dataset ids are in the default patterns
+    for dataset_id in get_unique_dataset_ids:
+        for k, pattern in DEFAULT_PATTERNS.items():
+            if re.match(pattern, dataset_id):
+                new_patterns[k.upper()] = pattern
+
+    # add patterns from bioregistry
+    # compiled = load_entity_patterns(local_path)
+    for k, pattern in compiled.items():
+        for dataset_id in get_unique_dataset_ids:
+            if re.match(pattern, dataset_id):
+                new_patterns[k.upper()] = pattern
+
+    return new_patterns
+
+@timer_wrap
+def update_entity_patterns(local_path="artifacts/entity_patterns.yaml") -> dict[str, re.Pattern]:
+    try:
+        compiled = load_entity_patterns(local_path)
+        new_patterns = get_patterns_from_train_labels(compiled)
+        # Check if any of the default patterns are in the compiled patterns
+        for k, v in new_patterns.items():
+            if k.upper() in compiled:
+                logger.info(f"Default pattern {k} is in the compiled patterns. Updating it.")
+                new_patterns[k.upper()] = v
+        return new_patterns
     except Exception as e:
         logger.warning(f"Falling back to baked-in patterns – {e}")
         return DEFAULT_PATTERNS
 
-ENTITY_PATTERNS = load_entity_patterns()
+
+ENTITY_PATTERNS = update_entity_patterns()

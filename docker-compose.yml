@@ -1,0 +1,39 @@
+services:
+  mdc-challenge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mdc-challenge-2025
+    environment:
+      - PYTHONPATH=/app
+      - UV_CACHE_DIR=/tmp/uv-cache
+    volumes:
+      # Mount data directory for persistence
+      - ./Data:/app/Data
+      - ./logs:/app/logs
+      - ./src:/app/src
+      - ./artifacts:/app/artifacts
+    working_dir: /app
+    # Use consistent command with Dockerfile (remove "uv run")
+    command: ["python", "src/get_citation_entities.py"]
+
+  # Optional: Development service with interactive shell
+  mdc-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mdc-challenge-dev
+    environment:
+      - PYTHONPATH=/app
+      - UV_CACHE_DIR=/tmp/uv-cache
+    volumes:
+      # Mount entire project for development
+      - ./:/app
+      - uv-cache:/tmp/uv-cache
+    working_dir: /app
+    command: ["tail", "-f", "/dev/null"]  # Keep container running
+    profiles:
+      - dev
+
+volumes:
+  uv-cache:

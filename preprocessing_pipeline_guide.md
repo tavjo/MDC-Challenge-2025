@@ -32,8 +32,6 @@ cd MDC-Challenge-2025
 
 # Install dependencies
 uv sync
-# or
-pip install -e .
 ```
 
 ### Verify Installation
@@ -63,11 +61,11 @@ python preprocessing.py --data-dir Data --chunk-size 300 --chunk-overlap 30
 # Run only pre-chunking EDA and document conversion
 python preprocessing.py --steps pre_chunking_eda,doc_conversion
 
-# Run up to semantic chunking
-python preprocessing.py --up-to semantic_chunking
-
 # Run from document parsing onwards
 python preprocessing.py --from document_parsing
+
+# Run up to semantic chunking
+python preprocessing.py --up-to semantic_chunking
 ```
 
 ### Resume After Interruption
