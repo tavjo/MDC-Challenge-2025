@@ -144,15 +144,17 @@ def get_patterns_from_train_labels(compiled: dict[str, re.Pattern],labels_file: 
     new_patterns = {}
     # determine if any of the dataset ids are in the default patterns
     for dataset_id in get_unique_dataset_ids:
+        dataset_id_pattern = rf"\b{re.escape(dataset_id)}\b"
         for k, pattern in DEFAULT_PATTERNS.items():
-            if re.match(pattern, dataset_id):
+            if re.match(dataset_id_pattern, pattern):
                 new_patterns[k.upper()] = pattern
 
     # add patterns from bioregistry
     # compiled = load_entity_patterns(local_path)
-    for k, pattern in compiled.items():
-        for dataset_id in get_unique_dataset_ids:
-            if re.match(pattern, dataset_id):
+    for dataset_id in get_unique_dataset_ids:
+        dataset_id_pattern = rf"\b{re.escape(dataset_id)}\b"
+        for k, pattern in compiled.items():
+            if re.match(dataset_id_pattern, pattern):
                 new_patterns[k.upper()] = pattern
 
     return new_patterns

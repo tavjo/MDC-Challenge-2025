@@ -181,7 +181,7 @@ class CitationEntityExtractor:
                 dataset_ids = labels_dict[article_id]
             # load the pdf file
             pages = load_pdf_pages(file)
-            self._get_known_entities(pages, article_id, dataset_ids)
+            self._get_known_entities(pages=pages, article_id=article_id, dataset_ids=dataset_ids)
         #final check: compare length of citation entities with length of dataset IDs
         known_entities_count = len(self.labels_df[self.labels_df["dataset_id"] != "Missing"])
         if len(self.citation_entities) != known_entities_count:
@@ -212,7 +212,7 @@ class CitationEntityExtractor:
             article_id = Path(file).stem
             # load the pdf file
             pages = load_pdf_pages(file)
-            self._get_unknown_entities(pages, article_id)
+            self._get_unknown_entities(pages=pages, article_id=article_id)
         # get total number of entities extracted
         total_entities = len(self.citation_entities)
         # get total number of unique entities extracted

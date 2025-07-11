@@ -162,7 +162,7 @@ def load_pdf_pages(pdf_path: str) -> List[str]:
 
 
 if __name__ == "__main__":
-    pdf_path = os.path.join(project_root, "docs/manuscripts/agee_jacs_2024_combined.pdf")
+    pdf_path = os.path.join(project_root, "Data/train/PDF/10.1002_2017jc013030.pdf")
     page_dicts = extract_pdf_text(pdf_path)
     print(page_dicts)
 
