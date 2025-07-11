@@ -21,6 +21,8 @@ RUN uv sync --frozen --no-dev
 
 # Copy the rest of the application
 COPY src/ ./src/
+COPY tests/ ./tests/
+COPY scripts/ ./scripts/
 
 # Create necessary directories
 RUN mkdir -p Data logs artifacts

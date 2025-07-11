@@ -201,7 +201,7 @@ def parallel_processing_decorator(
                     if len(args) == 0:
                         raise ValueError("No positional arguments provided to the function")
                     obj_list = args[0]
-                if not obj_list:
+                if len(obj_list) == 0:
                     raise ValueError("No objects available to process")
                 logger.info(f"Running {func.__name__} on {len(obj_list)} objects in batches of {batch_size}")
 
@@ -230,7 +230,7 @@ def parallel_processing_decorator(
                     if flatten:
                         try:
                             flat = flatten_results(func, results)
-                            logger.info(f"Flattened results: {flat}")
+                            logger.info(f"Flattened results.")
                             return flat
                         except Exception as e:
                             logger.error(f"Error flattening results: {e}")

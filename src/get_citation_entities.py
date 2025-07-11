@@ -8,11 +8,14 @@ This script is currently only meant to operate on PDF files.
 """
 
 import re
-from typing import List, Optional
+from typing import List, Optional, Dict, Set
 from pathlib import Path
 import pandas as pd
 import numpy as np
 import sys, os, json
+import nltk
+from nltk.corpus import stopwords
+import pathlib
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -21,11 +24,57 @@ sys.path.append(project_root)
 
 from src.helpers import timer_wrap, initialize_logging, parallel_processing_decorator
 from src.models import CitationEntity
-from src.update_patterns import ENTITY_PATTERNS
+from src.patterns import PATTERNS
 from src.extract_pdf_text_unstructured import load_pdf_pages
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
+
+# Download stopwords on startup (only if not already downloaded)
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords', quiet=True)
+
+# Add after existing constants
+STOP = set(nltk.corpus.stopwords.words("english"))
+TRIGGERS = {
+    "dataset", "accession", "deposited", "released",
+    "retrieved", "GEO", "SRA", "BioProject", "archive", 
+    "stored", "repository", "downloaded", "accession"
+}
+
+def _passes_lexical_filters(token: str) -> bool:
+    # Normalize token: strip trailing punctuation and convert to lowercase
+    tok = re.sub(r"\W+$", "", token).lower()
+    
+    if tok in STOP: 
+        return False
+    if tok.isdigit() and len(tok) <= 4:   # likely a year
+        return False
+    if not any(c.isdigit() for c in tok):
+        return False
+    return True
+
+def _in_lookup(candidate: str) -> bool:
+    # Extract prefix using regex to handle cases like "MODEL1234567890" correctly
+    m = re.match(r"([A-Z]{2,5})", candidate)
+    prefix = m.group(1) if m else None
+    
+    if not prefix:
+        return True  # no valid prefix found → trust regex
+    
+    tsv_file = pathlib.Path(f"artifacts/lookups/{prefix.lower()}.tsv")
+    if tsv_file.exists():
+        if not hasattr(_in_lookup, "_cache"):
+            _in_lookup._cache = {}
+        if prefix not in _in_lookup._cache:
+            _in_lookup._cache[prefix] = set(tsv_file.read_text().splitlines())
+        return candidate in _in_lookup._cache[prefix]
+    else:
+        # Warn user about missing lookup file to avoid silent failures
+        logger.warning(f"Lookup file missing for prefix '{prefix}': {tsv_file}")
+        return True   # no lookup → trust regex
 
 @timer_wrap
 class CitationEntityExtractor:
@@ -34,7 +83,8 @@ class CitationEntityExtractor:
                  known_entities: bool = True,
                  labels_file: Optional[str] = "train_labels.csv", 
                  draw_subset: bool = False,
-                 subset_size: Optional[int] = None):
+                 subset_size: Optional[int] = None,
+                 use_ner: bool = True):  # Add this parameter
         logger.info(f"Initializing CitationEntityExtractor with data directory: {data_dir}")
         self.data_dir = os.path.join(project_root, data_dir)
         self.known_entities = known_entities
@@ -52,7 +102,7 @@ class CitationEntityExtractor:
             logger.info("No known entities provided. Using regex patterns to extract citation entities.")
             self.labels_path = None
             self.labels_df = pd.DataFrame(columns = ["article_id", "dataset_id"])
-            self.patterns = ENTITY_PATTERNS
+            self.patterns = PATTERNS
             self.article_ids = [Path(file).stem for file in self.pdf_files]
         if draw_subset:
             self.subset_size = subset_size if subset_size is not None else 20
@@ -62,9 +112,39 @@ class CitationEntityExtractor:
             self.subset_ids = np.random.choice(self.pdf_files, self.subset_size, replace=False)
             self.pdf_files = self.subset_ids
         
+        self.use_ner = use_ner
+        if self.use_ner:
+            import spacy
+            self._nlp = spacy.load("en_core_sci_sm", disable=["parser","tagger"])
+        
         self.citation_entities: List[CitationEntity] = []
+        self.doc_pages: Dict[str, List[str]] = self._load_doc_pages(pdf_files=self.pdf_files)
+    
+    @parallel_processing_decorator(batch_param_name="pdf_files", batch_size=10, max_workers=8, flatten=True)
+    def _load_doc_pages(self, pdf_files: List[str]) -> Dict[str, List[str]]:
+        """
+        load all document pages into memory once.
+        """
+        # check if there are any pdf files
+        if len(pdf_files) == 0:
+            logger.warning("No PDF files found. Returning empty dict.")
+            return {}
+        doc_pages = {}
+        for file in pdf_files:
+            article_id = Path(file).stem
+            # check if the file exists
+            if not os.path.exists(file):
+                logger.warning(f"File not found: {file}")
+                continue
+            else:
+                logger.info(f"Loading pages for {article_id}")
+                pages = load_pdf_pages(file)
+                doc_pages[article_id] = pages
+        logger.info(f"Loaded {len(doc_pages)} documents.")
+        return doc_pages
 
-    @parallel_processing_decorator(batch_param_name="pages", batch_size=5, max_workers=8)
+
+    # @parallel_processing_decorator(batch_param_name="pages", batch_size=5, max_workers=8, flatten=True)
     def _get_known_entities(self, pages: List[str], article_id: str, dataset_ids: List[str]) -> List[CitationEntity]:
         """
         Get known entities from the document text using the known entities from the labels file.
@@ -73,25 +153,27 @@ class CitationEntityExtractor:
         
         # Track pages per dataset_id
         dataset_pages = {}  # dataset_id -> set of pages where it appears
+        # citation_entities = set()
         
         for idx, page in enumerate(pages):
             page_num = idx + 1
             logger.info(f"Processing page {page_num} of {num_pages}")
             
             for dataset_id in dataset_ids:
-                pattern = rf"\b{re.escape(dataset_id)}\b"
-                matches = re.findall(pattern, page)
+                # Try to use pattern from PATTERNS first, fallback to simple regex
+                pattern = self.patterns.get(dataset_id.split(':',1)[0])
+                if pattern is None:
+                    pattern = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(dataset_id)}(?![A-Za-z0-9_])")
                 
-                if matches:
-                    # Initialize if not exists
-                    if dataset_id not in dataset_pages:
-                        dataset_pages[dataset_id] = set()
-                    
-                    # Add current page to this dataset's pages
-                    dataset_pages[dataset_id].add(page_num)
+                for m in pattern.finditer(page):
+                    candidate = m.group(0)
+                    if candidate == dataset_id:  # Only accept exact matches for known entities
+                        if dataset_id not in dataset_pages:
+                            dataset_pages[dataset_id] = set()
+                        dataset_pages[dataset_id].add(page_num)
         
         # Create one CitationEntity per unique dataset_id found
-        entities = []
+        entities = list()
         for dataset_id, pages_set in dataset_pages.items():
             citation_entity = CitationEntity(
                 data_citation=dataset_id,
@@ -102,35 +184,60 @@ class CitationEntityExtractor:
         
         # Add to the main list
         self.citation_entities.extend(entities)
+        # deduplicate citation entities
+        # entities = list(set(entities))
         
-        return entities
+        return self.citation_entities
 
-    @parallel_processing_decorator(batch_param_name="pages", batch_size=5, max_workers=8)
+    # @parallel_processing_decorator(batch_param_name="pages", batch_size=5, max_workers=8)
     def _get_unknown_entities(self, pages: List[str], article_id: str) -> List[CitationEntity]:
         """
         Get unknown entities from the document text using the regex patterns from `src/update_patterns.py`
         """
+        # Add at the beginning
+        raw_matches = 0
+        after_lexical = 0
+        after_trigger = 0
+        after_ner = 0
+        after_lookup = 0
+        
         num_pages = len(pages)
         
         # Track pages per matched entity
         entity_pages = {}  # matched_entity -> set of pages where it appears
+
+        logger.info(f"Starting Entity Extraction for {article_id} with {len(self.patterns)} patterns.")
         
         for idx, page in enumerate(pages):
             page_num = idx + 1
             logger.info(f"Processing page {page_num} of {num_pages}")
             
             for name, pattern in self.patterns.items():
-                matches = pattern.findall(page)
-                logger.info(f"Found {len(matches)} matches for {name}")
-                
-                if matches:
-                    for match in matches:
-                        # Initialize if not exists
-                        if match not in entity_pages:
-                            entity_pages[match] = set()
-                        
-                        # Add current page to this entity's pages
-                        entity_pages[match].add(page_num)
+                for m in pattern.finditer(page):
+                    raw_matches += 1
+                    candidate = m.group(0)
+                    if not _passes_lexical_filters(candidate):
+                        continue
+                    after_lexical += 1
+                    window = page[max(0, m.start()-250): m.end()+250]
+                    if not any(t in window.lower() for t in TRIGGERS):
+                        continue
+                    after_trigger += 1
+                    
+                    # --- optional NER sanity check ---
+                    if self.use_ner:
+                        if not self._looks_like_dataset(window):
+                            continue
+                        after_ner += 1
+                    
+                    # --- optional lookup validation ---
+                    if not _in_lookup(candidate):
+                        continue
+                    after_lookup += 1
+                    
+                    if candidate not in entity_pages:
+                        entity_pages[candidate] = set()
+                    entity_pages[candidate].add(page_num)
         
         # Create one CitationEntity per unique matched entity found
         entities = []
@@ -141,11 +248,20 @@ class CitationEntityExtractor:
                 pages=sorted(list(pages_set))  # Convert set to sorted list
             )
             entities.append(citation_entity)
-        
+    
         # Add to the main list
         self.citation_entities.extend(entities)
         
-        return entities
+        # Add at the end
+        logger.info(f"Entity extraction metrics for {article_id}: "
+                    f"raw={raw_matches}, lexical={after_lexical}, "
+                    f"trigger={after_trigger}, ner={after_ner}, lookup={after_lookup}")
+        
+        return self.citation_entities
+
+    def _looks_like_dataset(self, context: str) -> bool:
+        doc = self._nlp(context)
+        return any(ent.label_ in {"RESOURCE", "DATASET"} for ent in doc.ents)
 
     def extract_known_entities(self) -> List[CitationEntity]:
         """
@@ -167,21 +283,14 @@ class CitationEntityExtractor:
         if len(self.pdf_files) == 0:
             logger.warning("No PDF files found. Returning empty list.")
             return []
-        for file in self.pdf_files:
-            # check if the file exists
-            if not os.path.exists(file):
-                logger.warning(f"File not found: {file}")
-                continue
-            # extract the article id from the file name
-            article_id = Path(file).stem
+        for article_id, pages in self.doc_pages.items():
             if article_id not in articles_ids:
-                logger.warning(f"Article ID {article_id} not found in the labels file. Skipping file: {file}")
+                logger.warning(f"Article ID {article_id} not found in the labels file. Skipping file: {article_id}")
                 continue
             else:
                 dataset_ids = labels_dict[article_id]
-            # load the pdf file
-            pages = load_pdf_pages(file)
             self._get_known_entities(pages=pages, article_id=article_id, dataset_ids=dataset_ids)
+            # self.citation_entities.extend(list(citation_entities))
         #final check: compare length of citation entities with length of dataset IDs
         known_entities_count = len(self.labels_df[self.labels_df["dataset_id"] != "Missing"])
         if len(self.citation_entities) != known_entities_count:
@@ -199,20 +308,11 @@ class CitationEntityExtractor:
         Extract citation entities from the document text using the regex patterns from `src/update_patterns.py`
         """
         logger.info("Extracting unknown entities using regex patterns.")
-        # check if there are any pdf files
-        if len(self.pdf_files) == 0:
-            logger.warning("No PDF files found. Returning empty list.")
-            return []
-        for file in self.pdf_files:
-            # check if the file exists
-            if not os.path.exists(file):
-                logger.warning(f"File not found: {file}")
-                continue
-            # extract the article id from the file name
-            article_id = Path(file).stem
-            # load the pdf file
-            pages = load_pdf_pages(file)
+        for article_id, pages in self.doc_pages.items():
             self._get_unknown_entities(pages=pages, article_id=article_id)
+            # deduplicate citation entities
+            # citation_entities = list(set(entities))
+            # self.citation_entities.extend(list(citation_entities))
         # get total number of entities extracted
         total_entities = len(self.citation_entities)
         # get total number of unique entities extracted
@@ -255,10 +355,20 @@ class CitationEntityExtractor:
         return [CitationEntity.model_validate(item) for item in raw]
     
 
-if __name__ == "__main__":
-    extractor = CitationEntityExtractor(data_dir="Data", known_entities=True, labels_file="train_labels.csv", draw_subset=True)
+@timer_wrap
+def main():
+    extractor = CitationEntityExtractor(data_dir="Data", known_entities=False, labels_file="train_labels.csv", draw_subset=True, subset_size = 5)
     extractor.extract_entities()
-    extractor.export_entities()
+    extractor.export_entities(output_file = "citation_entities_unknown.json")
+
+    # rerun with known entities
+    # extractor = CitationEntityExtractor(data_dir="Data", known_entities=True, labels_file="train_labels.csv", draw_subset=True, subset_size = 5)
+    # extractor.extract_entities()
+    # extractor.export_entities(output_file = "citation_entities_known.json")
+
+
+if __name__ == "__main__":
+    main()
 
 
 

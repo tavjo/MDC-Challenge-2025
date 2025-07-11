@@ -13,6 +13,8 @@ services:
       - ./logs:/app/logs
       - ./src:/app/src
       - ./artifacts:/app/artifacts
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
     working_dir: /app
     # Use consistent command with Dockerfile (remove "uv run")
     command: ["python", "src/get_citation_entities.py"]
@@ -34,6 +36,42 @@ services:
     command: ["tail", "-f", "/dev/null"]  # Keep container running
     profiles:
       - dev
+
+  # Test service for running entity extraction tests
+  mdc-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mdc-challenge-test
+    environment:
+      - PYTHONPATH=/app
+      - UV_CACHE_DIR=/tmp/uv-cache
+    volumes:
+      # Mount entire project for testing
+      - ./:/app
+      - uv-cache:/tmp/uv-cache
+    working_dir: /app
+    command: ["python", "scripts/run_tests.py"]
+    profiles:
+      - test
+
+  # Pytest service for comprehensive testing
+  mdc-pytest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mdc-challenge-pytest
+    environment:
+      - PYTHONPATH=/app
+      - UV_CACHE_DIR=/tmp/uv-cache
+    volumes:
+      # Mount entire project for testing
+      - ./:/app
+      - uv-cache:/tmp/uv-cache
+    working_dir: /app
+    command: ["python", "-m", "pytest", "tests/test_extractor.py", "-v", "--tb=short"]
+    profiles:
+      - test
 
 volumes:
   uv-cache:

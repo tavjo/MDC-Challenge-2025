@@ -118,7 +118,7 @@ class SecondClassifierInput(BaseModel):
     UMAP_2: Optional[float] = Field(None, description="UMAP 2 dimension")
     PC_1: Optional[float] = Field(None, description="PC 1 dimension")
     PC_2: Optional[float] = Field(None, description="PC 2 dimension")
-    has_primary: bool = Field(..., description="Whether the dataset citation is a primary dataset citation. Since there are only 2 classes at this stage, anything else is a secondary dataset citation.")
+    is_primary: bool = Field(..., description="Whether the dataset citation is a primary dataset citation. Since there are only 2 classes at this stage, anything else is a secondary dataset citation.")
 
 class PreprocessingReport(BaseModel):
     """Report of the preprocessing pipeline"""

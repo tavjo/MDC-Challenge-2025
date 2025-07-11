@@ -1,6 +1,7 @@
 import os, sys
 from pathlib import Path
 from typing import List, Dict, Tuple, Union
+import warnings
 
 try:
     # Unstructured's PDF partitioner returns a list of Elements that already
@@ -57,7 +58,7 @@ def clean_page(text: str) -> str:
     2.  Remove discretionary/soft hyphens.
     3.  Replace ligature glyphs with ASCII equivalents.
     4.  Collapse bare new-lines into a single space.
-    5.  Collapse runs of spaces/tabs.
+    5.  Collapse runs of spaces/tabs/non-breaking spaces.
     6.  NFKD normalisation (helps “weird” accents).
     """
     # 1. join   exam- \n ple  → example
@@ -86,6 +87,8 @@ def extract_pdf_text(
     *,
     include_page_breaks: bool = True,
     return_elements: bool = False,
+    strategy: str = "fast",  # "fast", "hi_res", "ocr_only"
+    include_metadata: bool = True,
 ) -> Union[List[Dict[str, str]], Tuple[List[Dict[str, str]], List[Element]]]:
     """Parse *pdf_path* with **unstructured** and return page-wise text.
 
@@ -96,27 +99,43 @@ def extract_pdf_text(
     include_page_breaks : bool, optional
         Whether to tell ``partition_pdf`` to insert explicit page breaks.
     return_elements : bool, optional
-        If ``True``, also return the raw ``Element`` list so that callers can
-        compute table/figure counts, language detection, etc.  Default is
+        If ``True``, also return the raw ``Element`` list so that 
+        callers can
+        compute table/figure counts, language detection, etc.  
+        Default is
         ``False`` for backward compatibility.
-
+        Partitioning strategy: "fast", "hi_res", or "ocr_only".
+    include_metadata : bool, optional
+        Whether to include metadata in the output.
+    
     Returns
     -------
     list | (list, list)
         * When *return_elements* is ``False`` (default):
           ``List[{'page_number': int, 'text': str}]``
-        * When *True*: a tuple ``(pages, elements)`` where *pages* is the same
-          list described above and *elements* is the unmodified list of
+        * When *True*: a tuple ``(pages, elements)`` where *pages* 
+        is the same
+          list described above and *elements* is the unmodified list 
+          of
           :class:`unstructured.documents.elements.Element` objects.
     """
     path = Path(pdf_path)
     if not path.exists():
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-    logger.info("Parsing PDF %s with unstructured.partition_pdf …", path)
+    logger.info("Parsing PDF %s with unstructured.partition_pdf (strategy: %s)…", path, strategy)
 
-    # Single pass over the PDF
-    elements: List[Element] = partition_pdf(str(path), include_page_breaks=include_page_breaks)
+    # Suppress pdfminer warnings about CropBox/MediaBox
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
+        
+        # Enhanced partition_pdf call with more options
+        elements: List[Element] = partition_pdf(
+            str(path), 
+            include_page_breaks=include_page_breaks,
+            strategy=strategy,
+            include_metadata=include_metadata
+        )
 
     # Group texts by page number
     pages_acc: Dict[int, List[str]] = {}
