@@ -14,10 +14,12 @@ except ImportError as e:
         "Install it with: pip install \"unstructured[all]\""
     ) from e
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+import pickle
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
-from src.helpers import initialize_logging
+from src.helpers import initialize_logging, timer_wrap, parallel_processing_decorator
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(log_file = filename)
@@ -179,10 +181,38 @@ def load_pdf_pages(pdf_path: str) -> List[str]:
         logger.error(f"Error extracting text from {pdf_path}: {e}")
         raise e
 
+@timer_wrap
+@parallel_processing_decorator(batch_param_name="pdf_files", batch_size=50, max_workers=8, flatten=True)
+def get_all_pdfs(pdf_files: List[str], pdf_dir: str, subset: bool = False, subset_size: int = 20):
+    """
+    Load and save all PDFs as a single pickle file in a directory.
+    """
+    if subset:
+        pdf_files = pdf_files[:subset_size]
+        logger.info(f"Subsetting to {subset_size} PDFs")
+    pdf_dicts = {}
+    for pdf_file in pdf_files:
+        article_id = Path(pdf_file).stem
+        pdf_path = os.path.join(pdf_dir, pdf_file)
+        pages = load_pdf_pages(pdf_path)
+        pdf_dicts[article_id] = pages
+    return pdf_dicts
+
+def save_pdf_dicts(pdf_dicts: Dict[str, List[str]], pdf_dir: str):
+    """
+    Save the PDF dictionary to a pickle file.
+    """
+    with open(os.path.join(pdf_dir, "all_pdfs.pkl"), "wb") as f:
+        pickle.dump(pdf_dicts, f)
+    logger.info(f"Loaded and saved {len(pdf_dicts)} PDFs to {os.path.join(pdf_dir, 'all_pdfs.pkl')}")
 
 if __name__ == "__main__":
-    pdf_path = os.path.join(project_root, "Data/train/PDF/10.1002_2017jc013030.pdf")
-    page_dicts = extract_pdf_text(pdf_path)
-    print(page_dicts)
+    # pdf_path = os.path.join(project_root, "Data/train/PDF/10.1002_2017jc013030.pdf")
+    # page_dicts = extract_pdf_text(pdf_path)
+    # print(page_dicts)
+    pdf_dir = os.path.join(project_root, "Data/train/PDF")
+    pdf_files = [f for f in os.listdir(pdf_dir) if f.endswith(".pdf")]
+    pdf_dicts = get_all_pdfs(pdf_files=pdf_files, pdf_dir=pdf_dir)
+    save_pdf_dicts(pdf_dicts=pdf_dicts, pdf_dir=pdf_dir)
 
 __all__ = ["extract_pdf_text"]

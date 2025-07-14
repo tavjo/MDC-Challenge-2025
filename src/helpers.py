@@ -1,11 +1,13 @@
 import logging
-import os, sys, time
+import os, sys, time, hashlib, json
 from functools import wraps
 import inspect
 from typing import List, Any
 from pydantic import BaseModel
 from typing_extensions import get_type_hints
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from src.models import Document
 
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -242,3 +244,69 @@ def parallel_processing_decorator(
                 raise
         return wrapper
     return decorator
+
+def compute_file_hash(file_path: Path) -> str:
+    """Compute MD5 hash of XML file for debugging reference."""
+    try:
+        with open(file_path, 'rb') as f:
+            return hashlib.md5(f.read()).hexdigest()
+    except Exception:
+        return ""
+
+
+def num_tokens(text: str, model: str = "gpt-4o-mini") -> int:
+    import tiktoken
+    encoding = tiktoken.encoding_for_model(model)
+    return len(encoding.encode(text))
+
+@timer_wrap
+def export_docs(documents: List[Document], output_file: str = "documents.json", output_dir: Path = Path(os.path.join(project_root, "Data/train/"))) -> None:
+    """
+    Export the list of CitationEntity objects as plain dicts,
+    avoiding double-encoded JSON strings.
+    """
+    outfile = str(output_dir / output_file)
+    logger.info(f"Exporting {len(documents)} documents to {outfile}")
+    # Use model_dump() to get a JSON-serializable dict directly
+    to_export = [document.model_dump() for document in documents]
+    with open(outfile, "w") as f:
+        json.dump(to_export, f, indent=4)
+
+
+def load_docs(input_file: str = os.path.join(project_root, "Data/train/documents.json")) -> List[Document]:
+    """
+    Load citation entities from a JSON file of dicts,
+    reconstructing each via Pydantic’s model_validate.
+    """
+    logger.info(f"Loading citation entities from {input_file}")
+    with open(input_file, "r") as f:
+        raw = json.load(f)  # List[dict]
+    # Validate and instantiate each model in one step
+    return [Document.model_validate(item) for item in raw]
+
+def clean_text_for_urls(text: str) -> str:
+    import re
+    """
+    Clean text to normalize URLs that may be broken up by spaces.
+    """
+    # remove doi prefix
+    text = re.sub('https://doi.org', '', text)
+    text = re.sub('https://dx.doi.org', '', text)
+    text = re.sub('http://dx.doi.org', '', text)
+    text = re.sub('http://doi.org', '', text)
+    text = re.sub('https://doi.org', '', text)
+    # Fix common URL breakage patterns
+    # Replace "dx.doi. org" with "dx.doi.org" (space after dot)
+    text = re.sub(r'dx\.doi\.\s+org', 'dx.doi.org', text)
+    # Replace "doi. org" with "doi.org" (space after dot)
+    text = re.sub(r'doi\.\s+org', 'doi.org', text)
+    # Replace "http://dx.doi. org" with "http://dx.doi.org"
+    text = re.sub(r'http://dx\.doi\.\s+org', 'http://dx.doi.org', text)
+    # Replace "https://dx.doi. org" with "https://dx.doi.org"
+    text = re.sub(r'https://dx\.doi\.\s+org', 'https://dx.doi.org', text)
+    # Replace "http://doi. org" with "http://doi.org"
+    text = re.sub(r'http://doi\.\s+org', 'http://doi.org', text)
+    # Replace "https://doi. org" with "https://doi.org"
+    text = re.sub(r'https://doi\.\s+org', 'https://doi.org', text)
+    
+    return text

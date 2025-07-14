@@ -8,7 +8,6 @@ class Section(BaseModel):
     page_end: Optional[int] = None
     text: str
     section_type: str  # "methods", "results", "data_availability","unknown" etc.
-    # section_label: str
     subsections: Optional[List[str]] = []
     order: int
     char_length: int
@@ -19,19 +18,13 @@ class CitationEntity(BaseModel):
     data_citation: str = Field(..., description="Data citation from text")
     doc_id: str = Field(..., description="DOI of the document where the data citation is found")
     pages: Optional[List[int]] = Field(None, description="List of page numbers where the data citation is mentioned.")
-    # page_start: Optional[int] = Field(None, description="Page number where the data citation is found")
-    # page_end: Optional[int] = Field(None, description="Second page number where the data citation is found, if it spans multiple pages")
+
 
 class ChunkMetadata(BaseModel):
     chunk_id: str
     document_id: str  # DOI from step 5
-    # section_type: Optional[str] = None        # Primary section containing this chunk
-    # section_order: Optional[int] = None       # Order within document sections
     previous_chunk_id: Optional[str] = None
     next_chunk_id: Optional[str] = None
-    # chunk_type: Optional[str] = None          # "body", "header", "caption"
-    # format_type: Optional[Literal["TEI", "JATS", "UNKNOWN"]] = Field(None, description="XML Format of the document")
-    # conversion_source: Optional[Literal["GROBID", "PDFPLUMBER", 'UNKNOWN']] = Field(None, description="Source of the document")
     token_count: int = Field(..., description="Number of tokens in the chunk")
     citation_entities: Optional[List[CitationEntity]] = Field(None, description="Citation entities found in this chunk")  # Entities found in this chunk
 
@@ -39,18 +32,10 @@ class Document(BaseModel):
     doi: str = Field(..., description="DOI or unique identifier of the document")
     has_dataset_citation: Optional[bool] = Field(None, description="Whether the document has 1 or more dataset citation")
     full_text: Union[str, List[str]] = Field(..., description="Full text of the document")
-    # section_labels: Optional[List[str]] = Field(None, description="List of section labels in the document")
-    # sections: Optional[List[Section]] = Field(None, description="List of sections in the document")
-    # section_count: int = Field(0, description="Number of sections in the document")
-    # section_order: List[int] = Field(..., description="Order of sections in the document")
     total_char_length: int = Field(..., description="Total number of characters in the document")
-    clean_text_length: int = Field(..., description="Total number of characters in the document after cleaning")
-    # format_type: Optional[Literal["TEI", "JATS", "UNKNOWN"]] = Field(None, description="XML Format of the document")
-    # source_type: Optional[str] = Field(None, description="Source type of the document")
-    # conversion_source: Optional[Literal["GROBID", "PDFPLUMBER","UNKNOWN"]] = Field(None, description="Source of the document")
-    # sections_with_text: int = Field(..., description="Number of sections with text in the document")
+    # clean_text_length: int = Field(..., description="Total number of characters in the document after cleaning")
     parsed_timestamp: str = Field(..., description="Timestamp of when the document was parsed")
-    validated: bool = Field(..., description="Whether the document has been validated")
+    # validated: bool = Field(..., description="Whether the document has been validated")
     total_chunks: Optional[int] = Field(None, description="Total number of chunks in the document")
     total_tokens: Optional[int] = Field(None, description="Total number of tokens in the document")
     avg_tokens_per_chunk: Optional[float] = Field(None, description="Average number of tokens per chunk in the document")
@@ -63,7 +48,6 @@ class Chunk(BaseModel):
     chunk_id: str
     text: str
     score: Optional[float] = None       # similarity score (added later)
-    # label: Literal["PRIMARY", "SECONDARY", "MISSING", "UNKNOWN"] = Field(..., description="Label of the dataset citation within the chunk if any citation is found")
     chunk_metadata: ChunkMetadata
     
     def __str__(self):
@@ -94,8 +78,6 @@ class Dataset(BaseModel):
     dataset_url: Optional[str] = Field(None, description="Dataset URL")
     total_char_length: int = Field(..., description="Total number of characters")
     clean_text_length: int = Field(..., description="Total number of characters after cleaning")
-    # format_type: Literal["TEI", "JATS", "UNKNOWN"] = Field(..., description="XML Format of the document")
-    # conversion_source: Optional[Literal["GROBID", "PDFPLUMBER"]] = Field(None, description="Source of the document")
     dataset_type: Optional[Literal["PRIMARY", "SECONDARY"]] = Field(None, description="Dataset Type: main target of the classification task")
     text: str = Field(..., description= "Text in the document where the dataset citation is found") 
 

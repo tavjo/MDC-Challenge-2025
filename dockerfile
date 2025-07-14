@@ -28,4 +28,4 @@ COPY scripts/ ./scripts/
 RUN mkdir -p Data logs artifacts
 
 # Set the default command to run the citation entity extractor
-CMD ["python", "src/get_citation_entities.py"]
+CMD ["python", "src/get_document_objects.py"]

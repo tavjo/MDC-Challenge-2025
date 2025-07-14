@@ -17,7 +17,7 @@ services:
       - ./scripts:/app/scripts
     working_dir: /app
     # Use consistent command with Dockerfile (remove "uv run")
-    command: ["python", "src/get_citation_entities.py"]
+    command: ["python", "src/get_document_objects.py"]
 
   # Optional: Development service with interactive shell
   mdc-dev:
