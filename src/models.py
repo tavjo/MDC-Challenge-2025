@@ -18,6 +18,7 @@ class CitationEntity(BaseModel):
     data_citation: str = Field(..., description="Data citation from text")
     doc_id: str = Field(..., description="DOI of the document where the data citation is found")
     pages: Optional[List[int]] = Field(None, description="List of page numbers where the data citation is mentioned.")
+    evidence: Optional[List[str]] = Field(None, description="List of evidence from the text for the data citation")
 
 
 class ChunkMetadata(BaseModel):

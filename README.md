@@ -1,6 +1,6 @@
 # Make Data Count - Finding Data References Challenge 2025
 
-A comprehensive solution for identifying and classifying data citations in scientific literature using advanced NLP techniques.
+A comprehensive solution for identifying and classifying data citations in scientific literature using advanced NLP techniques. The logical architecture of the implementation can be found [here](logical_arch.svg). 
 
 ## 🎯 Challenge Overview
 

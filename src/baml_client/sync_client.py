@@ -102,7 +102,7 @@ class BamlSyncClient:
         self,
         document: types.Document,
         baml_options: BamlCallOptions = {},
-    ) -> types.CitationExtractor:
+    ) -> List[types.CitationEntity]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
       __tb__ = options.get("tb", None)
       if __tb__ is not None:
@@ -123,7 +123,7 @@ class BamlSyncClient:
         __cr__,
         collectors,
       )
-      return cast(types.CitationExtractor, raw.cast_to(types, types, partial_types, False))
+      return cast(List[types.CitationEntity], raw.cast_to(types, types, partial_types, False))
     
 
 
@@ -142,7 +142,7 @@ class BamlStreamClient:
         self,
         document: types.Document,
         baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlSyncStream[partial_types.CitationExtractor, types.CitationExtractor]:
+    ) -> baml_py.BamlSyncStream[List[partial_types.CitationEntity], List[types.CitationEntity]]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
       __tb__ = options.get("tb", None)
       if __tb__ is not None:
@@ -165,10 +165,10 @@ class BamlStreamClient:
         collectors,
       )
 
-      return baml_py.BamlSyncStream[partial_types.CitationExtractor, types.CitationExtractor](
+      return baml_py.BamlSyncStream[List[partial_types.CitationEntity], List[types.CitationEntity]](
         raw,
-        lambda x: cast(partial_types.CitationExtractor, x.cast_to(types, types, partial_types, True)),
-        lambda x: cast(types.CitationExtractor, x.cast_to(types, types, partial_types, False)),
+        lambda x: cast(List[partial_types.CitationEntity], x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(List[types.CitationEntity], x.cast_to(types, types, partial_types, False)),
         self.__ctx_manager.get(),
       )
     

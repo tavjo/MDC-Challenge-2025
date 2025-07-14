@@ -41,7 +41,7 @@ class LlmResponseParser:
         self,
         llm_response: str,
         baml_options: BamlCallOptions = {},
-    ) -> types.CitationExtractor:
+    ) -> List[types.CitationEntity]:
       __tb__ = baml_options.get("tb", None)
       if __tb__ is not None:
         tb = __tb__._tb # type: ignore (we know how to use this private attribute)
@@ -61,7 +61,7 @@ class LlmResponseParser:
         __cr__,
       )
 
-      return cast(types.CitationExtractor, parsed)
+      return cast(List[types.CitationEntity], parsed)
     
 
 
@@ -78,7 +78,7 @@ class LlmStreamParser:
         self,
         llm_response: str,
         baml_options: BamlCallOptions = {},
-    ) -> partial_types.CitationExtractor:
+    ) -> List[partial_types.CitationEntity]:
       __tb__ = baml_options.get("tb", None)
       if __tb__ is not None:
         tb = __tb__._tb # type: ignore (we know how to use this private attribute)
@@ -98,7 +98,7 @@ class LlmStreamParser:
         __cr__,
       )
 
-      return cast(partial_types.CitationExtractor, parsed)
+      return cast(List[partial_types.CitationEntity], parsed)
     
 
 

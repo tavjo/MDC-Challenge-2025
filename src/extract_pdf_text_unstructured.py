@@ -171,6 +171,9 @@ def load_pdf_pages(pdf_path: str) -> List[str]:
     # 1) Parse PDF once and get both pages + elements
     # --------------------------------------------------
     logger.info(f"Extracting text from {pdf_path}")
+    # Suppress pdfminer warnings about CropBox/MediaBox
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
     try:
         pages_json = extract_pdf_text(str(path), return_elements=False)
         pages: List[str] = [p["text"] for p in pages_json]

@@ -34,7 +34,7 @@ client<llm> MyLocalLLM {
   provider ollama
   options {
     // base_url "http://localhost:11434/v1"
-    model "Phi4"
+    model "deepseek-r1:8b"
   }
 }
 

@@ -1,9 +1,10 @@
 # src/get_document_objects.py
 
-import os, sys
+import os, sys, warnings
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import List
+import numpy as np
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -25,6 +26,9 @@ def build_document_object(pdf_path: str):
         logger.error(f"PDF file does not exist: {pdf_path}")
         return None
     article_id = Path(pdf_path).stem
+    # Suppress pdfminer warnings about CropBox/MediaBox
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
     pages = load_pdf_pages(pdf_path)
     total_char_length = sum(len(page) for page in pages)
     parsed_timestamp = datetime.now(timezone.utc).isoformat()
@@ -45,9 +49,13 @@ def build_document_object(pdf_path: str):
 @timer_wrap
 # @parallel_processing_decorator(batch_param_name="pdf_paths", batch_size=5, max_workers=8, flatten=False)
 def build_document_objects(pdf_paths: List[str], subset: bool = False, subset_size: int = 20) -> List[Document]:
+    # Suppress pdfminer warnings about CropBox/MediaBox
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
     documents = []
     if subset:
-        pdf_paths = pdf_paths[:subset_size]
+        np.random.seed(42)
+        pdf_paths = np.random.choice(pdf_paths, subset_size, replace=False)
         logger.info(f"Subsetting to {subset_size} PDFs")
     for pdf_path in pdf_paths:
         document = build_document_object(pdf_path)

@@ -22,7 +22,7 @@ from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIM
 class TypeBuilder(_TypeBuilder):
     def __init__(self):
         super().__init__(classes=set(
-          ["CitationEntity","CitationExtractor","Document",]
+          ["CitationEntity","Document",]
         ), enums=set(
           []
         ), runtime=DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME)
@@ -31,10 +31,6 @@ class TypeBuilder(_TypeBuilder):
     @property
     def CitationEntity(self) -> "CitationEntityAst":
         return CitationEntityAst(self)
-
-    @property
-    def CitationExtractor(self) -> "CitationExtractorAst":
-        return CitationExtractorAst(self)
 
     @property
     def Document(self) -> "DocumentAst":
@@ -48,7 +44,7 @@ class CitationEntityAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("CitationEntity")
-        self._properties: typing.Set[str] = set([ "data_citation",  "doc_id",  "pages", ])
+        self._properties: typing.Set[str] = set([ "evidence",  "data_citation",  "doc_id",  "pages", ])
         self._props = CitationEntityProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
@@ -77,6 +73,10 @@ class CitationEntityProperties:
     
 
     @property
+    def evidence(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("evidence"))
+
+    @property
     def data_citation(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("data_citation"))
 
@@ -87,48 +87,6 @@ class CitationEntityProperties:
     @property
     def pages(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("pages"))
-
-    
-
-class CitationExtractorAst:
-    def __init__(self, tb: _TypeBuilder):
-        _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("CitationExtractor")
-        self._properties: typing.Set[str] = set([ "citation_entities",  "evidence", ])
-        self._props = CitationExtractorProperties(self._bldr, self._properties)
-
-    def type(self) -> FieldType:
-        return self._bldr.field()
-
-    @property
-    def props(self) -> "CitationExtractorProperties":
-        return self._props
-
-
-class CitationExtractorViewer(CitationExtractorAst):
-    def __init__(self, tb: _TypeBuilder):
-        super().__init__(tb)
-
-    
-    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
-        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
-
-
-
-class CitationExtractorProperties:
-    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
-        self.__bldr = bldr
-        self.__properties = properties
-
-    
-
-    @property
-    def citation_entities(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("citation_entities"))
-
-    @property
-    def evidence(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("evidence"))
 
     
 

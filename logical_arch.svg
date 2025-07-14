@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- MDC Kaggle Challenge – Logical Architecture (revision 4 – XML‑safe) -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <!-- ===== Gradient Fills for Layer Bands ===== -->
+    <linearGradient id="gradPreproc" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  style="stop-color:#e9f5ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d6ecff;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradDuck" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  style="stop-color:#fafafa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ececec;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradTrain" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  style="stop-color:#e9ffe9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d4f9d4;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- ===== Arrow Marker Definition ===== -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#555" />
+    </marker>
+
+    <!-- ===== CSS‑like Styles ===== -->
+    <style>
+      .layer-label { font-size:18px; font-weight:600; fill:#333; }
+      .stage-box  { fill:#ffffff; stroke:#1c75bc; stroke-width:1.5; rx:8; ry:8; }
+      .stage-text { font-size:14px; font-weight:600; fill:#000; pointer-events:none; }
+      .arrow      { stroke:#555; stroke-width:1.7; marker-end:url(#arrow); }
+      .arrow-dash { stroke:#888; stroke-width:1.5; stroke-dasharray:4 4; marker-end:url(#arrow); }
+      .db-box     { fill:#fff7e5; stroke:#d98e04; stroke-width:1.5; rx:8; ry:8; }
+      .db-text    { font-size:13px; fill:#000; pointer-events:none; }
+    </style>
+  </defs>
+
+  <!-- ======================================================= -->
+  <!--  LAYER 1 : PRE‑PROCESSING                               -->
+  <!-- ======================================================= -->
+  <rect x="20" y="20" width="1360" height="300" rx="12" fill="url(#gradPreproc)" />
+  <text x="700" y="42" text-anchor="middle" class="layer-label"> Pre‑processing</text>
+
+  <!-- === Stage: Raw Inputs === -->
+  <rect x="60"  y="80" width="160" height="70" class="stage-box" />
+  <text x="140" y="110" text-anchor="middle" class="stage-text">Raw Inputs</text>
+  <text x="140" y="128" text-anchor="middle" class="stage-text">PDFs / XML / Labels</text>
+
+  <!-- === Stage: Corpus Audit === -->
+  <rect x="240" y="80" width="160" height="70" class="stage-box" />
+  <text x="320" y="115" text-anchor="middle" class="stage-text">Corpus Audit</text>
+
+  <!-- === Stage: PDF → Pages === -->
+  <rect x="420" y="80" width="160" height="70" class="stage-box" />
+  <text x="500" y="110" text-anchor="middle" class="stage-text">PDF → Pages</text>
+  <text x="500" y="128" text-anchor="middle" class="stage-text">(Unstructured)</text>
+
+  <!-- === Forked Citation Discovery === -->
+  <!-- Training branch -->
+  <rect x="600" y="60" width="180" height="70" class="stage-box" />
+  <text x="690" y="92"  text-anchor="middle" class="stage-text">Citation Discovery</text>
+  <text x="690" y="110" text-anchor="middle" class="stage-text">Training (RegEx)</text>
+
+  <!-- Inference branch -->
+  <rect x="600" y="160" width="180" height="70" class="stage-box" />
+  <text x="690" y="192"  text-anchor="middle" class="stage-text">Citation Discovery</text>
+  <text x="690" y="210" text-anchor="middle" class="stage-text">Inference (LLM + Filter)</text>
+
+  <!-- === Stage: Chunking &amp; Masking === -->
+  <rect x="820" y="110" width="200" height="70" class="stage-box" />
+  <text x="920" y="142" text-anchor="middle" class="stage-text">Chunking &amp; Masking</text>
+
+  <!-- === Stage: Embedding &amp; Aggregation === -->
+  <rect x="1050" y="110" width="200" height="70" class="stage-box" />
+  <text x="1150" y="140" text-anchor="middle" class="stage-text">Embedding &amp;</text>
+  <text x="1150" y="158" text-anchor="middle" class="stage-text">Aggregation</text>
+
+  <!-- === Linear / Forked Arrows in Layer 1 === -->
+  <!-- Main left‑to‑right path -->
+  <line x1="220" y1="115" x2="240" y2="115" class="arrow" />
+  <line x1="400" y1="115" x2="420" y2="115" class="arrow" />
+
+  <!-- Fork from PDF → Pages to both citation boxes -->
+  <line x1="580" y1="115" x2="600" y2="95"  class="arrow" />
+  <line x1="580" y1="115" x2="600" y2="195" class="arrow" />
+
+  <!-- Merge back into Chunking -->
+  <line x1="780" y1="95"  x2="820" y2="145" class="arrow" />
+  <line x1="780" y1="195" x2="820" y2="145" class="arrow" />
+
+  <!-- To Embedding -->
+  <line x1="1020" y1="145" x2="1050" y2="145" class="arrow" />
+
+  <!-- ======================================================= -->
+  <!--  DUCKDB  (Unified Intermediate Store)                    -->
+  <!-- ======================================================= -->
+  <rect x="20" y="340" width="1360" height="120" rx="12" fill="url(#gradDuck)" />
+  <text x="700" y="362" text-anchor="middle" class="layer-label"> Database Layer </text>
+  <rect x="540" y="370" width="320" height="80" class="db-box" />
+  <text x="700" y="400" text-anchor="middle" class="db-text">DuckDB – Central Store for</text>
+  <text x="700" y="420" text-anchor="middle" class="db-text">All Intermediate Tables</text>
+  <!-- === Stage: ChromaDB (Vector Embeddings Storage) === -->
+  <rect x="1050" y="370" width="200" height="80" class="db-box" />
+  <text x="1150" y="400" text-anchor="middle" class="db-text">ChromaDB (vector</text>
+  <text x="1150" y="420" text-anchor="middle" class="db-text">embeddings storage)</text>
+  <!-- Arrow from Embedding & Aggregation to ChromaDB -->
+  <line x1="1150" y1="180" x2="1150" y2="370" class="arrow" />
+
+  <!-- ======================================================= -->
+  <!--  LAYER 2 : TRAINING / INFERENCE                          -->
+  <!-- ======================================================= -->
+  <rect x="20" y="480" width="1360" height="380" rx="12" fill="url(#gradTrain)" />
+  <text x="700" y="502" text-anchor="middle" class="layer-label"> Training &amp; Inference</text>
+
+  <!-- === Stage: Dimensionality Reduction === -->
+  <rect x="140" y="560" width="220" height="80" class="stage-box" />
+  <text x="250" y="593" text-anchor="middle" class="stage-text">Dimensionality</text>
+  <text x="250" y="611" text-anchor="middle" class="stage-text">Reduction (PCA/UMAP)</text>
+  <text x="250" y="629" text-anchor="middle" class="stage-text">On Embeddings</text>
+
+  <!-- === Stage: Feature Assembly === -->
+  <rect x="400" y="560" width="220" height="80" class="stage-box" />
+  <text x="510" y="593" text-anchor="middle" class="stage-text">Feature Assembly</text>
+  <text x="510" y="611" text-anchor="middle" class="stage-text">(PCA loadings/</text>
+  <text x="510" y="629" text-anchor="middle" class="stage-text">UMAP Embeddings)</text>
+
+  <!-- === Stage: Train Random‑Forest (upper lane) === -->
+  <rect x="680" y="520" width="220" height="80" class="stage-box" />
+  <text x="790" y="553" text-anchor="middle" class="stage-text">Train Random Forest</text>
+  <text x="790" y="571" text-anchor="middle" class="stage-text">Classifier On Features</text>
+
+  <!-- === Stage: Predict &amp; Submit (lower lane) === -->
+  <rect x="680" y="660" width="220" height="80" class="stage-box" />
+  <text x="790" y="693" text-anchor="middle" class="stage-text">Predict &amp; Submit</text>
+
+  <!-- === Stage: submission.csv output === -->
+  <rect x="960" y="660" width="180" height="80" class="stage-box" />
+  <text x="1050" y="693" text-anchor="middle" class="stage-text">submission.csv</text>
+
+  <!-- === Arrows inside Layer 2 === -->
+  <line x1="360" y1="600" x2="400" y2="600" class="arrow" />
+  <!-- Branch to Train &amp; Predict -->
+  <line x1="620" y1="600" x2="680" y2="560" class="arrow" />
+  <line x1="620" y1="600" x2="680" y2="700" class="arrow" />
+  <!-- Model hand‑off (Train → Predict) -->
+  <line x1="790" y1="600" x2="790" y2="660" class="arrow-dash" />
+
+  <!-- Predict path to submission.csv -->
+  <line x1="900" y1="700" x2="960" y2="700" class="arrow" />
+
+</svg>

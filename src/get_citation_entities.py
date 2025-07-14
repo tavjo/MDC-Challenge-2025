@@ -28,62 +28,11 @@ sys.path.append(project_root)
 from src.helpers import timer_wrap, initialize_logging, parallel_processing_decorator, export_docs, load_docs, clean_text_for_urls
 from src.models import CitationEntity, Document
 from src.baml_client import b as baml
-# try:
-#     from src.patterns import PATTERNS
-# except Exception as e:
-#     print(f"Warning: Could not load patterns: {e}")
-#     # Fallback to basic patterns for testing
-#     from src.patterns import DEFAULT_PATTERNS as PATTERNS
-# from src.extract_pdf_text_unstructured import load_pdf_pages
+
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
 
-# Download stopwords on startup (only if not already downloaded)
-# try:
-#     nltk.data.find('corpora/stopwords')
-# except LookupError:
-#     nltk.download('stopwords', quiet=True)
-
-# # Add after existing constants
-# STOP = set(nltk.corpus.stopwords.words("english"))
-# TRIGGERS = {
-#     "dataset", "accession", "deposited", "released",
-#     "retrieved", "GEO", "SRA", "BioProject", "archive", 
-#     "stored", "repository", "downloaded", "accession"
-# }
-
-# def _passes_lexical_filters(token: str) -> bool:
-#     # Normalize token: strip trailing punctuation and convert to lowercase
-#     tok = re.sub(r"\W+$", "", token).lower()
-    
-#     if tok in STOP: 
-#         return False
-#     if tok.isdigit() and len(tok) <= 4:   # likely a year
-#         return False
-#     if not any(c.isdigit() for c in tok):
-#         return False
-#     return True
-
-# def _in_lookup(candidate: str) -> bool:
-#     # Extract prefix using regex to handle cases like "MODEL1234567890" correctly
-#     m = re.match(r"([A-Z]{2,5})", candidate)
-#     prefix = m.group(1) if m else None
-    
-#     if not prefix:
-#         return True  # no valid prefix found → trust regex
-    
-#     tsv_file = pathlib.Path(f"artifacts/lookups/{prefix.lower()}.tsv")
-#     if tsv_file.exists():
-#         if not hasattr(_in_lookup, "_cache"):
-#             _in_lookup._cache = {}
-#         if prefix not in _in_lookup._cache:
-#             _in_lookup._cache[prefix] = set(tsv_file.read_text().splitlines())
-#         return candidate in _in_lookup._cache[prefix]
-#     else:
-#         # Warn user about missing lookup file to avoid silent failures
-#         logger.warning(f"Lookup file missing for prefix '{prefix}': {tsv_file}")
-#         return True   # no lookup → trust regex
 
 @timer_wrap
 class CitationEntityExtractor:
@@ -121,11 +70,7 @@ class CitationEntityExtractor:
             np.random.seed(42)
             self.subset_ids = np.random.choice(self.pdf_files, self.subset_size, replace=False)
             self.pdf_files = self.subset_ids
-        
-        # self.use_ner = use_ner
-        # if self.use_ner:
-        #     import spacy
-        #     self._nlp = spacy.load("en_core_sci_sm", disable=["parser","tagger"])
+
         
         self.citation_entities: List[CitationEntity] = []
         self.docs = self._load_doc_pages()
@@ -192,79 +137,6 @@ class CitationEntityExtractor:
         
         return self.citation_entities
 
-    # @parallel_processing_decorator(batch_param_name="pages", batch_size=5, max_workers=8)
-    # def _get_unknown_entities(self, pages: List[str], article_id: str) -> List[CitationEntity]:
-    #     """
-    #     Get unknown entities from the document text using the regex patterns from `src/update_patterns.py`
-    #     """
-    #     # Add at the beginning
-    #     raw_matches = 0
-    #     after_lexical = 0
-    #     after_trigger = 0
-    #     after_ner = 0
-    #     after_lookup = 0
-        
-    #     num_pages = len(pages)
-        
-    #     # Track pages per matched entity
-    #     entity_pages = {}  # matched_entity -> set of pages where it appears
-
-    #     logger.info(f"Starting Entity Extraction for {article_id} with {len(self.patterns)} patterns.")
-        
-    #     for idx, page in enumerate(pages):
-    #         page_num = idx + 1
-    #         logger.info(f"Processing page {page_num} of {num_pages}")
-            
-    #         for name, pattern in self.patterns.items():
-    #             for m in pattern.finditer(page):
-    #                 raw_matches += 1
-    #                 candidate = m.group(0)
-    #                 if not _passes_lexical_filters(candidate):
-    #                     continue
-    #                 after_lexical += 1
-    #                 window = page[max(0, m.start()-250): m.end()+250]
-    #                 if not any(t in window.lower() for t in TRIGGERS):
-    #                     continue
-    #                 after_trigger += 1
-                    
-    #                 # --- optional NER sanity check ---
-    #                 if self.use_ner:
-    #                     if not self._looks_like_dataset(window):
-    #                         continue
-    #                     after_ner += 1
-                    
-    #                 # --- optional lookup validation ---
-    #                 if not _in_lookup(candidate):
-    #                     continue
-    #                 after_lookup += 1
-                    
-    #                 if candidate not in entity_pages:
-    #                     entity_pages[candidate] = set()
-    #                 entity_pages[candidate].add(page_num)
-        
-    #     # Create one CitationEntity per unique matched entity found
-    #     entities = []
-    #     for matched_entity, pages_set in entity_pages.items():
-    #         citation_entity = CitationEntity(
-    #             data_citation=matched_entity,
-    #             doc_id=article_id,
-    #             pages=sorted(list(pages_set))  # Convert set to sorted list
-    #         )
-    #         entities.append(citation_entity)
-    
-    #     # Add to the main list
-    #     self.citation_entities.extend(entities)
-        
-    #     # Add at the end
-    #     logger.info(f"Entity extraction metrics for {article_id}: "
-    #                 f"raw={raw_matches}, lexical={after_lexical}, "
-    #                 f"trigger={after_trigger}, ner={after_ner}, lookup={after_lookup}")
-        
-    #     return entities
-
-    # def _looks_like_dataset(self, context: str) -> bool:
-    #     doc = self._nlp(context)
-    #     return any(ent.label_ in {"RESOURCE", "DATASET"} for ent in doc.ents)
 
     def extract_known_entities(self) -> List[CitationEntity]:
         """
@@ -307,24 +179,6 @@ class CitationEntityExtractor:
         else:
             logger.info("Known Entity extraction complete. No missing entities found.")
         return self.citation_entities
-    
-    
-    # def extract_unknown_entities(self) -> List[CitationEntity]:
-    #     """
-    #     Extract citation entities from the document text using the regex patterns from `src/update_patterns.py`
-    #     """
-    #     logger.info("Extracting unknown entities using regex patterns.")
-    #     for article_id, pages in self.doc_pages.items():
-    #         self._get_unknown_entities(pages=pages, article_id=article_id)
-    #         # deduplicate citation entities
-    #         # citation_entities = list(set(entities))
-    #         # self.citation_entities.extend(list(citation_entities))
-    #     # get total number of entities extracted
-    #     total_entities = len(self.citation_entities)
-    #     # get total number of unique entities extracted
-    #     unique_entities = len(set([entity.data_citation for entity in self.citation_entities]))
-    #     logger.info(f"Entity extraction complete.\nTotal entities extracted: {total_entities}.\nTotal unique entities extracted: {unique_entities}")
-    #     return self.citation_entities
     
     def _extract_entities_baml(self, doc: Document) -> List[CitationEntity]:
         """

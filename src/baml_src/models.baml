@@ -1,13 +1,14 @@
 class CitationEntity {
+    evidence string[] @description("List of evidence from the text for the data citation")
     data_citation string @description("Data citation from text")
     doc_id string @description("DOI of the document where the data citation is found")
     pages int[] @description("List of page numbers where the data citation is mentioned.")
 }
 
-class CitationExtractor {
-    citation_entities CitationEntity[] @description("List of dataset citation entities found in the document")
-    evidence string @description("Evidence in the text for the choosing the extracted dataset citation entities")
-}
+// class CitationExtractor {
+//     citation_entities CitationEntity[] @description("List of dataset citation entities found in the document")
+//     evidence string @description("Evidence in the text for the choosing the extracted dataset citation entities")
+// }
 
 class Document {
     doi string @description("DOI of the document")
