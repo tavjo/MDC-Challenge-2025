@@ -7,7 +7,8 @@ During inference, since there will be no train_labels.csv, we will create anothe
 This script is currently only meant to operate on PDF files.
 """
 
-import re
+# import re
+import regex as re
 from typing import List, Optional, Dict, Set
 from pathlib import Path
 import pandas as pd
@@ -25,7 +26,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 print(f"Project root: {project_root}")
 sys.path.append(project_root)
 
-from src.helpers import timer_wrap, initialize_logging, parallel_processing_decorator, export_docs, load_docs, clean_text_for_urls
+from src.helpers import timer_wrap, initialize_logging, parallel_processing_decorator, export_docs, load_docs, normalise
 from src.models import CitationEntity, Document
 from src.baml_client import b as baml
 
@@ -63,6 +64,10 @@ class CitationEntityExtractor:
             self.labels_df = pd.DataFrame(columns = ["article_id", "dataset_id"])
             # self.patterns = PATTERNS
             self.article_ids = [Path(file).stem for file in self.pdf_files]
+
+        
+        self.citation_entities: List[CitationEntity] = []
+        self.docs = self._load_doc_pages()
         if draw_subset:
             self.subset_size = subset_size if subset_size is not None else 20
             logger.info(f"Drawing subset of {self.subset_size} files from {len(self.pdf_files)} files.")
@@ -70,12 +75,7 @@ class CitationEntityExtractor:
             np.random.seed(42)
             self.subset_ids = np.random.choice(self.pdf_files, self.subset_size, replace=False)
             self.pdf_files = self.subset_ids
-
-        
-        self.citation_entities: List[CitationEntity] = []
-        self.docs = self._load_doc_pages()
-        if draw_subset:
-            self.docs = self.docs[:self.subset_size]
+            self.docs = np.random.choice(self.docs, self.subset_size, replace=False)
     
     # @parallel_processing_decorator(batch_param_name="pdf_files", batch_size=10, max_workers=8, flatten=True)
     def _load_doc_pages(self) -> List[Document]:
@@ -83,7 +83,19 @@ class CitationEntityExtractor:
         load all document pages into memory once.
         """
         return load_docs()
+    
+    def _make_pattern(self, ds_id: str) -> re.Pattern:
+        # 1. escape *everything* first
+        pat = re.escape(ds_id)
 
+        # 2. then widen the single underscore
+        pat = pat.replace('_', r'[_/]')     # now [_/] stays “live”
+
+        # 3. add word-boundaries only for simple accessions
+        if re.fullmatch(r'[A-Z]{1,4}\d+', ds_id, re.I):
+            pat = rf'\b{pat}\b'
+
+        return re.compile(pat, flags=re.IGNORECASE)
 
     # @parallel_processing_decorator(batch_param_name="pages", batch_size=5, max_workers=8, flatten=True)
     def _get_known_entities(self, pages: List[str], article_id: str, dataset_ids: List[str]) -> List[CitationEntity]:
@@ -96,29 +108,17 @@ class CitationEntityExtractor:
         dataset_pages = {}  # dataset_id -> set of pages where it appears
         
         for idx, page in enumerate(pages):
+            # page = normalise(page)
             page_num = idx + 1
             logger.info(f"Processing page {page_num} of {num_pages} for document: {article_id}")
             
             for dataset_id in dataset_ids:
                 logger.info(f"Processing dataset: {dataset_id}")
-                
-                # Create multiple patterns to match different URL formats
-                patterns = [
-                    rf"\b{re.escape(dataset_id)}\b",  # Exact match
-                ]
-                
-                matches = []
-                for pattern in patterns:
-                    matches.extend(re.findall(pattern, clean_text_for_urls(page)))
-                
-                logger.info(f"Found {len(matches)} matches for {dataset_id} on page {page_num}")
+                regex = self._make_pattern(dataset_id)
+                matches = regex.findall(page)
                 if matches:
-                    # Initialize if not exists
-                    if dataset_id not in dataset_pages:
-                        dataset_pages[dataset_id] = set()
-                    
-                    # Add current page to this dataset's pages
-                    dataset_pages[dataset_id].add(page_num)
+                    dataset_pages.setdefault(dataset_id,set()).add(page_num)
+                    logger.info(f"Found {len(matches)} matches for {dataset_id} on page {page_num}")
         
         # Create one CitationEntity per unique dataset_id found
         entities = []
@@ -262,10 +262,7 @@ class CitationEntityExtractor:
         output_file = os.path.join(self.data_dir, "train", output_file)
         self.update_docs_with_entities()
         export_docs(self.docs, output_file=output_file)
-        logger.info(f"Exported {len(self.docs)} updated documents to {output_file}")
-
-
-    
+        logger.info(f"Exported {len(self.docs)} updated documents to {output_file}")   
 
 @timer_wrap
 def main():
@@ -278,7 +275,7 @@ def main():
     #     logger.warning("No citation entities found. Skipping export.")
 
     # rerun with known entities
-    extractor = CitationEntityExtractor(data_dir="Data", known_entities=True, labels_file="train_labels.csv", draw_subset=True, subset_size = 2)
+    extractor = CitationEntityExtractor(data_dir="Data", known_entities=True, labels_file="train_labels.csv", draw_subset=False)
     extractor.extract_entities()
     if len(extractor.citation_entities) > 0:
         extractor.export_entities(output_file = "citation_entities_known.json")

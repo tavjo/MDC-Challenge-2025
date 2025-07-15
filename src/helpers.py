@@ -310,3 +310,8 @@ def clean_text_for_urls(text: str) -> str:
     text = re.sub(r'https://doi\.\s+org', 'https://doi.org', text)
     
     return text
+
+def normalise(page:str) -> str:
+    page = page.replace('-\n', '')   # undo soft-hyphen splits :contentReference[oaicite:6]{index=6}
+    page = page.replace('\n', ' ')
+    return clean_text_for_urls(page)

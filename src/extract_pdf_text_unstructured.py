@@ -51,36 +51,31 @@ _LIGATURE_MAP = str.maketrans({
 
 
 def clean_page(text: str) -> str:
-    """
-    Tidy a raw PDF-extracted page so that downstream regexes
-    (e.g., citation patterns) match reliably.
-
-    Steps:
-    1.  Join words split with hyphen at line-end.
-    2.  Remove discretionary/soft hyphens.
-    3.  Replace ligature glyphs with ASCII equivalents.
-    4.  Collapse bare new-lines into a single space.
-    5.  Collapse runs of spaces/tabs/non-breaking spaces.
-    6.  NFKD normalisation (helps “weird” accents).
-    """
-    # 1. join   exam- \n ple  → example
+    # 1. join   exam- \n ple  → example      (already present)
     text = _HYPHEN_LINEBREAK_RE.sub("", text)
 
-    # 2. strip the invisible soft hyphen
+    # 2. strip soft-hyphens                       (already present)
     text = _SOFT_HYPHEN_RE.sub("", text)
 
-    # 3. replace common ligatures
+    # 3. replace ligatures                        (already present)
     text = text.translate(_LIGATURE_MAP)
 
-    # 4. convert remaining line breaks to spaces
+    # 4. convert all remaining line breaks → space
     text = _NEWLINES_RE.sub(" ", text)
+    
+    # 4 b. **NEW**  delete any “dash + spaces” that remain inside a token  
+    #               e.g. “bca- d9957” → “bcad9957”
+    text = re.sub(r'-\s+(?=\w)', '', text)
 
-    # 5. squeeze multiple consecutive spaces/tabs/non-breaking spaces
+    # 4 c. NEW – delete any spaces *inside* a token that follows a dash
+    #(handles “…bca- d9957…”  →  “…bcad9957…”)
+    text = re.sub(r'(?<=-)\s+(?=\w)', '', text)
+
+    # 5. squeeze multiple spaces / tabs
     text = _MULTISPACE_RE.sub(" ", text).strip()
 
-    # 6. Unicode normalisation – makes “ﬃ”→“ffi” consistent, etc.
+    # 6. Unicode normalisation
     text = unicodedata.normalize("NFKD", text)
-
     return text
 
 

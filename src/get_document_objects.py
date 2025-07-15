@@ -67,7 +67,7 @@ def build_document_objects(pdf_paths: List[str], subset: bool = False, subset_si
 def main():
     pdf_paths = os.listdir(os.path.join(project_root, "Data/train/PDF"))
     pdf_paths = [os.path.join("Data/train/PDF", pdf) for pdf in pdf_paths if pdf.endswith(".pdf")]
-    documents = build_document_objects(pdf_paths=pdf_paths, subset=True, subset_size=20)
+    documents = build_document_objects(pdf_paths=pdf_paths, subset=False)
     export_docs(documents)
 
 if __name__ == "__main__":
