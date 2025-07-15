@@ -7,6 +7,8 @@ services:
     environment:
       - PYTHONPATH=/app
       - UV_CACHE_DIR=/tmp/uv-cache
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       # Mount data directory for persistence
       - ./Data:/app/Data
@@ -15,9 +17,10 @@ services:
       - ./artifacts:/app/artifacts
       - ./tests:/app/tests
       - ./scripts:/app/scripts
+      - ./configs:/app/configs
     working_dir: /app
     # Use consistent command with Dockerfile (remove "uv run")
-    command: ["python", "src/get_document_objects.py"]
+    command: ["python", "src/semantic_chunking.py"]
 
   # Optional: Development service with interactive shell
   mdc-dev:
@@ -28,6 +31,8 @@ services:
     environment:
       - PYTHONPATH=/app
       - UV_CACHE_DIR=/tmp/uv-cache
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       # Mount entire project for development
       - ./:/app
@@ -46,6 +51,8 @@ services:
     environment:
       - PYTHONPATH=/app
       - UV_CACHE_DIR=/tmp/uv-cache
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       # Mount entire project for testing
       - ./:/app
@@ -64,6 +71,8 @@ services:
     environment:
       - PYTHONPATH=/app
       - UV_CACHE_DIR=/tmp/uv-cache
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       # Mount entire project for testing
       - ./:/app

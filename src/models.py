@@ -29,6 +29,15 @@ class ChunkMetadata(BaseModel):
     token_count: int = Field(..., description="Number of tokens in the chunk")
     citation_entities: Optional[List[CitationEntity]] = Field(None, description="Citation entities found in this chunk")  # Entities found in this chunk
 
+class Chunk(BaseModel):
+    chunk_id: str
+    text: str
+    score: Optional[float] = None       # similarity score (added later)
+    chunk_metadata: ChunkMetadata
+    
+    # def __str__(self):
+    #     return f"Chunk({self.chunk_id[:8]}..., {len(self.text)} chars, {self.chunk_metadata.section_type})"
+
 class Document(BaseModel):
     doi: str = Field(..., description="DOI or unique identifier of the document")
     has_dataset_citation: Optional[bool] = Field(None, description="Whether the document has 1 or more dataset citation")
@@ -44,15 +53,6 @@ class Document(BaseModel):
     file_path: str = Field(..., description="Path to the document file")
     citation_entities: Optional[List[CitationEntity]] = Field(None, description="List of citation entities found in the document")
     n_pages: Optional[int] = Field(None, description="Number of pages in the document")
-
-class Chunk(BaseModel):
-    chunk_id: str
-    text: str
-    score: Optional[float] = None       # similarity score (added later)
-    chunk_metadata: ChunkMetadata
-    
-    def __str__(self):
-        return f"Chunk({self.chunk_id[:8]}..., {len(self.text)} chars, {self.chunk_metadata.section_type})"
 
 class ChunkingResult(BaseModel):
     """Result of the chunking pipeline"""
@@ -76,9 +76,9 @@ class Dataset(BaseModel):
     doc_id: str = Field(..., description="DOI in which the dataset citation was found")
     total_tokens: int = Field(..., description="Total number of tokens in all chunks.")
     avg_tokens_per_chunk: float = Field(..., description="Average number of tokens per chunk.")
-    dataset_url: Optional[str] = Field(None, description="Dataset URL")
     total_char_length: int = Field(..., description="Total number of characters")
     clean_text_length: int = Field(..., description="Total number of characters after cleaning")
+    cluster: Optional[str] = Field(None, description="Cluster of the dataset citation")
     dataset_type: Optional[Literal["PRIMARY", "SECONDARY"]] = Field(None, description="Dataset Type: main target of the classification task")
     text: str = Field(..., description= "Text in the document where the dataset citation is found") 
 
@@ -92,16 +92,19 @@ class FirstClassifierInput(BaseModel):
     PC_2: Optional[float] = Field(None, description="PC 2 dimension")
     has_data_citation: bool = Field(..., description="Whether the document has a dataset citation: first classifer target variable")
 
-
 class SecondClassifierInput(BaseModel):
     """Input for classifer that predicts the type of dataset citation"""
     dataset: Dataset = Field(..., description="Dataset to be classified")
     embeddings: List[float] = Field(..., description="Embeddings of the text containing the dataset citation")
-    UMAP_1: Optional[float] = Field(None, description="UMAP 1 dimension")
-    UMAP_2: Optional[float] = Field(None, description="UMAP 2 dimension")
-    PC_1: Optional[float] = Field(None, description="PC 1 dimension")
+    UMAP_1: float = Field(None, description="UMAP 1 dimension")
+    UMAP_2: float = Field(None, description="UMAP 2 dimension")
+    PC_1: float = Field(None, description="PC 1 dimension")
     PC_2: Optional[float] = Field(None, description="PC 2 dimension")
+    Cluster: Optional[str] = Field(None, description="Cluster of the dataset citation")
     is_primary: bool = Field(..., description="Whether the dataset citation is a primary dataset citation. Since there are only 2 classes at this stage, anything else is a secondary dataset citation.")
+    # Allow arbitrary additional fields per nf-core samplesheet flexibility
+    class Config:
+        extra = "allow"
 
 class PreprocessingReport(BaseModel):
     """Report of the preprocessing pipeline"""

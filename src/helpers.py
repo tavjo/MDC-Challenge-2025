@@ -315,3 +315,14 @@ def normalise(page:str) -> str:
     page = page.replace('-\n', '')   # undo soft-hyphen splits :contentReference[oaicite:6]{index=6}
     page = page.replace('\n', ' ')
     return clean_text_for_urls(page)
+
+
+
+def preprocess_text(text):
+    import re
+    from nltk.corpus import stopwords
+    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
+    text = text.lower()  # Lowercase
+    stop_words = set(stopwords.words("english"))
+    text = " ".join(word for word in text.split() if word not in stop_words)
+    return text

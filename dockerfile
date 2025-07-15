@@ -17,15 +17,16 @@ COPY pyproject.toml uv.lock ./
 
 # Install additional Python dependencies using uv
 # Note: unstructured[all] is already installed in the base image
-RUN uv sync --frozen --no-dev
+RUN uv sync
 
 # Copy the rest of the application
 COPY src/ ./src/
 COPY tests/ ./tests/
 COPY scripts/ ./scripts/
+COPY configs/ ./configs/
 
 # Create necessary directories
 RUN mkdir -p Data logs artifacts
 
 # Set the default command to run the citation entity extractor
-CMD ["python", "src/get_document_objects.py"]
+CMD ["python", "src/semantic_chunking.py"]
