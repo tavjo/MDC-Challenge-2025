@@ -23,7 +23,7 @@ class CitationEntity(BaseModel):
 
 class ChunkMetadata(BaseModel):
     chunk_id: str
-    document_id: str  # DOI from step 5
+    # document_id: str  # DOI from step 5
     previous_chunk_id: Optional[str] = None
     next_chunk_id: Optional[str] = None
     token_count: int = Field(..., description="Number of tokens in the chunk")
@@ -31,6 +31,7 @@ class ChunkMetadata(BaseModel):
 
 class Chunk(BaseModel):
     chunk_id: str
+    document_id: str #NEW: moved from ChunkMetadata to Chunk
     text: str
     score: Optional[float] = None       # similarity score (added later)
     chunk_metadata: ChunkMetadata

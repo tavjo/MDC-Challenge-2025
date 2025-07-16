@@ -3,12 +3,12 @@ src/tools/semantic_chunking.py
 ------------------------------
 Semantic chunking + OpenAI embeddings + ChromaDB persistence.
 
-This replaces the previous MiniLM/HuggingFace encoder with OpenAI’s
-`text-embedding-3-small` (or any other model you set in *conf/chunking.yaml*).
+This now uses OpenAI’s `text-embedding-3-small` (or any other model you set in *conf/chunking.yaml*)
+directly via the OpenAI library, instead of llama_index embeddings.
 
 Prerequisites
 ~~~~~~~~~~~~~
-1. `pip install llama-index-embeddings-openai chromadb`   # plus your other deps
+1. `pip install openai chromadb`   # plus your other deps
 2. Export OPENAI_API_KEY=sk-...
 
 Usage example
@@ -30,6 +30,7 @@ from typing import List, Optional
 import yaml
 import chromadb
 from llama_index.embeddings.openai import OpenAIEmbedding
+from src.helpers import get_embedding, CustomOpenAIEmbedding
 from llama_index.core.node_parser import SemanticSplitterNodeParser
 from llama_index.core.schema import Document
 from dotenv import load_dotenv
@@ -94,10 +95,9 @@ def _load_cfg(cfg_path: Optional[os.PathLike] | None = None) -> dict:
 
 
 def _build_embedder(model_name: str):
-    """Return an OpenAIEmbedding instance.
+    """Return an OpenAIEmbedding instance from llama_index.
 
-    The OPENAI_API_KEY environment variable must be set, or you can create
-    the embedder with an explicit `api_key` argument.
+    The OPENAI_API_KEY environment variable must be set.
     """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -106,7 +106,7 @@ def _build_embedder(model_name: str):
         )
 
     logger.info("▸ Loading OpenAI embedding model %s", model_name)
-    return OpenAIEmbedding(model=model_name, api_key=api_key)
+    return OpenAIEmbedding(model=model_name)
 
 
 def _build_splitter(cfg: dict, embedder: OpenAIEmbedding) -> SemanticSplitterNodeParser:
@@ -114,7 +114,7 @@ def _build_splitter(cfg: dict, embedder: OpenAIEmbedding) -> SemanticSplitterNod
     return SemanticSplitterNodeParser(
         embed_model=embedder,
         similarity_threshold=cfg.get("similarity_threshold", 0.75),
-        chunk_overlap=cfg.get("overlap_sentences", 2),
+        chunk_overlap=cfg.get("overlap_sentences", 10),
         chunk_size=cfg.get("max_tokens", 400),
         min_chunk_size=cfg.get("min_tokens", 80),
     )
@@ -174,7 +174,7 @@ def _chunk_obj_to_metadata(chunk_obj: "Chunk") -> dict:
 
     return {
         "chunk_id": cm.chunk_id,
-        "document_id": cm.document_id,
+        "document_id": chunk_obj.document_id,
         "token_count": cm.token_count,
         "previous_chunk_id": cm.previous_chunk_id or "",
         "next_chunk_id": cm.next_chunk_id or "",
@@ -196,12 +196,12 @@ def save_chunk_objs_to_chroma(
     cfg = _load_cfg(cfg_path)
     embedder = _build_embedder(cfg.get("embed_model", "text-embedding-3-small"))
     _, collection = _get_chroma_collection(
-        cfg, collection_name or chunk_objs[0].chunk_metadata.document_id
+        cfg, collection_name or chunk_objs[0].document_id
     )
 
     logger.info("▸ Embedding %d chunks for Chroma upsert", len(chunk_objs))
     documents = [c.text for c in chunk_objs]
-    embeddings = [embedder.get_text_embedding(txt) for txt in documents]
+    embeddings = [get_embedding(txt, embedder.get_text_embedding(txt)) for txt in documents]
     metadatas = [_chunk_obj_to_metadata(c) for c in chunk_objs]
     ids = [c.chunk_id for c in chunk_objs]
 
@@ -220,7 +220,7 @@ def fetch_chunk_objs_from_chroma(
     collection_name: str | None = None,
 ) -> List["Chunk"]:
     """Re-hydrate Chunk objects from Chroma by `document_id`."""
-    from src.models import ChunkMetadata, CitationEntity  # Updated import
+    # from src.models import ChunkMetadata, CitationEntity  # Updated import
 
     cfg = _load_cfg(cfg_path)
     _, collection = _get_chroma_collection(cfg, collection_name or doc_id)
@@ -249,7 +249,6 @@ def fetch_chunk_objs_from_chroma(
 
         chunk_meta = ChunkMetadata(
             chunk_id=meta["chunk_id"],
-            document_id=meta["document_id"],
             token_count=meta.get("token_count", 0),
             previous_chunk_id=meta.get("previous_chunk_id"),
             next_chunk_id=meta.get("next_chunk_id"),
@@ -258,6 +257,7 @@ def fetch_chunk_objs_from_chroma(
         chunks.append(
             Chunk(
                 chunk_id=meta["chunk_id"], 
+                document_id=meta["document_id"],
                 text=doc, 
                 score=None, 
                 chunk_metadata=chunk_meta

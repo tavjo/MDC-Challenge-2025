@@ -7,11 +7,13 @@ from pydantic import BaseModel
 from typing_extensions import get_type_hints
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from src.models import Document
+
 
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
+
+from src.models import Document
 
 # Ensure the logs directory exists
 logs_dir = os.path.join(project_root, 'logs')
@@ -326,3 +328,28 @@ def preprocess_text(text):
     stop_words = set(stopwords.words("english"))
     text = " ".join(word for word in text.split() if word not in stop_words)
     return text
+
+
+
+def get_embedding(text, model="text-embedding-3-small"):
+    from openai import OpenAI
+    client = OpenAI()
+    text = text.replace("\n", " ")
+    return client.embeddings.create(input = [text], model=model).data[0].embedding
+
+
+class CustomOpenAIEmbedding:
+    """Custom embedding class that wraps the get_embedding function for llama_index compatibility."""
+    
+    def __init__(self, model: str = "text-embedding-3-small"):
+        self.model = model
+    
+    def get_text_embedding(self, text: str) -> List[float]:
+        """Get embedding for a single text string."""
+        return get_embedding(text, self.model)
+    
+    def get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """Get embeddings for multiple text strings."""
+        return [get_embedding(text, self.model) for text in texts]
+    
+    

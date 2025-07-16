@@ -148,3 +148,4 @@ Thumbs.db
 *.7z
 tests/
 # artifacts/
+local_chroma/

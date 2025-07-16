@@ -10,7 +10,7 @@ import sys
 import uuid
 import re
 from pathlib import Path
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Optional
 from collections import defaultdict
 from datetime import datetime
 import pandas as pd
@@ -23,7 +23,7 @@ sys.path.append(project_root)
 from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult
 from src.helpers import initialize_logging, timer_wrap, load_docs, export_docs
 from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma
-from src.get_citation_entities import CitationEntityExtractor
+# from src.get_citation_entities import CitationEntityExtractor
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
@@ -46,9 +46,11 @@ def load_input_data(documents_path: str = "Data/train/documents_with_known_entit
         Tuple of (documents, citation_entities)
     """
     logger.info(f"Loading documents from: {documents_path}")
+    documents_path = os.path.join(project_root, documents_path)
     documents = load_docs(documents_path)
     
     logger.info(f"Loading citation entities from: {citation_entities_path}")
+    citation_entities_path = os.path.join(project_root, citation_entities_path)
     with open(citation_entities_path, "r") as f:
         raw_citations = json.load(f)
     citation_entities = [CitationEntity.model_validate(item) for item in raw_citations]
@@ -198,7 +200,6 @@ def create_chunks_from_documents(documents: List[Document], citation_entities: L
             
             chunk_meta = ChunkMetadata(
                 chunk_id=chunk_id,
-                document_id=doc.doi,
                 token_count=token_count,
                 citation_entities=chunk_citations,
                 previous_chunk_id=None,  # Will be set by link_adjacent_chunks
@@ -207,6 +208,7 @@ def create_chunks_from_documents(documents: List[Document], citation_entities: L
             
             chunks.append(Chunk(
                 chunk_id=chunk_id,
+                document_id=doc.doi,
                 text=chunk_text,
                 chunk_metadata=chunk_meta
             ))
@@ -234,7 +236,7 @@ def link_adjacent_chunks(chunks: List[Chunk]) -> List[Chunk]:
     # Group chunks by document
     by_document = defaultdict(list)
     for i, chunk in enumerate(chunks):
-        document_id = chunk.chunk_metadata.document_id
+        document_id = chunk.document_id
         by_document[document_id].append((i, chunk.text, chunk.chunk_metadata.model_dump()))
     
     # Link chunks within each document
@@ -256,6 +258,7 @@ def link_adjacent_chunks(chunks: List[Chunk]) -> List[Chunk]:
             
             new_chunk = Chunk(
                 chunk_id=metadata['chunk_id'],
+                document_id=document_id,
                 text=text,
                 chunk_metadata=ChunkMetadata.model_validate(metadata)
             )
@@ -294,14 +297,14 @@ def validate_chunk_integrity(chunks: List[Chunk], pre_chunk_inventory: pd.DataFr
     
     for chunk in chunks:
         text = chunk.text
-        doc_citations = citations_by_doc.get(chunk.chunk_metadata.document_id, [])
+        doc_citations = citations_by_doc.get(chunk.document_id, [])
         
         for citation in doc_citations:
             pattern = make_pattern(citation.data_citation)
             matches = pattern.findall(text)
             
             post_chunk_rows.append({
-                'document_id': chunk.chunk_metadata.document_id,
+                'document_id': chunk.document_id,
                 'citation_id': citation.data_citation,
                 'count': len(matches),
             })
@@ -405,11 +408,16 @@ def export_chunks_summary_csv(chunks: List[Chunk], output_path: str = "chunks_fo
 # ---------------------------------------------------------------------------
 
 @timer_wrap
-def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents.json",
+def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_with_known_entities.json",
                                  citation_entities_path: str = "Data/citation_entities_known.json",
                                  output_dir: str = "Data",
                                  chunk_size: int = 200,
-                                 chunk_overlap: int = 20) -> ChunkingResult:
+                                 chunk_overlap: int = 20,
+                                 collection_name: str = "semantic_chunks",
+                                 cfg_path: str = "configs/chunking.yaml",
+                                 subset: bool = False,
+                                 subset_size: Optional[int] = None
+                                 ) -> ChunkingResult:
     """
     Run the complete semantic chunking pipeline.
     
@@ -433,6 +441,9 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents.j
         
         if not documents:
             raise ValueError("No documents loaded - check input path")
+        
+        if subset:
+            documents = documents[:subset_size]
         
         # Step 2: Create pre-chunk entity inventory
         logger.info("\n📋 Step 2: Create Pre-Chunk Entity Inventory")
@@ -470,7 +481,8 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents.j
         
         # Step 6: Save to ChromaDB
         logger.info("\n📋 Step 6: Save to ChromaDB")
-        save_chunk_objs_to_chroma(chunks, collection_name="semantic_chunks")
+        save_chunk_objs_to_chroma(chunks, collection_name=collection_name,
+                                  cfg_path=cfg_path)
         
         # Step 7: Export results
         logger.info("\n📋 Step 7: Export Results")
@@ -531,5 +543,11 @@ if __name__ == "__main__":
     
     if results.success:
         logger.info("✅ Semantic chunking completed successfully!")
+        # save results to a json file
+        with open("chunking_results.json", "w") as f:
+            json.dump(results.model_dump(), f)
     else:
-        logger.error(f"❌ Pipeline failed: {results.error}") 
+        logger.error(f"❌ Pipeline failed: {results.error}")
+        # save results to a json file
+        with open("chunking_results.json", "w") as f:
+            json.dump(results.model_dump(), f) 

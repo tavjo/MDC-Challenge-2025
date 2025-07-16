@@ -6,31 +6,27 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "baml-py==0.88.0",
-    "chromadb>=1.0.15",
+    "duckdb>=1.3.2",
+    "fastapi>=0.116.1",
     "ipykernel>=6.29.5",
     "langchain>=0.3.26",
-    "llama-index>=0.12.49",
-    "llama-index-core>=0.12.49",
-    "llama-index-embeddings-openai>=0.3.1",
     "matplotlib>=3.10.3",
     "networkx>=3.5",
     "nltk>=3.9.1",
     "numpy>=2.3.1",
     "openai>=1.96.0",
     "pandas>=2.3.0",
-    #"pdfplumber>=0.11.7",
-    #"pi-heif>=1.0.0",
     "psutil>=7.0.0",
     "pydantic>=2.11.7",
     "pytest>=8.4.1",
     "python-dotenv>=1.1.1",
+    "python-multipart>=0.0.20",
     "pyyaml>=6.0.2",
     "regex>=2024.11.6", # high-perf pattern engine
     "requests>=2.32.4",
     "rich>=14.0.0",
     "scikit-learn>=1.7.0",
-    #"sentence-transformers==2.*", # embeddings for similarity checks
-    "scispacy>=0.5.5",
     "tiktoken>=0.8.0", # exact GPT-token counts
     "tqdm>=4.67.1",
+    "uvicorn>=0.35.0",
 ]
