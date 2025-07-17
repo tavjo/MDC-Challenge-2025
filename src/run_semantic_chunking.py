@@ -24,6 +24,7 @@ from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingR
 from src.helpers import initialize_logging, timer_wrap, load_docs, export_docs
 from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma
 # from src.get_citation_entities import CitationEntityExtractor
+import duckdb
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
@@ -57,6 +58,56 @@ def load_input_data(documents_path: str = "Data/train/documents_with_known_entit
     
     logger.info(f"✅ Loaded {len(documents)} documents and {len(citation_entities)} citation entities")
     return documents, citation_entities
+
+@timer_wrap
+def load_input_data_from_duckdb(db_path: str = "artifacts/mdc_challenge.db") -> Tuple[List[Document], List[CitationEntity]]:
+    """
+    Load Document and CitationEntity instances from DuckDB database.
+    
+    Args:
+        db_path: Path to DuckDB database file
+        
+    Returns:
+        Tuple of (documents, citation_entities)
+    """
+    logger.info(f"Loading data from DuckDB: {db_path}")
+    
+    try:
+        # Connect to DuckDB
+        conn = duckdb.connect(db_path)
+        
+        # Load documents
+        logger.info("Loading documents from DuckDB...")
+        doc_query = "SELECT * FROM documents"
+        doc_result = conn.execute(doc_query).fetchall()
+        doc_columns = [desc[0] for desc in conn.description]
+        
+        documents = []
+        for row in doc_result:
+            row_dict = dict(zip(doc_columns, row))
+            document = Document.from_duckdb_row(row_dict)
+            documents.append(document)
+        
+        # Load citation entities
+        logger.info("Loading citation entities from DuckDB...")
+        citation_query = "SELECT * FROM citations"
+        citation_result = conn.execute(citation_query).fetchall()
+        citation_columns = [desc[0] for desc in conn.description]
+        
+        citation_entities = []
+        for row in citation_result:
+            row_dict = dict(zip(citation_columns, row))
+            citation = CitationEntity.from_duckdb_row(row_dict)
+            citation_entities.append(citation)
+        
+        conn.close()
+        
+        logger.info(f"✅ Loaded {len(documents)} documents and {len(citation_entities)} citation entities from DuckDB")
+        return documents, citation_entities
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to load data from DuckDB: {str(e)}")
+        raise
 
 # ---------------------------------------------------------------------------
 # Pre-Chunk Entity Inventory (Using Exact Citations)
@@ -92,7 +143,7 @@ def create_pre_chunk_entity_inventory(documents: List[Document], citation_entiti
     
     # Validate ID formats
     doc_ids = {doc.doi for doc in documents}
-    citation_doc_ids = {citation.doc_id for citation in citation_entities}
+    citation_doc_ids = {citation.document_id for citation in citation_entities}
     
     if not doc_ids.intersection(citation_doc_ids):
         raise ValueError("No matching document IDs between documents and citations")
@@ -100,7 +151,7 @@ def create_pre_chunk_entity_inventory(documents: List[Document], citation_entiti
     # Group citations by document
     citations_by_doc = defaultdict(list)
     for citation in citation_entities:
-        citations_by_doc[citation.doc_id].append(citation)
+        citations_by_doc[citation.document_id].append(citation)
     
     # Cache compiled patterns
     pattern_cache = {}
@@ -165,7 +216,7 @@ def create_chunks_from_documents(documents: List[Document], citation_entities: L
     # Group citation entities by document
     citations_by_doc = defaultdict(list)
     for citation in citation_entities:
-        citations_by_doc[citation.doc_id].append(citation)
+        citations_by_doc[citation.document_id].append(citation)
     
     chunks = []
     
@@ -290,7 +341,7 @@ def validate_chunk_integrity(chunks: List[Chunk], pre_chunk_inventory: pd.DataFr
     # Group citation entities by document
     citations_by_doc = defaultdict(list)
     for citation in citation_entities:
-        citations_by_doc[citation.doc_id].append(citation)
+        citations_by_doc[citation.document_id].append(citation)
     
     # Count citations AFTER chunking
     post_chunk_rows = []
@@ -348,6 +399,58 @@ def validate_chunk_integrity(chunks: List[Chunk], pre_chunk_inventory: pd.DataFr
         logger.error(f"❌ FAILURE: {len(lost_citations)} citation losses detected")
     
     return validation_passed, lost_citations
+
+# ---------------------------------------------------------------------------
+# DuckDB Storage Functions
+# ---------------------------------------------------------------------------
+
+@timer_wrap
+def save_chunks_to_duckdb(chunks: List[Chunk], db_path: str = "artifacts/mdc_challenge.db") -> bool:
+    """
+    Save chunks to DuckDB database.
+    
+    Args:
+        chunks: List of Chunk objects to save
+        db_path: Path to DuckDB database file
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    logger.info(f"Saving {len(chunks)} chunks to DuckDB: {db_path}")
+    
+    try:
+        # Connect to DuckDB
+        conn = duckdb.connect(db_path)
+        
+        # Clear existing chunks (optional - depends on requirements)
+        # conn.execute("DELETE FROM chunks")
+        
+        # Insert chunks one by one
+        for chunk in chunks:
+            chunk_row = chunk.to_duckdb_row()
+            
+            # Insert chunk
+            conn.execute("""
+                INSERT OR REPLACE INTO chunks 
+                (chunk_id, document_id, chunk_text, score, chunk_metadata)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                chunk_row["chunk_id"],
+                chunk_row["document_id"],
+                chunk_row["chunk_text"],
+                chunk_row["score"],
+                chunk_row["chunk_metadata"]
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"✅ Successfully saved {len(chunks)} chunks to DuckDB")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to save chunks to DuckDB: {str(e)}")
+        return False
 
 # ---------------------------------------------------------------------------
 # Export Functions
@@ -416,17 +519,25 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
                                  collection_name: str = "semantic_chunks",
                                  cfg_path: str = "configs/chunking.yaml",
                                  subset: bool = False,
-                                 subset_size: Optional[int] = None
+                                 subset_size: Optional[int] = None,
+                                 use_duckdb: bool = True,
+                                 db_path: str = "artifacts/mdc_challenge.db"
                                  ) -> ChunkingResult:
     """
     Run the complete semantic chunking pipeline.
     
     Args:
-        documents_path: Path to documents JSON file
-        citation_entities_path: Path to citation entities JSON file
+        documents_path: Path to documents JSON file (used when use_duckdb=False)
+        citation_entities_path: Path to citation entities JSON file (used when use_duckdb=False)
         output_dir: Directory for output files
         chunk_size: Target chunk size in tokens
         chunk_overlap: Overlap between chunks in tokens
+        collection_name: ChromaDB collection name
+        cfg_path: Path to chunking configuration file
+        subset: Whether to use a subset of documents
+        subset_size: Size of subset to use
+        use_duckdb: Whether to use DuckDB for data I/O (default: True)
+        db_path: Path to DuckDB database file
         
     Returns:
         ChunkingResult object with pipeline results
@@ -437,7 +548,12 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
     try:
         # Step 1: Load input data
         logger.info("\n📋 Step 1: Load Input Data")
-        documents, citation_entities = load_input_data(documents_path, citation_entities_path)
+        if use_duckdb:
+            logger.info("Using DuckDB for data loading")
+            documents, citation_entities = load_input_data_from_duckdb(db_path)
+        else:
+            logger.info("Using JSON files for data loading")
+            documents, citation_entities = load_input_data(documents_path, citation_entities_path)
         
         if not documents:
             raise ValueError("No documents loaded - check input path")
@@ -484,8 +600,15 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
         save_chunk_objs_to_chroma(chunks, collection_name=collection_name,
                                   cfg_path=cfg_path)
         
-        # Step 7: Export results
-        logger.info("\n📋 Step 7: Export Results")
+        # Step 7: Save to DuckDB (if enabled)
+        if use_duckdb:
+            logger.info("\n📋 Step 7: Save Chunks to DuckDB")
+            save_success = save_chunks_to_duckdb(chunks, db_path)
+            if not save_success:
+                logger.warning("⚠️  Failed to save chunks to DuckDB, continuing with pipeline...")
+        
+        # Step 8: Export results
+        logger.info(f"\n📋 Step {'8' if use_duckdb else '7'}: Export Results")
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         

@@ -125,7 +125,7 @@ class CitationEntityExtractor:
         for dataset_id, pages_set in dataset_pages.items():
             citation_entity = CitationEntity(
                 data_citation=dataset_id,
-                doc_id=article_id,
+                document_id=article_id,
                 pages=sorted(list(pages_set))  # Convert set to sorted list
             )
             entities.append(citation_entity)
@@ -251,7 +251,7 @@ class CitationEntityExtractor:
         for doc in self.docs:
             citations = []
             for citation in self.citation_entities:
-                if doc.doi == citation.doc_id:
+                if doc.doi == citation.document_id:
                     citations.append(citation)
                     doc = self._update_doc_with_entities(doc, citations)
                     break # break out of the loop after finding the first citation entity for the document

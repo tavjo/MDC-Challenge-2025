@@ -19,7 +19,7 @@ COPY pyproject.toml uv.lock ./
 # Install additional Python dependencies using uv
 # Note: unstructured[all] is already installed in the base image
 RUN uv sync --frozen --no-dev
-RUN uv lock
+# RUN uv lock
 
 
 # Copy the rest of the application

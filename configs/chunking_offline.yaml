@@ -1,17 +1,16 @@
-# conf/chunking.yaml
+# conf/chunking_offline.yaml
+# Configuration for offline semantic chunking with SentenceTransformers
 splitter: semantic          # switch from "sliding" to "semantic"
 max_tokens: 300             # hard ceiling to prevent jumbo chunks
 similarity_threshold: 0.75  # cosine drop that triggers a new chunk
 min_tokens: 80              # merge stragglers below this size
 overlap_sentences: 2        # no duplicated text → lower token bill
 
-# Embedding model configuration
-# For OpenAI models: text-embedding-3-small, text-embedding-3-large, text-embedding-ada-002
-# For offline models: bge-small-en-v1.5, all-MiniLM-L6-v2, all-mpnet-base-v2
-# Use offline: prefix for explicit offline models: offline:bge-small-en-v1.5
-embed_model: text-embedding-3-small
+# Offline embedding model configuration
+# Use offline model by default - no OpenAI API required
+embed_model: bge-small-en-v1.5
 
-# Offline model configuration (used when embed_model is offline)
+# Offline model configuration
 offline_model:
   # Default offline model for when OpenAI is not available
   default_model: bge-small-en-v1.5
@@ -22,4 +21,4 @@ offline_model:
 
 vector_store:
   type: chroma
-  path: ./local_chroma
+  path: ./local_chroma 

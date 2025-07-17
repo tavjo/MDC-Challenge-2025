@@ -16,10 +16,63 @@ class Section(BaseModel):
 
 class CitationEntity(BaseModel):
     data_citation: str = Field(..., description="Data citation from text")
-    doc_id: str = Field(..., description="DOI of the document where the data citation is found")
+    document_id: str = Field(..., description="DOI of the document where the data citation is found")
     pages: Optional[List[int]] = Field(None, description="List of page numbers where the data citation is mentioned.")
     evidence: Optional[List[str]] = Field(None, description="List of evidence from the text for the data citation")
 
+    def to_string(self) -> str:
+        """
+        Flatten the citation entity into a string.
+        """
+        pages_str = ",".join(map(str, self.pages)) if self.pages else ""
+        evidence_str = ",".join(self.evidence) if self.evidence else ""
+        return f"{self.data_citation}|{self.document_id}|{pages_str}|{evidence_str}"
+
+    @classmethod
+    def from_string(cls, citation_entity_str: str) -> "CitationEntity":
+        """
+        Rehydrate the citation entity from a string.
+        """
+        parts = citation_entity_str.split("|", 3)
+        data_citation, document_id, pages_str, evidence_str = (
+            parts[0],
+            parts[1],
+            parts[2] if len(parts) > 2 else "",
+            parts[3] if len(parts) > 3 else "",
+        )
+
+        pages = [int(p) for p in pages_str.split(",") if p] if pages_str else None
+        evidence = evidence_str.split(",") if evidence_str else None
+
+        return cls(
+            data_citation=data_citation,
+            document_id=document_id,
+            pages=pages,
+            evidence=evidence,
+        )
+    
+    def to_duckdb_row(self) -> Dict[str, Any]:
+        """
+        Convert the citation entity into a dictionary that can be inserted into DuckDB.
+        """
+        return {
+            "data_citation": self.data_citation,
+            "document_id": self.document_id,
+            "pages": self.pages,
+            "evidence": self.evidence,
+        }
+    
+    @classmethod
+    def from_duckdb_row(cls, row: Dict[str, Any]) -> "CitationEntity":
+        """
+        Imports the citation entity from a DuckDB row.
+        """
+        return cls(
+            data_citation=row["data_citation"],
+            document_id=row["document_id"],
+            pages=row["pages"],
+            evidence=row["evidence"]
+        )
 
 class ChunkMetadata(BaseModel):
     chunk_id: str
@@ -35,9 +88,47 @@ class Chunk(BaseModel):
     text: str
     score: Optional[float] = None       # similarity score (added later)
     chunk_metadata: ChunkMetadata
-    
-    # def __str__(self):
-    #     return f"Chunk({self.chunk_id[:8]}..., {len(self.text)} chars, {self.chunk_metadata.section_type})"
+
+    def to_duckdb_row(self) -> Dict[str, Any]:
+        """
+        Convert the chunk and associated metadata into a dictionary that can be inserted into DuckDB.
+        """
+        citation_entities = [ce.to_string() for ce in self.chunk_metadata.citation_entities] if self.chunk_metadata.citation_entities else []
+        chunk_metadata_dict = {
+                "previous_chunk_id": self.chunk_metadata.previous_chunk_id,
+                "next_chunk_id": self.chunk_metadata.next_chunk_id,
+                "token_count": self.chunk_metadata.token_count,
+                "citation_entities": citation_entities,
+                "created_at": datetime.now().isoformat(),
+            }
+        return {
+            "chunk_id": self.chunk_id,
+            "document_id": self.document_id,
+            "chunk_text": self.text,
+            "score": self.score,
+            "chunk_metadata": tuple(chunk_metadata_dict.values())
+        }
+
+    @classmethod
+    def from_duckdb_row(cls, row: Dict[str, Any]) -> "Chunk":
+        """
+        Rehydrate the chunk from a DuckDB row.
+        """
+        citation_entities = [CitationEntity.from_string(ce_str) for ce_str in row["chunk_metadata"]["citation_entities"] if ce_str]
+        return cls(
+            chunk_id=row["chunk_id"],
+            document_id=row["document_id"],
+            text=row["chunk_text"],
+            score=row["score"],
+            chunk_metadata = ChunkMetadata(
+                chunk_id=row["chunk_id"],
+                previous_chunk_id=row["chunk_metadata"]["previous_chunk_id"],
+                next_chunk_id=row["chunk_metadata"]["next_chunk_id"],
+                token_count=row["chunk_metadata"]["token_count"],
+                citation_entities=citation_entities
+            )
+        )
+
 
 class Document(BaseModel):
     doi: str = Field(..., description="DOI or unique identifier of the document")
@@ -54,6 +145,50 @@ class Document(BaseModel):
     file_path: str = Field(..., description="Path to the document file")
     citation_entities: Optional[List[CitationEntity]] = Field(None, description="List of citation entities found in the document")
     n_pages: Optional[int] = Field(None, description="Number of pages in the document")
+
+    def to_duckdb_row(self) -> Dict[str, Any]:
+        """
+        Convert the document and associated metadata into a dictionary that can be inserted into DuckDB.
+        """
+        citation_entities = [ce.to_string() for ce in self.citation_entities] if self.citation_entities else []
+        return {
+            "doi": self.doi,
+            "has_dataset_citation": self.has_dataset_citation,
+            "full_text": self.full_text,
+            "total_char_length": self.total_char_length,
+            "parsed_timestamp": self.parsed_timestamp,
+            "total_chunks": self.total_chunks,
+            "total_tokens": self.total_tokens,
+            "avg_tokens_per_chunk": self.avg_tokens_per_chunk,
+            "file_hash": self.file_hash,
+            "file_path": self.file_path,
+            "citation_entities": citation_entities,
+            "n_pages": self.n_pages,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+
+    @classmethod
+    def from_duckdb_row(cls, row: Dict[str, Any]) -> "Document":
+        """
+        Rehydrate the document from a DuckDB row.
+        """
+        citation_entities = [CitationEntity.from_string(ce_str) for ce_str in row["citation_entities"] if ce_str]
+        return cls(
+            doi=row["doi"],
+            has_dataset_citation=row["has_dataset_citation"],
+            full_text=row["full_text"],
+            total_char_length=row["total_char_length"],
+            parsed_timestamp=row["parsed_timestamp"],
+            total_chunks=row["total_chunks"],
+            total_tokens=row["total_tokens"],
+            avg_tokens_per_chunk=row["avg_tokens_per_chunk"],
+            file_hash=row["file_hash"],
+            file_path=row["file_path"],
+            citation_entities=citation_entities,
+            n_pages=row["n_pages"]
+        )
+
 
 class ChunkingResult(BaseModel):
     """Result of the chunking pipeline"""

@@ -24,8 +24,10 @@ import logging
 import os
 import sys
 import uuid
+import json
 from pathlib import Path
 from typing import List, Optional
+from datetime import datetime
 
 import yaml
 import chromadb
@@ -36,6 +38,13 @@ from llama_index.core.schema import Document
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# For offline embeddings
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
@@ -90,26 +99,181 @@ def _load_cfg(cfg_path: Optional[os.PathLike] | None = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Offline Embedder Class
+# ---------------------------------------------------------------------------
+
+class OfflineEmbedder:
+    """
+    Offline embedding class using SentenceTransformers for local embeddings.
+    Compatible with llama_index embedding interface.
+    """
+    
+    def __init__(self, model_name: str = "bge-small-en-v1.5", cache_dir: str = "./offline_models"):
+        """Initialize the offline embedder with a SentenceTransformer model."""
+        if not SENTENCE_TRANSFORMERS_AVAILABLE:
+            raise ImportError(
+                "sentence-transformers not available. Install with: pip install sentence-transformers"
+            )
+        
+        self.model_name = model_name
+        self.cache_dir = Path(cache_dir)
+        
+        # Create cache directory if it doesn't exist
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        logger.info("▸ Loading offline embedding model %s (cache: %s)", model_name, cache_dir)
+        
+        # Download and cache model for offline use
+        self.model = SentenceTransformer(model_name, cache_folder=str(self.cache_dir))
+        
+        # Cache the model to ensure it's available offline
+        self._cache_model()
+    
+    def _cache_model(self):
+        """Cache the model for offline use."""
+        try:
+            # Test embedding to ensure model is fully loaded
+            test_embedding = self.model.encode("test")
+            logger.info("✅ Model %s cached successfully (embedding dim: %d)", 
+                       self.model_name, len(test_embedding))
+            
+            # Save model info to cache directory
+            model_info = {
+                "model_name": self.model_name,
+                "embedding_dim": len(test_embedding),
+                "cached_at": str(datetime.now()),
+                "cache_dir": str(self.cache_dir)
+            }
+            
+            info_file = self.cache_dir / f"{self.model_name.replace('/', '_')}_info.json"
+            with open(info_file, 'w') as f:
+                json.dump(model_info, f, indent=2)
+                
+        except Exception as e:
+            logger.error("❌ Failed to cache model %s: %s", self.model_name, str(e))
+            raise
+    
+    def get_text_embedding(self, text: str) -> List[float]:
+        """Get embedding for a single text string."""
+        if not text:
+            return []
+        
+        # Clean text for embedding
+        text = text.replace("\n", " ").strip()
+        
+        # Generate embedding
+        embedding = self.model.encode(text)
+        return embedding.tolist()
+    
+    def get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """Get embeddings for multiple text strings."""
+        if not texts:
+            return []
+        
+        # Clean texts
+        cleaned_texts = [text.replace("\n", " ").strip() for text in texts]
+        
+        # Generate embeddings in batch
+        embeddings = self.model.encode(cleaned_texts)
+        return embeddings.tolist()
+
+    @staticmethod
+    def download_model(model_name: str, cache_dir: str = "./offline_models") -> bool:
+        """Download and cache a model for offline use.
+        
+        Args:
+            model_name: Name of the SentenceTransformer model to download
+            cache_dir: Directory to cache the model
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not SENTENCE_TRANSFORMERS_AVAILABLE:
+            logger.error("sentence-transformers not available for model download")
+            return False
+            
+        try:
+            cache_path = Path(cache_dir)
+            cache_path.mkdir(parents=True, exist_ok=True)
+            
+            logger.info("▸ Downloading model %s to %s", model_name, cache_dir)
+            
+            # Download the model
+            model = SentenceTransformer(model_name, cache_folder=str(cache_path))
+            
+            # Test the model
+            test_embedding = model.encode("test")
+            logger.info("✅ Model %s downloaded successfully (embedding dim: %d)", 
+                       model_name, len(test_embedding))
+            
+            # Save model info
+            model_info = {
+                "model_name": model_name,
+                "embedding_dim": len(test_embedding),
+                "downloaded_at": str(datetime.now()),
+                "cache_dir": str(cache_path)
+            }
+            
+            info_file = cache_path / f"{model_name.replace('/', '_')}_info.json"
+            with open(info_file, 'w') as f:
+                json.dump(model_info, f, indent=2)
+                
+            return True
+            
+        except Exception as e:
+            logger.error("❌ Failed to download model %s: %s", model_name, str(e))
+            return False
+
+# ---------------------------------------------------------------------------
 # Builders
 # ---------------------------------------------------------------------------
 
 
-def _build_embedder(model_name: str):
-    """Return an OpenAIEmbedding instance from llama_index.
+def _build_embedder(model_name: str, cfg: dict = None):
+    """Return an embedding instance (OpenAI or offline) based on model name.
 
-    The OPENAI_API_KEY environment variable must be set.
+    Args:
+        model_name: Model name. If starts with 'offline:' or is in offline models list,
+                   uses SentenceTransformer. Otherwise uses OpenAI.
+        cfg: Configuration dictionary with offline model settings.
+    
+    Returns:
+        Embedding instance compatible with llama_index interface.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise EnvironmentError(
-            "OPENAI_API_KEY not found – please set it before calling this helper."
-        )
+    # List of known offline models
+    offline_models = [
+        "bge-small-en-v1.5",
+        "all-MiniLM-L6-v2", 
+        "all-mpnet-base-v2",
+        "sentence-transformers/all-MiniLM-L6-v2",
+        "sentence-transformers/all-mpnet-base-v2",
+        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    ]
+    
+    # Get offline model configuration
+    offline_cfg = cfg.get("offline_model", {}) if cfg else {}
+    cache_dir = offline_cfg.get("cache_dir", "./offline_models")
+    
+    # Check if this is an offline model
+    if model_name.startswith("offline:"):
+        # Remove offline: prefix
+        actual_model = model_name[8:]
+        return OfflineEmbedder(actual_model, cache_dir=cache_dir)
+    elif model_name in offline_models:
+        return OfflineEmbedder(model_name, cache_dir=cache_dir)
+    else:
+        # Use OpenAI embedding
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise EnvironmentError(
+                "OPENAI_API_KEY not found – please set it before calling this helper."
+            )
 
-    logger.info("▸ Loading OpenAI embedding model %s", model_name)
-    return OpenAIEmbedding(model=model_name)
+        logger.info("▸ Loading OpenAI embedding model %s", model_name)
+        return OpenAIEmbedding(model=model_name)
 
 
-def _build_splitter(cfg: dict, embedder: OpenAIEmbedding) -> SemanticSplitterNodeParser:
+def _build_splitter(cfg: dict, embedder) -> SemanticSplitterNodeParser:
     """Instantiate SemanticSplitterNodeParser with config-driven hyper-params."""
     return SemanticSplitterNodeParser(
         embed_model=embedder,
@@ -136,14 +300,15 @@ def _get_chroma_collection(cfg: dict, collection_name: str):
 
 @timer_wrap
 def semantic_chunk_text(
-    text: str, cfg_path: Optional[os.PathLike] | None = None
+    text: str, cfg_path: Optional[os.PathLike] | None = None,
+    model_name: str = "text-embedding-3-small"
 ) -> List[str]:
     """Return a list of semantic chunks for *text* (page or whole document)."""
     if not text:
         return []
 
     cfg = _load_cfg(cfg_path)
-    embedder = _build_embedder(cfg.get("embed_model", "text-embedding-3-small"))
+    embedder = _build_embedder(cfg.get("embed_model", model_name))
     splitter = _build_splitter(cfg, embedder)
 
     logger.info(
@@ -167,7 +332,7 @@ def _chunk_obj_to_metadata(chunk_obj: "Chunk") -> dict:
     
     # Handle citation_entities (not candidate_entities)
     citation_entities_str = (
-        "/".join([f"{ce.data_citation}|{ce.doc_id}" for ce in cm.citation_entities])
+        "/".join([ce.to_string() for ce in cm.citation_entities])
         if cm.citation_entities
         else ""
     )
@@ -181,12 +346,43 @@ def _chunk_obj_to_metadata(chunk_obj: "Chunk") -> dict:
         "citation_entities": citation_entities_str,
     }
 
+@timer_wrap
+def save_chunk_obj_to_chroma(
+    chunk_obj: "Chunk",
+    cfg_path: Optional[os.PathLike] | None = None,
+    collection_name: str | None = None,
+    model_name: str = "text-embedding-3-small"
+):
+    """Persist a list of Chunk objects (text + metadata) to ChromaDB."""
+    if not chunk_obj:
+        logger.warning("No chunk objects supplied – nothing to write to Chroma")
+        return
+
+    cfg = _load_cfg(cfg_path)
+    embedder = _build_embedder(cfg.get("embed_model", model_name))
+    _, collection = _get_chroma_collection(
+        cfg, collection_name or chunk_obj.document_id
+    )
+
+    logger.info("▸ Embedding %d chunks for Chroma upsert")
+    documents =chunk_obj.text
+    embeddings = get_embedding(documents, embedder.get_text_embedding(documents))
+    metadatas = _chunk_obj_to_metadata(chunk_obj)
+    ids = chunk_obj.chunk_id
+
+    collection.add(
+        ids=ids, documents=documents, metadatas=metadatas, embeddings=embeddings
+    )
+    logger.info(
+        "✅ Persisted 1 chunk to Chroma collection '%s'", collection.name
+    )
 
 @timer_wrap
 def save_chunk_objs_to_chroma(
     chunk_objs: List["Chunk"],
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str | None = None,
+    model_name: str = "text-embedding-3-small"
 ):
     """Persist a list of Chunk objects (text + metadata) to ChromaDB."""
     if not chunk_objs:
@@ -194,7 +390,7 @@ def save_chunk_objs_to_chroma(
         return
 
     cfg = _load_cfg(cfg_path)
-    embedder = _build_embedder(cfg.get("embed_model", "text-embedding-3-small"))
+    embedder = _build_embedder(cfg.get("embed_model", model_name))
     _, collection = _get_chroma_collection(
         cfg, collection_name or chunk_objs[0].document_id
     )
@@ -236,16 +432,8 @@ def fetch_chunk_objs_from_chroma(
         citation_entities = []
         if meta.get("citation_entities"):
             for ce_str in meta["citation_entities"].split("/"):
-                if "|" in ce_str:
-                    data_citation, doc_id = ce_str.split("|", 1)
-                    citation_entities.append(
-                        CitationEntity(
-                            data_citation=data_citation,
-                            doc_id=doc_id,
-                            pages=None,  # Not stored in metadata
-                            evidence=None  # Not stored in metadata
-                        )
-                    )
+                if ce_str:
+                    citation_entities.append(CitationEntity.from_string(ce_str))
 
         chunk_meta = ChunkMetadata(
             chunk_id=meta["chunk_id"],
@@ -267,6 +455,37 @@ def fetch_chunk_objs_from_chroma(
     logger.info("▸ Fetched %d chunks from Chroma", len(chunks))
     return chunks
 
+@timer_wrap
+def save_chunk_to_chroma(
+    chunk: str,
+    cfg_path: Optional[os.PathLike] | None = None,
+    collection_name: str = "chunks",
+    metadata: Optional[List[dict]] = None,
+    model_name: str = "text-embedding-3-small"
+):
+    """Embed raw *chunks* and upsert them into a ChromaDB collection."""
+    if not chunk:
+        logger.warning("save_chunks_to_chroma() called with an empty chunk list")
+        return
+
+    cfg = _load_cfg(cfg_path)
+    embedder = _build_embedder(cfg.get("embed_model", model_name))
+
+    logger.info("▸ Embedding %d chunks for Chroma upsert")
+    embeddings = embedder.get_text_embedding(chunk)
+    if metadata is None:
+        metadata = {"chunk_index": 0}
+
+    client, collection = _get_chroma_collection(cfg, collection_name)
+    id = str(uuid.uuid4())
+
+    logger.info(
+        "▸ Upserting 1 item into collection '%s' (path=%s)",
+        collection_name,
+        cfg["vector_store"]["path"],
+    )
+    collection.add(ids=id, documents=chunk, metadatas=metadata, embeddings=embeddings)
+    logger.info("✅ Persisted collection to disk (%s)", cfg["vector_store"]["path"])
 
 @timer_wrap
 def save_chunks_to_chroma(
@@ -274,6 +493,7 @@ def save_chunks_to_chroma(
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str = "chunks",
     metadata: Optional[List[dict]] = None,
+    model_name: str = "text-embedding-3-small"
 ):
     """Embed raw *chunks* and upsert them into a ChromaDB collection."""
     if not chunks:
@@ -281,7 +501,7 @@ def save_chunks_to_chroma(
         return
 
     cfg = _load_cfg(cfg_path)
-    embedder = _build_embedder(cfg.get("embed_model", "text-embedding-3-small"))
+    embedder = _build_embedder(cfg.get("embed_model", model_name))
 
     logger.info("▸ Embedding %d chunks for Chroma upsert", len(chunks))
     embeddings = [embedder.get_text_embedding(ch) for ch in chunks]
@@ -308,16 +528,33 @@ def save_chunks_to_chroma(
 # CLI helper (quick test)
 # ---------------------------------------------------------------------------
 
+def download_offline_model(model_name: str = "bge-small-en-v1.5"):
+    """Download and cache an offline model for use."""
+    success = OfflineEmbedder.download_model(model_name)
+    if success:
+        logger.info("✅ Offline model %s ready for use", model_name)
+    else:
+        logger.error("❌ Failed to download offline model %s", model_name)
+    return success
+
+
 if __name__ == "__main__":  # pragma: no cover
+    import sys
     import textwrap
 
-    sample_text = textwrap.dedent(
-        """
-        Semantic chunking splits text along **topic changes** instead of raw
-        token counts.  This standalone demo embeds the chunks via OpenAI and
-        stores them in a local ChromaDB collection named 'test'.
-        """
-    ).strip()
+    # Check if we're being asked to download a model
+    if len(sys.argv) > 1 and sys.argv[1] == "download":
+        model_name = sys.argv[2] if len(sys.argv) > 2 else "bge-small-en-v1.5"
+        download_offline_model(model_name)
+    else:
+        # Default demo
+        sample_text = textwrap.dedent(
+            """
+            Semantic chunking splits text along **topic changes** instead of raw
+            token counts.  This standalone demo embeds the chunks via OpenAI and
+            stores them in a local ChromaDB collection named 'test'.
+            """
+        ).strip()
 
-    cks = semantic_chunk_text(sample_text)
-    save_chunks_to_chroma(cks, collection_name="test")
+        cks = semantic_chunk_text(sample_text)
+        save_chunks_to_chroma(cks, collection_name="test")
