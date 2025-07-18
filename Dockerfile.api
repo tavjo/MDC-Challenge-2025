@@ -7,7 +7,10 @@ RUN pip install uv
 WORKDIR /app
 
 # Install only the specific dependencies needed for the API service
-RUN uv add fastapi uvicorn duckdb chromadb sentence-transformers llama-index llama-index-core llama-index-embeddings-openai openai python-dotenv tiktoken pandas pytest pydantic pyyaml typing-extensions
+# Using uv pip install instead of uv add for Docker builds (no project context needed)
+RUN uv pip install --system fastapi uvicorn duckdb chromadb sentence-transformers \
+    llama-index llama-index-core llama-index-embeddings-openai openai \
+    python-dotenv tiktoken pandas pytest pydantic pyyaml typing-extensions
 
 # Copy necessary files
 COPY src/ /app/src/

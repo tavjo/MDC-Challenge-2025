@@ -15,7 +15,6 @@ WORKDIR /app
 # Copy pyproject.toml and uv.lock first (for better caching)
 COPY pyproject.toml uv.lock ./
 
-
 # Install additional Python dependencies using uv
 # Note: unstructured[all] is already installed in the base image
 RUN uv sync --frozen --no-dev
@@ -27,7 +26,7 @@ COPY src/ ./src/
 COPY tests/ ./tests/
 
 # Create necessary directories
-RUN mkdir -p Data logs artifacts configs tests
+RUN mkdir -p Data logs tests
 
 # Set the default command to run the citation entity extractor
 CMD ["python", "src/get_document_objects.py"]

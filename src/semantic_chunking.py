@@ -366,7 +366,7 @@ def save_chunk_obj_to_chroma(
 
     logger.info("▸ Embedding %d chunks for Chroma upsert")
     documents =chunk_obj.text
-    embeddings = get_embedding(documents, embedder.get_text_embedding(documents))
+    embeddings = embedder.get_text_embedding(documents)
     metadatas = _chunk_obj_to_metadata(chunk_obj)
     ids = chunk_obj.chunk_id
 
@@ -397,7 +397,7 @@ def save_chunk_objs_to_chroma(
 
     logger.info("▸ Embedding %d chunks for Chroma upsert", len(chunk_objs))
     documents = [c.text for c in chunk_objs]
-    embeddings = [get_embedding(txt, embedder.get_text_embedding(txt)) for txt in documents]
+    embeddings = [embedder.get_text_embedding(txt) for txt in documents]
     metadatas = [_chunk_obj_to_metadata(c) for c in chunk_objs]
     ids = [c.chunk_id for c in chunk_objs]
 

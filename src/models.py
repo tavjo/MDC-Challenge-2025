@@ -106,7 +106,7 @@ class Chunk(BaseModel):
             "document_id": self.document_id,
             "chunk_text": self.text,
             "score": self.score,
-            "chunk_metadata": tuple(chunk_metadata_dict.values())
+            "chunk_metadata": chunk_metadata_dict
         }
 
     @classmethod
@@ -179,7 +179,7 @@ class Document(BaseModel):
             has_dataset_citation=row["has_dataset_citation"],
             full_text=row["full_text"],
             total_char_length=row["total_char_length"],
-            parsed_timestamp=row["parsed_timestamp"],
+            parsed_timestamp=str(row["parsed_timestamp"]),
             total_chunks=row["total_chunks"],
             total_tokens=row["total_tokens"],
             avg_tokens_per_chunk=row["avg_tokens_per_chunk"],

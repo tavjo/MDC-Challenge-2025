@@ -14,6 +14,7 @@ from typing import List, Tuple, Optional
 from collections import defaultdict
 from datetime import datetime
 import pandas as pd
+import numpy as np
 
 # Add project root to path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -22,9 +23,10 @@ sys.path.append(project_root)
 # Local imports
 from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult
 from src.helpers import initialize_logging, timer_wrap, load_docs, export_docs
-from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma
+from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma, save_chunks_to_chroma
 # from src.get_citation_entities import CitationEntityExtractor
 import duckdb
+from api.duckdb_utils import get_duckdb_helper
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
@@ -128,67 +130,61 @@ def make_pattern(dataset_id: str) -> re.Pattern:
     return re.compile(pat, flags=re.IGNORECASE)
 
 @timer_wrap
-def create_pre_chunk_entity_inventory(documents: List[Document], citation_entities: List[CitationEntity]) -> pd.DataFrame:
+def create_pre_chunk_entity_inventory(document: Document, citation_entities: List[CitationEntity]) -> pd.DataFrame:
     """
     Count exact dataset citations before chunking using CitationEntity objects.
     
     Args:
-        documents: List of Document objects
+        document: Document object
         citation_entities: List of CitationEntity objects
         
     Returns:
         DataFrame with citation counts by document
     """
-    logger.info(f"Creating pre-chunk entity inventory for {len(documents)} documents")
+    logger.info(f"Creating pre-chunk entity inventory for document {document.doi}")
     
-    # Validate ID formats
-    doc_ids = {doc.doi for doc in documents}
-    citation_doc_ids = {citation.document_id for citation in citation_entities}
+    # Filter citations for this document
+    doc_citations = [citation for citation in citation_entities if citation.document_id == document.doi]
     
-    if not doc_ids.intersection(citation_doc_ids):
-        raise ValueError("No matching document IDs between documents and citations")
+    if not doc_citations:
+        logger.info(f"No citations found for document {document.doi}")
+        return pd.DataFrame(columns=['document_id', 'citation_id', 'count'])
     
-    # Group citations by document
-    citations_by_doc = defaultdict(list)
-    for citation in citation_entities:
-        citations_by_doc[citation.document_id].append(citation)
+    logger.info(f"Found {len(doc_citations)} citations for document {document.doi}")
+    
+    # Standardize text format
+    if isinstance(document.full_text, list):
+        text = " ".join(document.full_text)
+    else:
+        text = document.full_text
     
     # Cache compiled patterns
     pattern_cache = {}
     rows = []
     
-    for doc in documents:
-        # Standardize text format
-        if isinstance(doc.full_text, list):
-            text = " ".join(doc.full_text)
-        else:
-            text = doc.full_text
+    for citation in doc_citations:
+        # Cache pattern compilation
+        if citation.data_citation not in pattern_cache:
+            pattern_cache[citation.data_citation] = make_pattern(citation.data_citation)
         
-        doc_citations = citations_by_doc.get(doc.doi, [])
+        pattern = pattern_cache[citation.data_citation]
+        matches = pattern.findall(text)
         
-        for citation in doc_citations:
-            # Cache pattern compilation
-            if citation.data_citation not in pattern_cache:
-                pattern_cache[citation.data_citation] = make_pattern(citation.data_citation)
-            
-            pattern = pattern_cache[citation.data_citation]
-            matches = pattern.findall(text)
-            
-            rows.append({
-                'document_id': doc.doi,
-                'citation_id': citation.data_citation,
-                'count': len(matches),
-            })
+        rows.append({
+            'document_id': document.doi,
+            'citation_id': citation.data_citation,
+            'count': len(matches),
+        })
     
     inventory_df = pd.DataFrame(rows)
     
     # Summary statistics
     total_citations = inventory_df['count'].sum()
-    documents_with_citations = len(inventory_df[inventory_df['count'] > 0]['document_id'].unique())
+    citations_found = len(inventory_df[inventory_df['count'] > 0])
     
     logger.info(f"✅ Created entity inventory:")
     logger.info(f"📊 Total citations found: {total_citations}")
-    logger.info(f"📊 Documents with citations: {documents_with_citations}/{len(documents)}")
+    logger.info(f"📊 Citations with matches: {citations_found}/{len(doc_citations)}")
     
     return inventory_df 
 
@@ -197,13 +193,13 @@ def create_pre_chunk_entity_inventory(documents: List[Document], citation_entiti
 # ---------------------------------------------------------------------------
 
 @timer_wrap
-def create_chunks_from_documents(documents: List[Document], citation_entities: List[CitationEntity], 
+def create_chunks_from_document(document: Document, citation_entities: List[CitationEntity], 
                                 chunk_size: int = 200, chunk_overlap: int = 20) -> List[Chunk]:
     """
     Create chunks using semantic_chunking.py functions with citation assignment.
     
     Args:
-        documents: List of Document objects
+        document: Document object
         citation_entities: List of CitationEntity objects
         chunk_size: Target chunk size in tokens
         chunk_overlap: Overlap between chunks in tokens
@@ -211,7 +207,7 @@ def create_chunks_from_documents(documents: List[Document], citation_entities: L
     Returns:
         List of Chunk objects
     """
-    logger.info(f"Creating semantic chunks for {len(documents)} documents")
+    logger.info(f"Creating semantic chunks for {document.doi}")
     
     # Group citation entities by document
     citations_by_doc = defaultdict(list)
@@ -220,51 +216,51 @@ def create_chunks_from_documents(documents: List[Document], citation_entities: L
     
     chunks = []
     
-    for doc in documents:
-        # Standardize text format
-        if isinstance(doc.full_text, list):
-            text = " ".join(doc.full_text)
-        else:
-            text = doc.full_text
-        
-        # Use semantic chunking
-        text_chunks = semantic_chunk_text(text)
-        
-        # Get citations for this document
-        doc_citations = citations_by_doc.get(doc.doi, [])
-        
-        # Create Chunk objects with metadata
-        for i, chunk_text in enumerate(text_chunks):
-            chunk_id = f"{doc.doi}_{i}"
-            
-            # Find which citations appear in this chunk
-            chunk_citations = []
-            for citation in doc_citations:
-                pattern = make_pattern(citation.data_citation)
-                if pattern.search(chunk_text):  # Check if citation appears in chunk
-                    chunk_citations.append(citation)
-            
-            # Use tiktoken for accurate token counting
-            import tiktoken
-            tok = tiktoken.get_encoding("cl100k_base")
-            token_count = len(tok.encode(chunk_text))
-            
-            chunk_meta = ChunkMetadata(
-                chunk_id=chunk_id,
-                token_count=token_count,
-                citation_entities=chunk_citations,
-                previous_chunk_id=None,  # Will be set by link_adjacent_chunks
-                next_chunk_id=None
-            )
-            
-            chunks.append(Chunk(
-                chunk_id=chunk_id,
-                document_id=doc.doi,
-                text=chunk_text,
-                chunk_metadata=chunk_meta
-            ))
+    doc = document
+    # Standardize text format
+    if isinstance(doc.full_text, list):
+        text = " ".join(doc.full_text)
+    else:
+        text = doc.full_text
     
-    logger.info(f"✅ Created {len(chunks)} chunks from {len(documents)} documents")
+    # Use semantic chunking
+    text_chunks = semantic_chunk_text(text)
+    
+    # Get citations for this document
+    doc_citations = citations_by_doc.get(doc.doi, [])
+    
+    # Create Chunk objects with metadata
+    for i, chunk_text in enumerate(text_chunks):
+        chunk_id = f"{doc.doi}_{i}"
+        
+        # Find which citations appear in this chunk
+        chunk_citations = []
+        for citation in doc_citations:
+            pattern = make_pattern(citation.data_citation)
+            if pattern.search(chunk_text):  # Check if citation appears in chunk
+                chunk_citations.append(citation)
+        
+        # Use tiktoken for accurate token counting
+        import tiktoken
+        tok = tiktoken.get_encoding("cl100k_base")
+        token_count = len(tok.encode(chunk_text))
+        
+        chunk_meta = ChunkMetadata(
+            chunk_id=chunk_id,
+            token_count=token_count,
+            citation_entities=chunk_citations,
+            previous_chunk_id=None,  # Will be set by link_adjacent_chunks
+            next_chunk_id=None
+        )
+        
+        chunks.append(Chunk(
+            chunk_id=chunk_id,
+            document_id=doc.doi,
+            text=chunk_text,
+            chunk_metadata=chunk_meta
+        ))
+    
+    logger.info(f"✅ Created {len(chunks)} chunks from {document.doi}")
     return chunks 
 
 # ---------------------------------------------------------------------------
@@ -285,35 +281,39 @@ def link_adjacent_chunks(chunks: List[Chunk]) -> List[Chunk]:
     logger.info(f"Linking adjacent chunks for {len(chunks)} chunks")
     
     # Group chunks by document
-    by_document = defaultdict(list)
+    # by_document = defaultdict(list)
+    # for i, chunk in enumerate(chunks):
+    #     document_id = chunk.document_id
+    #     by_document[document_id].append((i, chunk.text, chunk.chunk_metadata.model_dump()))
+
+    doc_chunks = []
     for i, chunk in enumerate(chunks):
-        document_id = chunk.document_id
-        by_document[document_id].append((i, chunk.text, chunk.chunk_metadata.model_dump()))
+        doc_chunks.append((i, chunk.text, chunk.chunk_metadata.model_dump(), chunk.document_id))
     
     # Link chunks within each document
     linked_chunks = []
-    for document_id, doc_chunks in by_document.items():
-        # Sort by chunk position (assuming order from semantic chunking)
-        doc_chunks.sort(key=lambda x: x[0])
+    # for document_id, doc_chunks in by_document.items():
+    # Sort by chunk position (assuming order from semantic chunking)
+    doc_chunks.sort(key=lambda x: x[0])
+    
+    for i, (original_idx, text, metadata, document_id) in enumerate(doc_chunks):
+        # Set previous chunk ID
+        if i > 0:
+            prev_metadata = doc_chunks[i-1][2]
+            metadata['previous_chunk_id'] = prev_metadata['chunk_id']
         
-        for i, (original_idx, text, metadata) in enumerate(doc_chunks):
-            # Set previous chunk ID
-            if i > 0:
-                prev_metadata = doc_chunks[i-1][2]
-                metadata['previous_chunk_id'] = prev_metadata['chunk_id']
-            
-            # Set next chunk ID
-            if i < len(doc_chunks) - 1:
-                next_metadata = doc_chunks[i+1][2]
-                metadata['next_chunk_id'] = next_metadata['chunk_id']
-            
-            new_chunk = Chunk(
-                chunk_id=metadata['chunk_id'],
-                document_id=document_id,
-                text=text,
-                chunk_metadata=ChunkMetadata.model_validate(metadata)
-            )
-            linked_chunks.append(new_chunk)
+        # Set next chunk ID
+        if i < len(doc_chunks) - 1:
+            next_metadata = doc_chunks[i+1][2]
+            metadata['next_chunk_id'] = next_metadata['chunk_id']
+        
+        new_chunk = Chunk(
+            chunk_id=metadata['chunk_id'],
+            document_id=document_id,
+            text=text,
+            chunk_metadata=ChunkMetadata.model_validate(metadata)
+        )
+        linked_chunks.append(new_chunk)
     
     logger.info(f"✅ Linked {len(linked_chunks)} chunks")
     return linked_chunks 
@@ -339,35 +339,39 @@ def validate_chunk_integrity(chunks: List[Chunk], pre_chunk_inventory: pd.DataFr
     logger.info(f"Validating chunk integrity for {len(chunks)} chunks")
     
     # Group citation entities by document
-    citations_by_doc = defaultdict(list)
-    for citation in citation_entities:
-        citations_by_doc[citation.document_id].append(citation)
+    # citations_by_doc = defaultdict(list)
+    # for citation in citation_entities:
+    #     citations_by_doc[citation.document_id].append(citation)
     
     # Count citations AFTER chunking
     post_chunk_rows = []
     
     for chunk in chunks:
         text = chunk.text
-        doc_citations = citations_by_doc.get(chunk.document_id, [])
+        doc_id = chunk.document_id
+        doc_citations = [citation for citation in citation_entities if citation.document_id == doc_id]
         
         for citation in doc_citations:
             pattern = make_pattern(citation.data_citation)
             matches = pattern.findall(text)
             
             post_chunk_rows.append({
-                'document_id': chunk.document_id,
+                'document_id': doc_id,
                 'citation_id': citation.data_citation,
                 'count': len(matches),
             })
     
     # Aggregate post-chunk counts by document
     post_chunk_df = pd.DataFrame(post_chunk_rows)
-    post_aggregated = (
-        post_chunk_df
-        .groupby(['document_id', 'citation_id'])['count']
-        .sum()
-        .reset_index()
-    )
+    if post_chunk_df.empty:
+        post_aggregated = pd.DataFrame(columns=['document_id', 'citation_id', 'count'])
+    else:
+        post_aggregated = (
+            post_chunk_df
+            .groupby(['document_id', 'citation_id'])['count']
+            .sum()
+            .reset_index()
+        )
     
     # Merge with pre-chunk inventory
     merged = pre_chunk_inventory.merge(
@@ -420,33 +424,37 @@ def save_chunks_to_duckdb(chunks: List[Chunk], db_path: str = "artifacts/mdc_cha
     
     try:
         # Connect to DuckDB
-        conn = duckdb.connect(db_path)
+        # conn = duckdb.connect(db_path)
         
         # Clear existing chunks (optional - depends on requirements)
         # conn.execute("DELETE FROM chunks")
         
         # Insert chunks one by one
-        for chunk in chunks:
-            chunk_row = chunk.to_duckdb_row()
+        # for chunk in chunks:
+        #     chunk_row = chunk.to_duckdb_row()
             
-            # Insert chunk
-            conn.execute("""
-                INSERT OR REPLACE INTO chunks 
-                (chunk_id, document_id, chunk_text, score, chunk_metadata)
-                VALUES (?, ?, ?, ?, ?)
-            """, (
-                chunk_row["chunk_id"],
-                chunk_row["document_id"],
-                chunk_row["chunk_text"],
-                chunk_row["score"],
-                chunk_row["chunk_metadata"]
-            ))
+        #     # Insert chunk
+        #     conn.execute("""
+        #         INSERT OR REPLACE INTO chunks 
+        #         (chunk_id, document_id, chunk_text, score, chunk_metadata)
+        #         VALUES (?, ?, ?, ?, ?)
+        #     """, (
+        #         chunk_row["chunk_id"],
+        #         chunk_row["document_id"],
+        #         chunk_row["chunk_text"],
+        #         chunk_row["score"],
+        #         chunk_row["chunk_metadata"]
+        #     ))
         
-        conn.commit()
-        conn.close()
-        
-        logger.info(f"✅ Successfully saved {len(chunks)} chunks to DuckDB")
-        return True
+        # conn.commit()
+        # conn.close()
+        db_helper = get_duckdb_helper(db_path)
+        if db_helper.store_chunks(chunks):
+            logger.info(f"✅ Successfully saved {len(chunks)} chunks to DuckDB")
+            return True
+        else:
+            logger.error(f"❌ Failed to save chunks to DuckDB")
+            return False
         
     except Exception as e:
         logger.error(f"❌ Failed to save chunks to DuckDB: {str(e)}")
@@ -480,7 +488,7 @@ def export_chunks_to_json(chunks: List[Chunk], output_path: str = "chunks_for_em
     return output_path
 
 @timer_wrap
-def export_chunks_summary_csv(chunks: List[Chunk], output_path: str = "chunks_for_embedding_summary.csv") -> str:
+def create_chunks_summary_csv(chunks: List[Chunk], export: bool = True, output_path: str = "chunks_for_embedding_summary.csv") -> str:
     """
     Export chunk summary statistics to CSV.
     
@@ -501,10 +509,11 @@ def export_chunks_summary_csv(chunks: List[Chunk], output_path: str = "chunks_fo
         summary_rows.append(row)
     
     summary_df = pd.DataFrame(summary_rows)
-    summary_df.to_csv(output_path, index=False)
+    if export:
+        summary_df.to_csv(output_path, index=False)
     
     logger.info(f"✅ Exported chunk summary to CSV: {output_path}")
-    return output_path 
+    return summary_df 
 
 # ---------------------------------------------------------------------------
 # Main Pipeline Function
@@ -559,81 +568,122 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
             raise ValueError("No documents loaded - check input path")
         
         if subset:
-            documents = documents[:subset_size]
+            np.random.seed(42)
+            documents = np.random.choice(documents, size=subset_size, replace=False)
+
+        result_list = []
+        inventory_list = []
+        all_validated_chunks = []
+        lost_entities_list = []
+        # summary_df_list = []
         
-        # Step 2: Create pre-chunk entity inventory
-        logger.info("\n📋 Step 2: Create Pre-Chunk Entity Inventory")
-        pre_chunk_inventory = create_pre_chunk_entity_inventory(documents, citation_entities)
-        
-        # Step 3: Create chunks
-        logger.info("\n📋 Step 3: Create Semantic Chunks")
-        chunks = create_chunks_from_documents(documents, citation_entities, chunk_size, chunk_overlap)
-        
-        # Step 4: Link adjacent chunks
-        logger.info("\n📋 Step 4: Link Adjacent Chunks")
-        chunks = link_adjacent_chunks(chunks)
-        
-        # Step 5: Validate integrity
-        logger.info("\n📋 Step 5: Validate Chunk Integrity")
-        validation_passed, lost_citations = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
-        
-        # Quality gates check
-        if not validation_passed:
-            logger.error("❌ QUALITY GATE FAILURE: Citation retention < 100%")
-            logger.error("   Pipeline aborted to prevent data loss")
-            
-            return ChunkingResult(
+        for document in documents:
+            logger.info(f"\n📋 Step 2: Create Pre-Chunk Entity Inventory for {document.doi}")
+            pre_chunk_inventory = create_pre_chunk_entity_inventory(document, citation_entities)
+            inventory_list.append(pre_chunk_inventory)
+            # step 3: create chunks
+            logger.info(f"\n📋 Step 3: Create Semantic Chunks for {document.doi}")
+            chunks = create_chunks_from_document(document, citation_entities, chunk_size, chunk_overlap)
+            # Step 4: Link adjacent chunks within document
+            logger.info(f"\n📋 Step 4: Link Adjacent Chunks for {document.doi}")
+            chunks = link_adjacent_chunks(chunks)
+            # post-chunk validation
+            logger.info(f"\n📋 Step 5: Validate Chunk Integrity for {document.doi}")
+            validation_passed, lost_citations = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
+            if lost_citations is not None:
+                lost_entities_list.append(lost_citations)
+            if not validation_passed:
+                logger.error("❌ QUALITY GATE FAILURE: Citation retention < 100%")
+                logger.error("   Pipeline aborted to prevent data loss")
+                result_list.append(ChunkingResult(
                 success=False,
                 error="Quality gate failure: Citation retention < 100%",
                 pipeline_completed_at=datetime.now().isoformat(),
-                total_documents=len(documents),
+                total_documents=1,
                 total_unique_datasets=len(citation_entities),
                 total_chunks=len(chunks),
                 total_tokens=sum(chunk.chunk_metadata.token_count for chunk in chunks),
                 avg_tokens_per_chunk=sum(chunk.chunk_metadata.token_count for chunk in chunks) / len(chunks) if chunks else 0,
                 validation_passed=validation_passed,
                 entity_retention=0.0,
+                ))
+                continue
+            all_validated_chunks.extend(chunks)
+            # step 6: save chunks to chroma for document
+            logger.info(f"\n📋 Step 6: Save Chunks to ChromaDB for {document.doi}")
+            save_chunk_objs_to_chroma(chunks, collection_name=collection_name,
+                                cfg_path=cfg_path)
+            # step 7: save chunks
+            output_path = Path(os.path.join(project_root, output_dir))
+            output_path.mkdir(parents=True, exist_ok=True)
+            if use_duckdb:
+                logger.info(f"\n📋 Step 7: Save Chunks to DuckDB for {document.doi}")
+                save_success = save_chunks_to_duckdb(chunks, db_path)
+                if not save_success:
+                    logger.warning("⚠️  Failed to save chunks to DuckDB, saving to JSON instead...")
+                    json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
+                else:
+                    logger.info(f"✅ Successfully saved {len(chunks)} chunks to DuckDB")
+                    json_file = None
+            else:
+                logger.info(f"\n📋 Step 7: Save Chunks to JSON for {document.doi}")
+                json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
+        
+        lost_entities = pd.concat(lost_entities_list) if len(lost_entities_list) > 0 else None
+        if len(result_list) > 0:
+            # combine all results into a single result
+            failed_results = ChunkingResult(
+                success=False,
+                error="Some documents failed chunking",
+                pipeline_completed_at=datetime.now().isoformat(),
+                total_documents=len(result_list),
+                total_unique_datasets=sum(result.total_unique_datasets for result in result_list),
+                total_chunks=sum(result.total_chunks for result in result_list),
+                total_tokens=sum(result.total_tokens for result in result_list),
+                avg_tokens_per_chunk=sum(result.avg_tokens_per_chunk for result in result_list) / len(result_list) if result_list else 0,
+                validation_passed=False,
+                entity_retention=0.0,
+                lost_entities=lost_entities.to_dict() if len(lost_entities) > 0 else None,
             )
-        
-        # Step 6: Save to ChromaDB
-        logger.info("\n📋 Step 6: Save to ChromaDB")
-        save_chunk_objs_to_chroma(chunks, collection_name=collection_name,
-                                  cfg_path=cfg_path)
-        
-        # Step 7: Save to DuckDB (if enabled)
-        if use_duckdb:
-            logger.info("\n📋 Step 7: Save Chunks to DuckDB")
-            save_success = save_chunks_to_duckdb(chunks, db_path)
-            if not save_success:
-                logger.warning("⚠️  Failed to save chunks to DuckDB, continuing with pipeline...")
-        
-        # Step 8: Export results
-        logger.info(f"\n📋 Step {'8' if use_duckdb else '7'}: Export Results")
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-        
-        json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
-        csv_file = export_chunks_summary_csv(chunks, str(output_path / "chunks_for_embedding_summary.csv"))
-        
+            if len(result_list) == len(documents):
+                logger.error("❌ QUALITY GATE FAILURE: All documents failed chunking")
+                failed_results.error = "All documents failed chunking"
+                return failed_results
+
+        # step 8: create chunks summary csv
+        logger.info(f"\n📋 Step 8: Create Chunks Summary CSV for {document.doi}")
+        csv_file = str(output_path / "chunks_for_embedding_summary.csv")
+        summary_df = create_chunks_summary_csv(all_validated_chunks, export=True, output_path=csv_file)
+
         # Calculate final statistics
-        total_tokens = sum(chunk.chunk_metadata.token_count for chunk in chunks)
-        avg_tokens_per_chunk = total_tokens / len(chunks) if chunks else 0
-        total_citations_pre = pre_chunk_inventory['count'].sum()
+        inventory_df = pd.concat(inventory_list)
+        total_tokens = sum(chunk.chunk_metadata.token_count for chunk in all_validated_chunks)
+        avg_tokens_per_chunk = total_tokens / len(all_validated_chunks) if all_validated_chunks else 0
+        total_citations_pre = inventory_df['count'].sum()
         entity_retention = 100.0 if total_citations_pre > 0 else 100.0
+
+        # get info from failed results list
+        total_docs = len(documents) if len(result_list) == 0 else len(documents)-failed_results.total_documents
+        total_datasets = len(citation_entities) if len(result_list) == 0 else len(citation_entities)-failed_results.total_unique_datasets
+        out_files = []
+        if json_file is not None:
+            out_files.append(json_file)
+        if csv_file is not None:
+            out_files.append(csv_file)
         
         results = ChunkingResult(
             success=True,
-            total_documents=len(documents),
-            total_unique_datasets=len(citation_entities),
-            total_chunks=len(chunks),
+            total_documents=total_docs,
+            total_unique_datasets=total_datasets,
+            total_chunks=len(all_validated_chunks),
             total_tokens=total_tokens,
             avg_tokens_per_chunk=avg_tokens_per_chunk,
             validation_passed=validation_passed,
             pipeline_completed_at=datetime.now().isoformat(),
             entity_retention=entity_retention,
-            lost_entities=lost_citations.to_dict() if len(lost_citations) > 0 else None,
+            lost_entities=lost_entities.to_dict() if len(lost_entities) > 0 else None,
             output_path=str(output_path),
-            output_files=[json_file, csv_file],
+            output_files=out_files,
         )
         
         logger.info(f"\n✅ Pipeline completed successfully!")
@@ -662,7 +712,7 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
 
 if __name__ == "__main__":
     # Run with default parameters
-    results = run_semantic_chunking_pipeline()
+    results = run_semantic_chunking_pipeline(subset=False, use_duckdb=True, db_path=str(project_root / "artifacts" / "mdc_challenge.db"), cfg_path=str(project_root / "configs" / "chunking.yaml"))
     
     if results.success:
         logger.info("✅ Semantic chunking completed successfully!")

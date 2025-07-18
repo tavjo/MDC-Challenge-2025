@@ -12,7 +12,6 @@ services:
     volumes:
       # Mount data directory for persistence
       - ./Data:/app/Data
-      - ./logs:/app/logs
       - ./src:/app/src
       - ./artifacts:/app/artifacts
       - ./tests:/app/tests
@@ -22,7 +21,7 @@ services:
     # Use consistent command with Dockerfile (remove "uv run")
     command: ["python", "src/get_document_objects.py"]
 
-  # Optional: Development service with interactive shell
+  # # Optional: Development service with interactive shell
   mdc-dev:
     build:
       context: .
@@ -36,51 +35,11 @@ services:
     volumes:
       # Mount entire project for development
       - ./:/app
-      # - uv-cache:/tmp/uv-cache
+      - uv-cache:/tmp/uv-cache
     working_dir: /app
     command: ["tail", "-f", "/dev/null"]  # Keep container running
     profiles:
       - dev
-
-  # Test service for running entity extraction tests
-  mdc-test:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: mdc-challenge-test
-    environment:
-      - PYTHONPATH=/app
-      # - UV_CACHE_DIR=/tmp/uv-cache
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-    volumes:
-      # Mount entire project for testing
-      - ./:/app
-      # - uv-cache:/tmp/uv-cache
-    working_dir: /app
-    command: ["python", "scripts/run_tests.py"]
-    profiles:
-      - test
-
-  # Pytest service for comprehensive testing
-  mdc-pytest:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: mdc-challenge-pytest
-    environment:
-      - PYTHONPATH=/app
-      # - UV_CACHE_DIR=/tmp/uv-cache
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-    volumes:
-      # Mount entire project for testing
-      - ./:/app
-      # - uv-cache:/tmp/uv-cache
-    working_dir: /app
-    command: ["python", "-m", "pytest", "tests/test_extractor.py", "-v", "--tb=short"]
-    profiles:
-      - test
 
   # API service for chunking and embedding microservice
   mdc-api:
@@ -94,10 +53,9 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       # Mount data and artifacts for persistence
-      - ./Data:/app/Data
       - ./artifacts:/app/artifacts
-      - ./logs:/app/logs
       - ./configs:/app/configs
+      - ./src:/app/src
     working_dir: /app
     ports:
       - "8000:8000"
