@@ -1,33 +1,26 @@
-# Use the official Unstructured Docker image as base
+# syntax=docker/dockerfile:1
+# DO NOT CHANGE THIS FILE.
 FROM downloads.unstructured.io/unstructured-io/unstructured:latest
 
-# # Set environment variables for uv
 ENV UV_CACHE_DIR=/tmp/uv-cache \
-    UV_PYTHON_PREFERENCE=only-system \
-    PYTHONPATH=/app
+    PYTHONUNBUFFERED=1
 
-# # Install uv (if not already available)
-RUN pip install uv
+RUN pip install --no-cache-dir uv
 
-# Set working directory
 WORKDIR /app
-
-# Copy pyproject.toml and uv.lock first (for better caching)
 COPY pyproject.toml uv.lock ./
 
-# Install additional Python dependencies using uv
-# Note: unstructured[all] is already installed in the base image
-RUN uv sync --frozen --no-dev
-# RUN uv lock
+# Create a project venv and sync exactly to uv.lock (default behaviour) 
+RUN python -m venv --system-site-packages .venv \
+    && . .venv/bin/activate \
+    && uv sync --locked --inexact
 
+# Expose venv on PATH for *all* subsequent RUN/CMD layers
+ENV PATH="/app/.venv/bin:${PATH}"
 
-# Copy the rest of the application
-COPY src/ ./src/
-COPY tests/ ./tests/
-COPY api/ ./api/
+COPY src/  ./src/
+COPY api/  ./api/
+COPY tests ./tests/
+RUN mkdir -p Data logs artifacts
 
-# Create necessary directories
-RUN mkdir -p Data logs tests artifacts
-
-# Set the default command to run the citation entity extractor
 CMD ["uvicorn", "api.parse_doc_api:app", "--host", "0.0.0.0", "--port", "3000"]

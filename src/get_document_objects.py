@@ -40,10 +40,10 @@ def main():
     pdf_paths = os.listdir(os.path.join(project_root, "Data/train/PDF"))
     pdf_paths = [os.path.join("Data/train/PDF", pdf) for pdf in pdf_paths if pdf.endswith(".pdf")]
     response = get_document_object(pdf_path=pdf_paths[0])
-    logger.info(f"Response: {response}")
+    logger.info(f"Response: {response["message"]}")
 
     # bulk_response = get_document_objects(pdf_paths=pdf_paths, subset=False)
-    # logger.info(f"Bulk response: {bulk_response}")
+    # logger.info(f"Bulk response: {bulk_response["message"]}")
 
 if __name__ == "__main__":
     main()
