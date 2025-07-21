@@ -24,9 +24,10 @@ RUN uv sync --frozen --no-dev
 # Copy the rest of the application
 COPY src/ ./src/
 COPY tests/ ./tests/
+COPY api/ ./api/
 
 # Create necessary directories
-RUN mkdir -p Data logs tests
+RUN mkdir -p Data logs tests artifacts
 
 # Set the default command to run the citation entity extractor
-CMD ["python", "src/get_document_objects.py"]
+CMD ["uvicorn", "api.parse_doc_api:app", "--host", "0.0.0.0", "--port", "3000"]

@@ -16,14 +16,13 @@ Features:
 
 Steps to be run:
 1) Pre-Chunking EDA (scripts/run_prechunking_eda.py)
-2) PDF -> XML conversion (scripts/run_doc_conversion.py)
-3) Document Parsing (scripts/run_full_doc_parsing.py)
-4) Semantic Chunking (scripts/run_chunking_pipeline.py)
-5) Create Vector Embeddings 
-6) Chunk-level EDA
-7) QC
-8) Export Artifacts for training loop
-9) Generate Report
+2) PDF -> XML conversion (scripts/run_doc_conversion.py) (deprecated)
+3) Document Parsing (scripts/run_full_doc_parsing.py) (deprecated)
+4) Semantic Chunking & Embedding (src/run_semantic_chunking.py)
+5) Create Document Objects (not yet implemented)
+6) QC and Chunk-level EDA (not yet implemented)
+7) Export/Store Final Artifacts for training loop (not yet implemented)
+8) Generate Report (not yet implemented)
 """
 
 import sys

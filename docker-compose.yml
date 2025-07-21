@@ -15,11 +15,13 @@ services:
       - ./src:/app/src
       - ./artifacts:/app/artifacts
       - ./tests:/app/tests
-      - ./scripts:/app/scripts
       - ./configs:/app/configs
+      - ./api:/app/api
     working_dir: /app
+    ports:
+      - "3000:3000"
     # Use consistent command with Dockerfile (remove "uv run")
-    command: ["python", "src/get_document_objects.py"]
+    command: ["uvicorn", "api.parse_doc_api:app", "--host", "0.0.0.0", "--port", "3000"]
 
   # # Optional: Development service with interactive shell
   mdc-dev:
@@ -42,26 +44,26 @@ services:
       - dev
 
   # API service for chunking and embedding microservice
-  mdc-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
-    container_name: mdc-challenge-api
-    environment:
-      - PYTHONPATH=/app
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-    volumes:
-      # Mount data and artifacts for persistence
-      - ./artifacts:/app/artifacts
-      - ./configs:/app/configs
-      - ./src:/app/src
-    working_dir: /app
-    ports:
-      - "8000:8000"
-    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-    profiles:
-      - api
+  # mdc-api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.api
+  #   container_name: mdc-challenge-api
+  #   environment:
+  #     - PYTHONPATH=/app
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #     - GEMINI_API_KEY=${GEMINI_API_KEY}
+  #   volumes:
+  #     # Mount data and artifacts for persistence
+  #     - ./artifacts:/app/artifacts
+  #     - ./configs:/app/configs
+  #     - ./src:/app/src
+  #   working_dir: /app
+  #   ports:
+  #     - "8000:8000"
+  #   command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+  #   profiles:
+  #     - api
 
 volumes:
   uv-cache:

@@ -23,7 +23,7 @@ from src.run_semantic_chunking import run_semantic_chunking_pipeline
 from src.helpers import initialize_logging
 
 # Initialize logging
-logger = initialize_logging("api_main")
+logger = initialize_logging("chunk_and_embed_api")
 
 # Create FastAPI app
 app = FastAPI(

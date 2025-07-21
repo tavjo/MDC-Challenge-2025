@@ -7,7 +7,7 @@ specification from chunk_and_embedding_api.md.
 
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Iterable, Union, Tuple
 
 import duckdb
 
@@ -357,6 +357,103 @@ class DuckDBHelper:
         except Exception as e:
             logger.error(f"Failed to retrieve chunks for {document_id}: {str(e)}")
             raise ValueError(f"Database query failed: {str(e)}")
+    
+    def get_chunks_by_chunk_ids(
+        self,
+        chunk_ids: Union[str, Iterable[str]],
+    ) -> List[Chunk]:
+        """
+        Retrieve one or many chunks by their ``chunk_id``.
+
+        Parameters
+        ----------
+        chunk_ids : str | Iterable[str]
+            A single chunk ID or any iterable of IDs.
+
+        Returns
+        -------
+        List[Chunk]
+            The matching ``Chunk`` objects (empty list if none found).
+        """
+        # Normalise parameter(s) to a list
+        if isinstance(chunk_ids, str):
+            chunk_ids = [chunk_ids]
+        chunk_ids = list(chunk_ids)  # ensure subscriptable/len()
+
+        if not chunk_ids:  # graceful empty-input behaviour
+            return []
+
+        # Build a fully-parameterised IN (...) clause
+        placeholders = ", ".join("?" * len(chunk_ids))
+        sql = f"SELECT * FROM chunks WHERE chunk_id IN ({placeholders})"
+
+        try:
+            result = self.engine.execute(sql, chunk_ids)
+            rows = result.fetchall()
+            return [
+                Chunk.from_duckdb_row(
+                    dict(zip([d[0] for d in result.description], row))
+                )
+                for row in rows
+            ]
+        except Exception as exc:
+            logger.error(
+                f"Failed to fetch chunks for IDs {chunk_ids}: {exc}"
+            )
+            raise ValueError(str(exc)) from exc
+
+    def get_citation_entities_by_keys(
+        self,
+        keys: Union[
+            Tuple[str, str],  # (data_citation, document_id)
+            Iterable[Tuple[str, str]],
+        ],
+    ) -> List[CitationEntity]:
+        """
+        Retrieve citation-entity rows by **composite primary key**.
+
+        Parameters
+        ----------
+        keys : (str, str) | Iterable[(str, str)]
+            A single key tuple or an iterable of the form
+            ``(data_citation, document_id)``.
+
+        Returns
+        -------
+        List[CitationEntity]
+            Matching ``CitationEntity`` objects (empty list if none).
+        """
+        if isinstance(keys, tuple) and len(keys) == 2:
+            keys = [keys]
+        keys = list(keys)
+
+        if not keys:
+            return []
+
+        # Flatten key tuples -> [dc1, doc1, dc2, doc2, ...]
+        flat_params: List[str] = [
+            elem for key in keys for elem in key  # type: ignore[misc]
+        ]
+        placeholders = ", ".join("(?, ?)" for _ in keys)
+        sql = (
+            "SELECT * FROM citations "
+            f"WHERE (data_citation, document_id) IN ({placeholders})"
+        )
+
+        try:
+            result = self.engine.execute(sql, flat_params)
+            rows = result.fetchall()
+            return [
+                CitationEntity.from_duckdb_row(
+                    dict(zip([d[0] for d in result.description], row))
+                )
+                for row in rows
+            ]
+        except Exception as exc:
+            logger.error(
+                f"Failed to fetch citation entities for keys {keys}: {exc}"
+            )
+            raise ValueError(str(exc)) from exc
     
     def get_database_stats(self) -> dict:
         """Get basic statistics about the database."""

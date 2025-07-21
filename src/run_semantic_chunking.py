@@ -22,7 +22,7 @@ sys.path.append(project_root)
 
 # Local imports
 from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult
-from src.helpers import initialize_logging, timer_wrap, load_docs, export_docs
+from src.helpers import initialize_logging, timer_wrap, load_docs, export_docs, preprocess_text
 from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma, save_chunks_to_chroma
 # from src.get_citation_entities import CitationEntityExtractor
 import duckdb
@@ -168,6 +168,7 @@ def create_pre_chunk_entity_inventory(document: Document, citation_entities: Lis
             pattern_cache[citation.data_citation] = make_pattern(citation.data_citation)
         
         pattern = pattern_cache[citation.data_citation]
+        # matches = pattern.findall(preprocess_text(text))
         matches = pattern.findall(text)
         
         rows.append({
@@ -194,7 +195,7 @@ def create_pre_chunk_entity_inventory(document: Document, citation_entities: Lis
 
 @timer_wrap
 def create_chunks_from_document(document: Document, citation_entities: List[CitationEntity], 
-                                chunk_size: int = 200, chunk_overlap: int = 20) -> List[Chunk]:
+                                chunk_size: int = 200, chunk_overlap: int = 10) -> List[Chunk]:
     """
     Create chunks using semantic_chunking.py functions with citation assignment.
     
@@ -225,6 +226,7 @@ def create_chunks_from_document(document: Document, citation_entities: List[Cita
     
     # Use semantic chunking
     text_chunks = semantic_chunk_text(text)
+    text_chunks = [preprocess_text(chunk) for chunk in text_chunks]
     
     # Get citations for this document
     doc_citations = citations_by_doc.get(doc.doi, [])
@@ -524,7 +526,7 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
                                  citation_entities_path: str = "Data/citation_entities_known.json",
                                  output_dir: str = "Data",
                                  chunk_size: int = 200,
-                                 chunk_overlap: int = 20,
+                                 chunk_overlap: int = 10,
                                  collection_name: str = "semantic_chunks",
                                  cfg_path: str = "configs/chunking.yaml",
                                  subset: bool = False,

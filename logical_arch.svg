@@ -57,16 +57,16 @@
   <!-- Training branch -->
   <rect x="600" y="60" width="180" height="70" class="stage-box" />
   <text x="690" y="92"  text-anchor="middle" class="stage-text">Citation Discovery</text>
-  <text x="690" y="110" text-anchor="middle" class="stage-text">Training (RegEx)</text>
+  <text x="690" y="110" text-anchor="middle" class="stage-text">(Training: RegEx)</text>
 
   <!-- Inference branch -->
   <rect x="600" y="160" width="180" height="70" class="stage-box" />
   <text x="690" y="192"  text-anchor="middle" class="stage-text">Citation Discovery</text>
-  <text x="690" y="210" text-anchor="middle" class="stage-text">Inference (LLM + Filter)</text>
+  <text x="690" y="210" text-anchor="middle" class="stage-text">(Inference: LLM)</text>
 
   <!-- === Stage: Chunking &amp; Masking === -->
   <rect x="820" y="110" width="200" height="70" class="stage-box" />
-  <text x="920" y="142" text-anchor="middle" class="stage-text">Chunking &amp; Masking</text>
+  <text x="920" y="142" text-anchor="middle" class="stage-text">Extraction &amp; Chunking</text>
 
   <!-- === Stage: Embedding &amp; Aggregation === -->
   <rect x="1050" y="110" width="200" height="70" class="stage-box" />
