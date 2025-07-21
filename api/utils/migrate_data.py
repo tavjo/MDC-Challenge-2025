@@ -19,7 +19,7 @@ import sys, os
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.models import Document, CitationEntity
-from api.duckdb_schema import DuckDBSchemaInitializer
+from api.database.duckdb_schema import DuckDBSchemaInitializer
 from src.helpers import timer_wrap, initialize_logging
 
 # Configure logging

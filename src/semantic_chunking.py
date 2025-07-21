@@ -300,7 +300,8 @@ def _get_chroma_collection(cfg: dict, collection_name: str):
 
 @timer_wrap
 def semantic_chunk_text(
-    text: str, cfg_path: Optional[os.PathLike] | None = None,
+    text: str, 
+    cfg_path: Optional[os.PathLike] | None = None,
     model_name: str = "text-embedding-3-small"
 ) -> List[str]:
     """Return a list of semantic chunks for *text* (page or whole document)."""
@@ -313,7 +314,7 @@ def semantic_chunk_text(
 
     logger.info(
         "▸ Splitting text with SemanticSplitterNodeParser (chunk_size=%s, τ=%s)",
-        cfg.get("max_tokens", 400),
+        cfg.get("max_tokens", 200),
         cfg.get("similarity_threshold", 0.75),
     )
 
@@ -486,6 +487,11 @@ def save_chunk_to_chroma(
     )
     collection.add(ids=id, documents=chunk, metadatas=metadata, embeddings=embeddings)
     logger.info("✅ Persisted collection to disk (%s)", cfg["vector_store"]["path"])
+    return {
+        "id": id,
+        "metadata": metadata,
+        "embeddings": embeddings
+    }
 
 @timer_wrap
 def save_chunks_to_chroma(
@@ -522,6 +528,13 @@ def save_chunks_to_chroma(
     )
     collection.add(ids=ids, documents=chunks, metadatas=metadata, embeddings=embeddings)
     logger.info("✅ Persisted collection to disk (%s)", cfg["vector_store"]["path"])
+    return [
+        {
+            "id": id,
+            "metadata": metadata,
+            "embeddings": embeddings
+        } for id, metadata, embeddings in zip(ids, metadata, embeddings)
+    ]
 
 
 # ---------------------------------------------------------------------------

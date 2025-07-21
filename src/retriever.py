@@ -57,7 +57,7 @@ sys.path.append(project_root)
 
 from src.models import Chunk, ChunkMetadata, CitationEntity
 from src.helpers import initialize_logging
-from api.duckdb_utils import get_duckdb_helper
+from api.utils.duckdb_utils import get_duckdb_helper
 
 # Initialize logging
 filename = os.path.basename(__file__)

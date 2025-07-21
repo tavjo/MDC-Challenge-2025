@@ -10,13 +10,17 @@ from typing import Optional, List
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from api.document_parsing_service import build_document_objects, build_document_object
-from api.duckdb_utils import get_duckdb_helper
+from api.services.document_parsing_service import build_document_objects, build_document_object
+from api.utils.duckdb_utils import get_duckdb_helper
 from src.helpers import export_docs, initialize_logging
 
 logger = initialize_logging("parse_doc_api")
 
-app = FastAPI()
+app = FastAPI(
+    title="Document Parsing Microservice",
+    description="API for parsing pdfs with unstructured and storing them into DuckDB",
+    version="0.1.0"
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -64,9 +68,41 @@ async def parse_docs(pdf_paths: List[str], export_file: Optional[str] = None, ex
 @app.get("/health")
 async def health_check():
     """
-    Simple health check for the microservice.
+    Simple health check for the document parsing microservice.
+    
+    Checks DuckDB connection and write permissions.
     """
-    pass
+    try:
+        # Test DuckDB helper connection
+        conn = DUCKDB_HELPER.conn
+        
+        # Test basic connection
+        result = conn.execute("SELECT 1").fetchone()
+        
+        # Test that we can access the documents table
+        conn.execute("SELECT COUNT(*) FROM documents").fetchone()
+        
+        duckdb_ok = True
+        duckdb_error = None
+        
+    except Exception as e:
+        logger.error(f"DuckDB health check failed: {str(e)}")
+        duckdb_ok = False
+        duckdb_error = str(e)
+    
+    status = "healthy" if duckdb_ok else "unhealthy"
+    
+    response = {
+        "status": status,
+        "duckdb_connected": duckdb_ok,
+        "service": "document_parsing",
+        "db_path": os.path.join(project_root, "artifacts", "mdc_challenge.db")
+    }
+    
+    if not duckdb_ok:
+        response["error"] = duckdb_error
+    
+    return response
 
 if __name__ == "__main__":
     import uvicorn

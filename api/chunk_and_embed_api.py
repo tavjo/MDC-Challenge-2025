@@ -8,7 +8,7 @@ with DuckDB integration as specified in the chunk_and_embedding_api.md plan.
 import sys
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,9 +18,12 @@ import duckdb
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from src.models import Document, ChunkingResult
-from src.run_semantic_chunking import run_semantic_chunking_pipeline
+from src.models import Document, ChunkingResult, EmbeddingResult
+from api.services.chunking_and_embedding_services import run_semantic_chunking_pipeline
 from src.helpers import initialize_logging
+from src.semantic_chunking import semantic_chunk_text
+from api.utils.duckdb_utils import get_duckdb_helper
+from api.services.embeddings_services import embed_chunk, embed_chunks
 
 # Initialize logging
 logger = initialize_logging("chunk_and_embed_api")
@@ -42,12 +45,96 @@ app.add_middleware(
 )
 
 # Default database path
-DEFAULT_DB_PATH = "artifacts/mdc_challenge.db"
+DEFAULT_DUCKDB_PATH = os.path.join(project_root, "artifacts", "mdc_challenge.db")
+DUCKDB_HELPER = get_duckdb_helper(DEFAULT_DUCKDB_PATH)
+DEFAULT_CHROMA_CONFIG = os.path.join(project_root, "configs", "chunking.yaml")
+
+@app.post("/create_chunks", response_model=List[str])
+async def create_chunks(
+    text: str,
+    cfg_path: Optional[str] = None,
+    model_name: Optional[str] = None,
+):
+    """
+    Create a chunk from text.
+    """
+    try:
+        logger.info(f"Creating chunk from text.")
+        if cfg_path is None:
+            cfg_path = DEFAULT_CHROMA_CONFIG
+        if model_name is None:
+            chunks = semantic_chunk_text(text, cfg_path)
+        else:
+            chunks = semantic_chunk_text(text, cfg_path, model_name)
+        logger.info(f"Created {len(chunks)} chunks")
+        return chunks
+    except Exception as e:
+        logger.error(f"Chunk creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chunk creation failed: {str(e)}")
+
+@app.post("/batch_create_chunks", response_model=Dict[str, List[str]])
+async def batch_create_chunks(
+    texts: List[str],
+    cfg_path: Optional[str] = None,
+    model_name: Optional[str] = None,
+) -> Dict[str, List[str]]:
+    """
+    Create chunks for a list of texts.
+    """
+    try:
+        logger.info(f"Creating chunks for {len(texts)} texts.")
+        chunks = {}
+        for i, text in enumerate(texts):
+            chunks[i] = (semantic_chunk_text(text, cfg_path, model_name))
+        logger.info(f"Created {len(chunks)} chunks")
+        return chunks
+    except Exception as e:
+        logger.error(f"Chunk creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chunk creation failed: {str(e)}")
+
+
+@app.post("/embed_chunk", response_model=EmbeddingResult)
+async def embed_chunk(
+    text: str,
+    cfg_path: Optional[str] = None,
+    model_name: Optional[str] = None,
+    collection_name: Optional[str] = None,
+    local_model: Optional[bool] = False,
+) -> EmbeddingResult:
+    """
+    Create embeddings for text.
+    """
+    try:
+        logger.info(f"Creating embeddings for text.")
+        response = embed_chunk(text, cfg_path, model_name, collection_name, local_model)
+        return response
+    except Exception as e:
+        logger.error(f"Chunk creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chunk creation failed: {str(e)}")
+
+@app.post("/embed_chunks", response_model=List[EmbeddingResult])
+async def embed_chunks(
+    chunks: List[str],
+    cfg_path: Optional[str] = None,
+    model_name: Optional[str] = None,
+    collection_name: Optional[str] = None,
+    local_model: Optional[bool] = False,
+) -> List[EmbeddingResult]:
+    """
+    Create embeddings for chunks.
+    """
+    try:
+        logger.info(f"Creating embeddings for {len(chunks)} chunks.")
+        response = embed_chunks(chunks, cfg_path, model_name, collection_name, local_model)
+        return response
+    except Exception as e:
+        logger.error(f"Chunk creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chunk creation failed: {str(e)}")
 
 @app.post("/run_semantic_chunking", response_model=ChunkingResult)
 async def run_pipeline(
     config_path: Optional[str] = Query(None, description="Path to chunking config file"),
-    db_path: Optional[str] = Query(DEFAULT_DB_PATH, description="Path to DuckDB database"),
+    db_path: Optional[str] = Query(DEFAULT_DUCKDB_PATH, description="Path to DuckDB database"),
     collection_name: Optional[str] = Query("semantic_chunks", description="ChromaDB collection name"),
     chunk_size: Optional[int] = Query(200, description="Target chunk size in tokens"),
     chunk_overlap: Optional[int] = Query(20, description="Overlap between chunks in tokens"),
@@ -69,7 +156,7 @@ async def run_pipeline(
             "chunk_size": chunk_size,
             "chunk_overlap": chunk_overlap,
             "collection_name": collection_name,
-            "cfg_path": config_path or "configs/chunking.yaml",
+            "cfg_path": config_path or DEFAULT_CHROMA_CONFIG,
             "subset": subset,
             "subset_size": subset_size,
             "use_duckdb": True,
@@ -89,7 +176,7 @@ async def run_pipeline(
 @app.post("/chunk/documents", response_model=ChunkingResult)
 async def chunk_specific_documents(
     documents: List[Document],
-    db_path: Optional[str] = Query(DEFAULT_DB_PATH, description="Path to DuckDB database"),
+    db_path: Optional[str] = Query(DEFAULT_DUCKDB_PATH, description="Path to DuckDB database"),
     collection_name: Optional[str] = Query("semantic_chunks", description="ChromaDB collection name"),
     chunk_size: Optional[int] = Query(200, description="Target chunk size in tokens"),
     chunk_overlap: Optional[int] = Query(20, description="Overlap between chunks in tokens")
@@ -141,7 +228,7 @@ async def chunk_specific_documents(
             "chunk_size": chunk_size,
             "chunk_overlap": chunk_overlap,
             "collection_name": collection_name,
-            "cfg_path": "configs/chunking.yaml",
+            "cfg_path": DEFAULT_CHROMA_CONFIG,
             "use_duckdb": True,
             "db_path": db_path
         }
@@ -156,7 +243,7 @@ async def chunk_specific_documents(
         raise HTTPException(status_code=500, detail=f"Document processing failed: {str(e)}")
 
 @app.get("/health")
-async def health_check(db_path: Optional[str] = Query(DEFAULT_DB_PATH, description="Path to DuckDB database")):
+async def health_check(db_path: Optional[str] = Query(DEFAULT_DUCKDB_PATH, description="Path to DuckDB database")):
     """
     Simple health check for the microservice.
     

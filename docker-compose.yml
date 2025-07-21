@@ -31,7 +31,7 @@ services:
     container_name: mdc-challenge-dev
     environment:
       - PYTHONPATH=/app
-      # - UV_CACHE_DIR=/tmp/uv-cache
+      - UV_CACHE_DIR=/tmp/uv-cache
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
@@ -44,28 +44,28 @@ services:
       - dev
 
   # API service for chunking and embedding microservice
-  # mdc-api:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.api
-  #   container_name: mdc-challenge-api
-  #   environment:
-  #     - PYTHONPATH=/app
-  #     - UV_CACHE_DIR=/tmp/uv-cache
-  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
-  #     - GEMINI_API_KEY=${GEMINI_API_KEY}
-  #   volumes:
-  #     # Mount data and artifacts for persistence
-  #     - ./artifacts:/app/artifacts
-  #     - ./configs:/app/configs
-  #     - ./src:/app/src
-  #     - ./api:/app/api
-  #   working_dir: /app
-  #   ports:
-  #     - "8000:8000"
-  #   command: ["uvicorn", "api.chunk_and_embed_api:app", "--host", "0.0.0.0", "--port", "8000"]
-  #   profiles:
-  #     - api
+  mdc-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: mdc-challenge-api
+    environment:
+      - PYTHONPATH=/app
+      - UV_CACHE_DIR=/tmp/uv-cache
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      # Mount data and artifacts for persistence
+      - ./artifacts:/app/artifacts
+      - ./configs:/app/configs
+      - ./src:/app/src
+      - ./api:/app/api
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "api.chunk_and_embed_api:app", "--host", "0.0.0.0", "--port", "8000"]
+    profiles:
+      - api
 
 volumes:
   uv-cache:

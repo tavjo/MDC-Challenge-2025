@@ -245,3 +245,12 @@ class SecondClassifierInput(BaseModel):
 class PreprocessingReport(BaseModel):
     """Report of the preprocessing pipeline"""
     pass
+
+class EmbeddingResult(BaseModel):
+    """Result of the embedding step"""
+    success: bool = Field(..., description="Whether the embedding pipeline completed successfully.")
+    error: Optional[str] = Field(None, description="Error message if pipeline failed.")
+    embeddings: Optional[List[float]] = Field(None, description="Embeddings of the text")
+    model_name: Optional[str] = Field(None, description="Name of the model used for embedding")
+    collection_name: Optional[str] = Field(None, description="Name of the collection in ChromaDB")
+    id: str = Field(..., description="ID of the embedding in ChromaDB if not associated with a chunk")
