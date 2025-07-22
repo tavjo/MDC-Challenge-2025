@@ -1,6 +1,6 @@
 # Make Data Count - Finding Data References Challenge 2025
 
-A comprehensive solution for identifying and classifying data citations in scientific literature using advanced NLP techniques. The logical architecture of the implementation can be found [here](logical_arch.svg). 
+A comprehensive solution for identifying and classifying data citations in scientific literature using advanced NLP techniques. The logical architecture of the implementation can be found [here](logical_arch.svg).
 
 ## 🎯 Challenge Overview
 
@@ -15,183 +15,298 @@ The [challenge](CHALLENGE_OVERVIEW.md) involves processing scientific papers fro
 
 ```
 MDC-Challenge-2025/
-├── Data/                               # Dataset and generated workflow files
+├── api/                               # Microservices APIs
+│   ├── parse_doc_api.py              # Document parsing microservice
+│   ├── chunk_and_embed_api.py        # Chunking & embedding microservice
+│   ├── services/                     # API service modules
+│   ├── utils/                        # API utilities
+│   └── database/                     # Database configurations
+├── src/                              # Core processing modules
+│   ├── models.py                     # Pydantic data models
+│   ├── document_parser.py            # PDF/XML document parsing
+│   ├── semantic_chunking.py          # Text chunking algorithms
+│   ├── get_citation_entities.py      # Citation entity extraction
+│   ├── get_document_objects.py       # Document object creation
+│   ├── retriever.py                  # Document retrieval utilities
+│   ├── helpers.py                    # Utility functions and logging
+│   ├── patterns.py                   # Text pattern matching
+│   ├── pdf_to_xml_conversion.py      # PDF to XML conversion
+│   ├── xml_format_detector.py        # XML format detection
+│   ├── section_mapping.py            # Document section mapping
+│   ├── pipeline_config.py            # Configuration management
+│   ├── pipeline_visualization.py     # Progress visualization
+│   ├── run_semantic_chunking.py      # Semantic chunking pipeline
+│   ├── run_full_doc_parsing.py       # Full document parsing
+│   ├── baml_client/                  # BAML client integration
+│   └── baml_src/                     # BAML source files
+├── Data/                             # Dataset and workflow files
 │   ├── train_labels.csv               # Training labels
 │   ├── train/                         # Training documents
 │   │   ├── PDF/                       # PDF files (524 files)
-│   │   └── XML/                       # XML files (400 files, ~75% coverage)
-│   ├── test/                          # Test documents
-│   │   ├── PDF/                       # Test PDF files
-│   │   └── XML/                       # Test XML files
-│   ├── conversion_candidates.csv      # Generated: Articles needing PDF→XML conversion
-│   ├── document_inventory.csv         # Generated: Complete document inventory
-│   └── problematic_articles.txt       # Generated: Articles missing both formats
-├── src/                               # Core modules
-│   ├── label_mapper.py                # Label analysis and document mapping
-│   ├── document_parser.py             # Document parsing and extraction
-│   ├── semantic_chunking.py           # Text chunking for processing
-│   ├── pdf_to_xml_conversion.py       # PDF to XML conversion utilities
-│   ├── xml_format_detector.py         # XML format detection and validation
-│   ├── section_mapping.py             # Document section mapping
-│   ├── pipeline_visualization.py      # Pipeline visualization and progress tracking
-│   ├── pipeline_config.py             # Configuration management and validation
-│   ├── helpers.py                     # Utility functions and logging
-│   └── models.py                      # Data models and schemas
-├── scripts/                           # Executable scripts
-│   ├── run_prechunking_eda.py         # Pre-chunking exploratory data analysis
-│   ├── run_full_doc_parsing.py        # Full document parsing pipeline
-│   ├── run_chunking_pipeline.py       # Semantic chunking pipeline
-│   ├── run_doc_conversion.py          # PDF→XML conversion script
-│   └── demo_prechunking_eda.py        # EDA demonstration script
-├── notebooks/                         # Jupyter notebooks
-│   └── label_doc_mapping.ipynb        # Label and document mapping analysis
-├── docs/                              # Documentation
-│   ├── prechunking_eda_script_guide.md # EDA script usage guide
-│   ├── pdf_to_xml_guide.md            # PDF to XML conversion guide
-│   └── troubleshooting_guide.md       # Troubleshooting and debugging guide
-├── reports/                           # Generated analysis reports
-│   ├── prechunking_eda_report_*.md    # EDA analysis reports
-│   └── prechunking_eda_summary_*.json # EDA summary data
-├── models/                            # Trained models and artifacts
-├── tests/                             # Test files
-│   ├── test_preprocessing_pipeline.py # Unit tests for preprocessing pipeline
-│   ├── test_pipeline_integration.py   # Integration tests for full pipeline
-│   ├── test_semantic_chunking.py      # Tests for semantic chunking
-│   └── test_xml_formats.py            # Tests for XML format detection
-├── configs/                           # Configuration files
-│   ├── development_config.yaml        # Development environment configuration
-│   ├── production_config.yaml         # Production environment configuration
-│   └── fast_config.yaml               # Fast processing configuration
-├── logs/                              # Application logs
-├── guides/                            # Additional guides and documentation
-├── main.py                            # Main entry point
-├── preprocessing.py                   # Preprocessing pipeline coordinator
-├── pyproject.toml                     # Project configuration and dependencies
-└── README.md                          # This file
-└── preprocessing_pipeline_guide.md # Comprehensive preprocessing pipeline guide
+│   │   └── XML/                       # XML files (400 files, ~75% 
+coverage)
+│   └── test/                         # Test documents (PDF/XML)
+├── configs/                          # Configuration files
+│   ├── development_config.json       # Development configuration
+│   ├── production_config.json        # Production configuration
+│   ├── fast_config.json              # Fast processing configuration
+│   ├── chunking.yaml                 # Chunking pipeline config
+│   └── chunking_offline.yaml         # Offline chunking config
+├── artifacts/                        # Generated artifacts and databases
+│   ├── bioregistry/                  # Bioregistry data
+│   ├── lookups/                      # Lookup tables
+│   ├── bioregistry_data.json         # Bioregistry dataset
+│   ├── citation_patterns.yaml        # Citation pattern definitions
+│   └── entity_patterns.yaml          # Entity pattern definitions
+├── scripts/                          # Standalone execution scripts
+├── notebooks/                        # Jupyter notebooks for analysis
+├── docs/                            # Documentation
+├── tests/                           # Test files
+├── reports/                         # Generated analysis reports
+├── logs/                            # Application logs
+├── models/                          # Trained models and artifacts
+├── guides/                          # Additional guides
+├── docker-compose.yml               # Docker service orchestration
+├── Dockerfile                       # Main service Docker image
+├── Dockerfile.api                   # API service Docker image
+├── Makefile                         # Docker management automation
+├── pyproject.toml                   # Project configuration
+├── uv.lock                          # Dependency lock file
+└── main.py                          # Main entry point
 ```
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.12+
-- UV package manager (recommended) or pip
+- **Docker** and **Docker Compose** installed
+- **Python 3.12+** (if running locally)
+- **uv** package manager (recommended) or pip
 - Sufficient disk space (10GB+ for full dataset)
-- Optional: Rich library for enhanced visualization
 
-### Installation
+### Docker-based Setup (Recommended)
 
-1. Clone the repository:
+The project uses Docker containers for both microservices. Use the included Makefile for easy management:
+
+#### 1. Build and Start Both APIs
+
+```bash
+# Build both services and start them
+make build-up-no-cache
+
+# Or for development (with existing cache)
+make build-up
+```
+
+This will:
+- Build the document parsing API (port 3000)
+- Build the chunking & embedding API (port 8000)
+- Start both services in detached mode
+
+#### 2. Check Service Status
+
+```bash
+# Check if both services are running
+make status
+
+# View logs from both services
+make logs
+
+# View logs from specific service
+make logs-main  # Document parsing API
+make logs-api   # Chunking API
+```
+
+#### 3. Test API Health
+
+```bash
+# Test both APIs
+make test
+
+# Access API documentation
+open http://localhost:3000/docs  # Document parsing API
+open http://localhost:8000/docs  # Chunking & embedding API
+```
+
+#### 4. Stop Services
+
+```bash
+# Stop both services
+make down
+
+# Or just pause them (without removing containers)
+make stop
+```
+
+### Available Makefile Commands
+
+The Makefile provides convenient commands for managing Docker services:
+
+| Command | Description |
+|---------|-------------|
+| `make help` | Show all available commands |
+| `make build` | Build both services |
+| `make build-no-cache` | Build both services without Docker cache |
+| `make up` | Start both services |
+| `make down` | Stop and remove both services |
+| `make status` | Show running container status |
+| `make logs` | Show logs from both services |
+| `make logs-main` | Show logs from document parsing API |
+| `make logs-api` | Show logs from chunking API |
+| `make test` | Test both API health endpoints |
+| `make restart` | Restart both services |
+| `make clean` | Remove all containers and volumes |
+| `make dev-setup` | Complete development setup |
+| `make main-shell` | Open shell in document parsing container |
+| `make api-shell` | Open shell in chunking API container |
+
+### Local Development Setup
+
+If you prefer to run services locally without Docker:
+
+1. **Clone and install dependencies:**
 ```bash
 git clone https://github.com/your-username/MDC-Challenge-2025.git
 cd MDC-Challenge-2025
-```
 
-2. Install dependencies:
-```bash
-# Using UV (recommended)
+# Using uv (recommended)
 uv sync
 
 # Or using pip
 pip install -e .
 ```
 
-### Quick Start
-
-#### Option 1: Complete Preprocessing Pipeline (Recommended)
-
+2. **Start the APIs directly:**
 ```bash
-# Run the complete preprocessing pipeline
-python preprocessing.py --data-dir Data --progress
+# Terminal 1: Document parsing API
+python api/parse_doc_api.py
 
-# Run with custom configuration
-python preprocessing.py --config configs/development_config.yaml
-
-# Run specific steps only
-python preprocessing.py --steps pre_chunking_eda,doc_conversion --verbose
+# Terminal 2: Chunking & embedding API  
+python api/chunk_and_embed_api.py
 ```
 
-#### Option 2: Individual Steps
+## 🔧 API Services
 
+### Document Parsing API (Port 3000)
+
+The document parsing microservice handles PDF document processing:
+
+- **Endpoint**: `http://localhost:3000`
+- **Documentation**: `http://localhost:3000/docs`
+- **Health Check**: `http://localhost:3000/health`
+
+**Key Endpoints:**
+- `GET /parse_doc` - Parse a single document
+- `GET /bulk_parse_docs` - Parse multiple documents
+- `GET /health` - Service health status
+
+### Chunking & Embedding API (Port 8000)
+
+The chunking & embedding microservice handles text segmentation and embeddings:
+
+- **Endpoint**: `http://localhost:8000`
+- **Documentation**: `http://localhost:8000/docs`
+- **Health Check**: `http://localhost:8000/health`
+
+**Key Endpoints:**
+- `POST /create_chunks` - Create text chunks from input
+- `POST /run_semantic_chunking` - Run semantic chunking pipeline
+- `POST /chunk/documents` - Process specific documents
+- `GET /health` - Service health status with database connectivity
+
+## 🏗️ Architecture
+
+The project follows a microservices architecture with two main APIs:
+
+1. **Document Parsing Service**: Handles PDF/XML processing and document object creation
+2. **Chunking & Embedding Service**: Manages text chunking, embeddings, and ChromaDB integration
+
+Both services use:
+- **DuckDB** for structured data storage
+- **ChromaDB** for vector embeddings
+- **FastAPI** for REST API endpoints
+- **Pydantic** for data validation
+- **Docker** for containerization
+
+## 🔍 Key Features
+
+- **Microservices Architecture**: Separated concerns with dedicated APIs
+- **Multi-format Support**: Handles both PDF and XML documents
+- **Docker Integration**: Full containerization with Docker Compose
+- **Health Monitoring**: Built-in health checks for all services
+- **Comprehensive Logging**: Detailed progress tracking and error handling
+- **Database Integration**: DuckDB for structured data, ChromaDB for embeddings
+- **Flexible Configuration**: Configurable parameters via YAML/JSON files
+- **Development Tools**: Makefile automation for easy management
+
+## 🛠️ Development Workflow
+
+### Starting Development
+
+1. **Set up the environment:**
 ```bash
-# Run individual preprocessing steps
-python scripts/run_prechunking_eda.py --data-dir Data
-python scripts/run_pdf_to_xml_conversion.py --data-dir Data
-python scripts/run_full_doc_parsing.py --data-dir Data
-python scripts/run_chunking_pipeline.py --input-path Data/train/parsed/parsed_documents.pkl
+make dev-setup
 ```
 
-#### Option 3: Resume After Interruption
-
+2. **Monitor services:**
 ```bash
-# Resume from last successful step
-python preprocessing.py --resume --verbose
+# Check status
+make status
 
-# Resume with force retry of failed steps
-python preprocessing.py --resume --force
+# Follow logs in real-time
+make logs
 ```
 
-## 🔧 Core Components
+3. **Access services:**
+- Document parsing API: http://localhost:3000/docs
+- Chunking & embedding API: http://localhost:8000/docs
 
-### Preprocessing Pipeline (`preprocessing.py`)
-- **Central orchestration script** for the entire preprocessing workflow
-- **Step-by-step execution** with dependency management and validation
-- **Flexible execution modes**: run all, specific steps, up to step, from step, resume
-- **CLI interface** with comprehensive argument parsing and configuration support
-- **Progress tracking** with real-time monitoring and visualization
-- **Error handling** with automatic retry, rollback, and recovery mechanisms
-- **Consolidated reporting** with JSON and Markdown outputs
-- **Resource monitoring** with memory, CPU, and disk usage tracking
-- **Configuration management** with YAML/JSON support and templates
+### Testing Changes
 
-### Data Analysis (`src/label_mapper.py`)
-- Comprehensive label and document analysis
-- PDF↔XML file mapping and availability tracking
-- Quality checks and validation
-- Conversion workflow planning
+1. **Rebuild with changes:**
+```bash
+make build-up-no-cache
+```
 
-### Document Processing (`src/document_parser.py`)
-- Multi-format document parsing (PDF, XML)
-- Text extraction and preprocessing
-- Section identification and mapping
-- Metadata extraction
+2. **Test API endpoints:**
+```bash
+make test
+```
 
-### Semantic Chunking (`src/semantic_chunking.py`)
-- Intelligent text segmentation
-- Context-aware chunking strategies
-- Optimized for citation detection
-- Configurable chunk sizes and overlap
+3. **Debug issues:**
+```bash
+# Access container shell
+make main-shell  # or make api-shell
 
-### PDF to XML Conversion (`src/pdf_to_xml_conversion.py`)
-- Automated PDF to XML conversion
-- Format validation and quality checks
-- Batch processing capabilities
-- Error handling and logging
+# Check specific service logs
+make logs-main   # or make logs-api
+```
 
-### Pipeline Visualization (`src/pipeline_visualization.py`)
-- **Console progress bars** with Rich library integration
-- **Real-time status dashboard** for monitoring pipeline execution
-- **Dependency graph generation** with matplotlib and networkx
-- **Mermaid diagram export** for documentation and visualization
-- **Performance metrics visualization** and resource usage tracking
+### Cleanup
 
-### Configuration Management (`src/pipeline_config.py`)
-- **YAML/JSON configuration files** with validation and schema support
-- **Configuration templates** for different environments (development, production, fast)
-- **CLI argument to configuration** conversion and persistence
-- **Parameter validation** and conflict resolution
-- **Configuration inheritance** and override capabilities
+```bash
+# Stop services and clean up
+make clean
 
-## 📊 Analysis and Reporting
+# Full cleanup including images
+make clean-all
+```
 
-The project includes comprehensive analysis tools:
+## 🧪 Testing
 
-- **Pre-chunking EDA**: Detailed analysis of labels and document availability
-- **Document Inventory**: Complete mapping of available files
-- **Conversion Workflow**: Automated PDF→XML conversion planning
-- **Quality Checks**: Data validation and consistency checks
-- **Progress Tracking**: Detailed logging and reporting
+The project includes comprehensive testing:
+
+```bash
+# Run all tests (when implemented)
+python -m pytest tests/
+
+# Test API health
+make test
+
+# Manual API testing via documentation
+open http://localhost:3000/docs
+open http://localhost:8000/docs
+```
 
 ## 🏆 Challenge Details
 
@@ -208,168 +323,14 @@ The project includes comprehensive analysis tools:
 - [**Elliott Risch**](https://www.linkedin.com/in/modusponens/) - Solutions Architect
 - [**Taïsha Joseph-Risch**](http://www.linkedin.com/in/taïsha-joseph-0974229b) - ML Specialist (taishajo@mit.edu)
 
-## 📈 Development Workflow
-
-### Recommended Approach (Using Preprocessing Pipeline)
-
-1. **Setup and Configuration**: Configure the preprocessing pipeline for your environment
-   ```bash
-   python preprocessing.py --template development --save-config my_config.yaml
-   ```
-
-2. **Complete Preprocessing**: Run the full preprocessing pipeline with monitoring
-   ```bash
-   python preprocessing.py --config my_config.yaml --progress --monitor-resources
-   ```
-
-3. **Review Results**: Examine consolidated reports and pipeline metrics
-   ```bash
-   # Reports are generated automatically in reports/
-   ls reports/preprocessing_pipeline_*.md
-   ```
-
-4. **Iterate and Refine**: Adjust parameters and re-run specific steps as needed
-   ```bash
-   python preprocessing.py --steps semantic_chunking --chunk-size 300 --force
-   ```
-
-5. **Model Development**: Use processed data for model training and evaluation
-
-### Alternative Approach (Step-by-Step)
-
-1. **Data Analysis**: Run EDA scripts to understand dataset characteristics
-   ```bash
-   python preprocessing.py --steps pre_chunking_eda --show-plots --detailed-analysis
-   ```
-
-2. **Document Processing**: Convert PDFs to XML where needed
-   ```bash
-   python preprocessing.py --steps doc_conversion --verbose
-   ```
-
-3. **Text Extraction**: Parse documents and extract relevant sections
-   ```bash
-   python preprocessing.py --steps document_parsing --extract-sections
-   ```
-
-4. **Chunking**: Apply semantic chunking for optimal processing
-   ```bash
-   python preprocessing.py --steps semantic_chunking --chunk-size 200 --chunk-overlap 20
-   ```
-
-5. **Advanced Processing**: Vector embeddings, QC, and artifact export
-   ```bash
-   python preprocessing.py --from vector_embeddings
-   ```
-
-6. **Feature Engineering**: Extract features relevant to citation detection
-7. **Model Training**: Train models for citation identification and classification
-8. **Evaluation**: Validate model performance using F1-score
-9. **Deployment**: Prepare final submission
-
-### Testing and Validation
-
-```bash
-# Run unit tests
-python -m pytest tests/test_preprocessing_pipeline.py -v
-
-# Run integration tests
-python -m pytest tests/test_pipeline_integration.py -v
-
-# Validate pipeline with test data
-python preprocessing.py --test-mode --sample-size 10 --validate-only
-```
-
-## 🔍 Key Features
-
-- **Multi-format Support**: Handles both PDF and XML documents
-- **Intelligent Preprocessing**: Automated workflow planning and execution
-- **Comprehensive Analysis**: Detailed EDA and quality assessment
-- **Scalable Processing**: Efficient batch processing capabilities
-- **Robust Logging**: Detailed progress tracking and error handling
-- **Flexible Configuration**: Configurable parameters for different use cases
-
-## 🚀 Preprocessing Pipeline
-
-The project includes a comprehensive preprocessing pipeline that orchestrates all data processing steps with advanced features:
-
-### Key Features
-
-- **Centralized Orchestration**: Single entry point for all preprocessing steps
-- **Flexible Execution**: Run all steps, specific steps, or resume from interruption
-- **Progress Monitoring**: Real-time progress bars and status dashboard
-- **Error Recovery**: Automatic retry, rollback, and recovery mechanisms
-- **Resource Monitoring**: Memory, CPU, and disk usage tracking with alerts
-- **Configuration Management**: YAML/JSON configuration files with templates
-- **Comprehensive Reporting**: Consolidated JSON and Markdown reports
-- **Visualization**: Pipeline flow diagrams and dependency graphs
-
-### CLI Command Examples
-
-```bash
-# Run complete pipeline with progress monitoring
-python preprocessing.py --data-dir Data --progress --verbose
-
-# Run specific steps only
-python preprocessing.py --steps pre_chunking_eda,doc_conversion,document_parsing
-
-# Run up to semantic chunking
-python preprocessing.py --up-to semantic_chunking --chunk-size 200
-
-# Resume after interruption
-python preprocessing.py --resume --force
-
-# Use configuration file
-python preprocessing.py --config configs/production_config.yaml
-
-# Generate pipeline diagrams
-python preprocessing.py --generate-diagrams --dashboard
-
-# Monitor resources with custom thresholds
-python preprocessing.py --monitor-resources --memory-threshold 80 --cpu-threshold 90
-```
-
-### Configuration Templates
-
-```bash
-# Development environment (debug logging, visualization enabled)
-python preprocessing.py --template development --save-config dev_config.yaml
-
-# Production environment (optimized for performance)
-python preprocessing.py --template production --save-config prod_config.yaml
-
-# Fast processing (reduced quality for testing)
-python preprocessing.py --template fast --save-config fast_config.yaml
-```
-
-### Error Handling and Recovery
-
-```bash
-# Automatic retry with custom parameters
-python preprocessing.py --retry-count 5 --retry-delay 10
-
-# Rollback failed steps and restart
-python preprocessing.py --rollback-failed --force
-
-# Skip problematic files and continue
-python preprocessing.py --skip-corrupted --skip-missing --continue-on-error
-```
-
-## 📚 Documentation
-
-- [**Preprocessing Pipeline Guide**](preprocessing_pipeline_guide.md) - Comprehensive guide for the preprocessing pipeline
-- [**Troubleshooting Guide**](docs/troubleshooting_guide.md) - Common issues and solutions
-- [Pre-chunking EDA Guide](docs/prechunking_eda_script_guide.md) - EDA script usage guide
-- [PDF to XML Conversion Guide](docs/pdf_to_xml_guide.md) - PDF conversion documentation
-- [Label Document Mapping Notebook](notebooks/label_doc_mapping.ipynb) - Analysis notebook
-
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Make changes and test with `make build-up-no-cache`
+4. Commit your changes (`git commit -m 'Add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
 ## 📄 License
 

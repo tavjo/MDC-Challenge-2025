@@ -246,6 +246,28 @@ class PreprocessingReport(BaseModel):
     """Report of the preprocessing pipeline"""
     pass
 
+class ChunkingPipelinePayload(BaseModel):
+    """Payload for the chunking API"""
+    chunk_size: Optional[int] = Field(200, description="Target chunk size in tokens")
+    chunk_overlap: Optional[int] = Field(20, description="Overlap between chunks in tokens")
+    collection_name: str = Field(..., description="Name of the collection in ChromaDB")
+    local_model: Optional[bool] = Field(False, description="Whether to use the local model")
+    cfg_path: str = Field(..., description="Path to the configuration file")
+    db_path: str = Field(..., description="Path to the DuckDB database")
+    subset: Optional[bool] = Field(False, description="Whether to use a subset of the data")
+    subset_size: Optional[int] = Field(5, description="Size of the subset")
+    output_dir: Optional[str] = Field(None, description="Path to the output directory")
+    output_files: Optional[List[str]] = Field(None, description="List of output file paths")
+    output_path: Optional[str] = Field(None, description="Path to the output file")
+
+class EmbeddingPayload(BaseModel):
+    """Payload for the embedding API"""
+    text: str = Field(..., description="Text to be embedded")
+    collection_name: str = Field(..., description="Name of the collection in ChromaDB")
+    local_model: Optional[bool] = Field(False, description="Whether to use the local model")
+    cfg_path: Optional[str] = Field(None, description="Path to the configuration file")
+    model_name: Optional[str] = Field(None, description="Name of the model used for embedding. If not provided, will be inferred from default local_model selection")
+
 class EmbeddingResult(BaseModel):
     """Result of the embedding step"""
     success: bool = Field(..., description="Whether the embedding pipeline completed successfully.")

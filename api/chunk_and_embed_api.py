@@ -18,7 +18,7 @@ import duckdb
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from src.models import Document, ChunkingResult, EmbeddingResult
+from src.models import Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload
 from api.services.chunking_and_embedding_services import run_semantic_chunking_pipeline
 from src.helpers import initialize_logging
 from src.semantic_chunking import semantic_chunk_text
@@ -133,13 +133,7 @@ async def embed_chunks(
 
 @app.post("/run_semantic_chunking", response_model=ChunkingResult)
 async def run_pipeline(
-    config_path: Optional[str] = Query(None, description="Path to chunking config file"),
-    db_path: Optional[str] = Query(DEFAULT_DUCKDB_PATH, description="Path to DuckDB database"),
-    collection_name: Optional[str] = Query("semantic_chunks", description="ChromaDB collection name"),
-    chunk_size: Optional[int] = Query(200, description="Target chunk size in tokens"),
-    chunk_overlap: Optional[int] = Query(20, description="Overlap between chunks in tokens"),
-    subset: Optional[bool] = Query(False, description="Whether to use a subset of documents"),
-    subset_size: Optional[int] = Query(None, description="Size of subset to use")
+    payload: ChunkingPipelinePayload
 ):
     """
     Trigger the semantic chunking pipeline.
@@ -152,16 +146,18 @@ async def run_pipeline(
         
         # Build parameters for the pipeline
         pipeline_params = {
-            "output_dir": "Data",
-            "chunk_size": chunk_size,
-            "chunk_overlap": chunk_overlap,
-            "collection_name": collection_name,
-            "cfg_path": config_path or DEFAULT_CHROMA_CONFIG,
-            "subset": subset,
-            "subset_size": subset_size,
-            "use_duckdb": True,
-            "db_path": db_path
-        }
+            "output_dir": payload.output_dir,
+            "output_files": payload.output_files,
+            "output_path": payload.output_path,
+            "chunk_size": payload.chunk_size,
+            "chunk_overlap": payload.chunk_overlap,
+            "collection_name": payload.collection_name,
+            "cfg_path": payload.cfg_path or DEFAULT_CHROMA_CONFIG,
+            "subset": payload.subset,
+            "subset_size": payload.subset_size,
+            "db_path": payload.db_path or DEFAULT_DUCKDB_PATH,
+            "local_model": payload.local_model
+            }
         
         # Run the pipeline
         result = run_semantic_chunking_pipeline(**pipeline_params)

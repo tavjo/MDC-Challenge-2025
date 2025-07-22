@@ -22,8 +22,8 @@ sys.path.append(project_root)
 
 # Local imports
 from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult
-from src.helpers import initialize_logging, timer_wrap, load_docs, export_docs, preprocess_text
-from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma, save_chunks_to_chroma
+from src.helpers import initialize_logging, timer_wrap, load_docs, preprocess_text
+from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma
 # from src.get_citation_entities import CitationEntityExtractor
 import duckdb
 from api.utils.duckdb_utils import get_duckdb_helper
@@ -425,31 +425,6 @@ def save_chunks_to_duckdb(chunks: List[Chunk], db_path: str = "artifacts/mdc_cha
     logger.info(f"Saving {len(chunks)} chunks to DuckDB: {db_path}")
     
     try:
-        # Connect to DuckDB
-        # conn = duckdb.connect(db_path)
-        
-        # Clear existing chunks (optional - depends on requirements)
-        # conn.execute("DELETE FROM chunks")
-        
-        # Insert chunks one by one
-        # for chunk in chunks:
-        #     chunk_row = chunk.to_duckdb_row()
-            
-        #     # Insert chunk
-        #     conn.execute("""
-        #         INSERT OR REPLACE INTO chunks 
-        #         (chunk_id, document_id, chunk_text, score, chunk_metadata)
-        #         VALUES (?, ?, ?, ?, ?)
-        #     """, (
-        #         chunk_row["chunk_id"],
-        #         chunk_row["document_id"],
-        #         chunk_row["chunk_text"],
-        #         chunk_row["score"],
-        #         chunk_row["chunk_metadata"]
-        #     ))
-        
-        # conn.commit()
-        # conn.close()
         db_helper = get_duckdb_helper(db_path)
         if db_helper.store_chunks(chunks):
             logger.info(f"✅ Successfully saved {len(chunks)} chunks to DuckDB")

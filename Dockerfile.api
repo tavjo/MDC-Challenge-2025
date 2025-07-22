@@ -14,14 +14,9 @@ COPY pyproject.toml uv.lock ./
 
 RUN python -m venv --system-site-packages .venv \
     && . .venv/bin/activate \
-    && uv pip install fastapi uvicorn duckdb chromadb sentence-transformers \
-    llama-index llama-index-core llama-index-embeddings-openai openai \
+    && uv pip install chromadb sentence-transformers \
+    llama-index llama-index-core llama-index-embeddings-openai \
     && uv sync --locked --inexact
-
-# RUN uv pip install --system fastapi uvicorn duckdb chromadb sentence-transformers \
-#     llama-index llama-index-core llama-index-embeddings-openai openai \
-#     python-dotenv tiktoken pandas pytest pydantic pyyaml typing-extensions
-
 
 # Expose venv on PATH for *all* subsequent RUN/CMD layers
 ENV PATH="/app/.venv/bin:${PATH}"
