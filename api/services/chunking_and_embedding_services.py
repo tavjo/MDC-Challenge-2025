@@ -223,10 +223,31 @@ def create_chunks_from_document(document: Document, citation_entities: List[Cita
         text = " ".join(doc.full_text)
     else:
         text = doc.full_text
-    
-    # Use semantic chunking
-    text_chunks = semantic_chunk_text(text)
-    text_chunks = [preprocess_text(chunk) for chunk in text_chunks]
+
+    # Use semantic chunking with overrides from pipeline
+    raw_chunks = semantic_chunk_text(
+        text,
+        None,  # cfg_path default
+        None,  # model_name default
+        chunk_size,
+        chunk_overlap,
+    )
+    # Fallback: ensure no chunk exceeds the hard token limit
+    import tiktoken, math
+    tok = tiktoken.get_encoding("cl100k_base")
+    processed_chunks = []
+    for chunk_text in raw_chunks:
+        token_ids = tok.encode(chunk_text)
+        if len(token_ids) <= chunk_size:
+            processed_chunks.append(chunk_text)
+        else:
+            num_pieces = math.ceil(len(token_ids) / chunk_size)
+            logger.warning(f"Chunk too large ({len(token_ids)} tokens); splitting into {num_pieces} parts")
+            for i in range(0, len(token_ids), chunk_size):
+                sub_tokens = token_ids[i : i + chunk_size]
+                processed_chunks.append(tok.decode(sub_tokens))
+    # Preprocess text on all final chunks
+    text_chunks = [preprocess_text(c) for c in processed_chunks]
     
     # Get citations for this document
     doc_citations = citations_by_doc.get(doc.doi, [])

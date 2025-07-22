@@ -33,8 +33,8 @@ API_ENDPOINTS = {
 }
 
 # Default database path
-DEFAULT_DUCKDB_PATH = os.path.join(project_root, "artifacts", "mdc_challenge.db")
-DEFAULT_CHROMA_CONFIG = os.path.join(project_root, "configs", "chunking.yaml")
+DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
+DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
 
 class SemanticChunkingPipeline:
     def __init__(self,
@@ -81,9 +81,9 @@ class SemanticChunkingPipeline:
         payload = self._construct_payload()
         full_url = self._get_api_url("run_semantic_chunking")
         logger.info(f"Running semantic chunking pipeline with full url: {full_url}")
-        response = requests.post(full_url, json=payload.model_dump())
+        response = requests.post(full_url, json=payload.model_dump(exclude_none=True))
         if response.status_code == 200:
-            return ChunkingResult.model_validate_json(response.json())
+            return ChunkingResult.model_validate(response.json())
         else:
             raise Exception(f"Pipeline failed: {response.text}")
     

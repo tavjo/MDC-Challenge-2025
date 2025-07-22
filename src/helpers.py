@@ -352,5 +352,78 @@ class CustomOpenAIEmbedding:
     def get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Get embeddings for multiple text strings."""
         return [get_embedding(text, self.model) for text in texts]
+
+def create_sentences(text: str) -> List[str]:
+    logger.info("Creating sentences from text...")
+    doc = nlp(text)
+    sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+    logger.info(f"Extracted {len(sentences)} sentences from text")
+    return sentences
+
+def adjust_window_size(sentences: List[str], window_size: int, buffer: int) -> int:
+    """
+    This function adjusts the window size to account for long sentences. It calculates the new window size by rounding up the max sentence length to the nearest 100 and then adding the buffer. That is because the sliding_window_chunks function stalls if there is sentence with less than N difference between the current window size and the sentence length.
+
+    Args:
+        sentences (List[str]): A list of sentences
+        window_size (int): The current window size
+        buffer (int): The buffer to add to the window size. This is calculated as 3 times the overlap.
+    Returns:
+        int: The adjusted window size
+    """
+    import math
+    # Check if any sentence is longer than the current window size
+    max_sentence_length = max(len(sentence.split()) for sentence in sentences)
+    # round up to nearest 100
+    new_window_size = math.ceil(max_sentence_length / 100) * 100 + buffer
+    logger.info(f"Adjusted window_size from {window_size} to {new_window_size} due to a sentence with {max_sentence_length} words")
+    return new_window_size
+
+@timer_wrap
+def sliding_window_chunks(text: str, window_size: int = 300, overlap: int = 50) -> List[str]:
+    # import math
+    buffer = overlap * 4
+    try:
+        logger.info(f"Creating chunks with initial window size {window_size} and overlap {overlap}")
+        sentences = create_sentences(text)
+        
+        # Check if any sentence is longer than the current window size - buffer
+        max_sentence_length = max(len(sentence.split()) for sentence in sentences)
+        logger.debug(f"Max sentence length: {max_sentence_length}")
+        
+        ## Heuristic: Because this process stalls when the a very long sentence relative to the window size is encountered, we account for this by first checking if the max sentence length is greater than the window size minus 150. If it is, we adjust the window size using the adjust_window_size function.
+        if max_sentence_length > (window_size-buffer):
+            logger.info(f"Adjusting window size due to sentence length {max_sentence_length} exceeding buffer of {buffer} words from current window size {window_size}")
+            window_size = adjust_window_size(sentences, window_size, buffer)
+        
+        chunks = []
+        current_chunk = []
+        current_length = 0
+        i = 0
+        
+        while i < len(sentences):
+            sentence = sentences[i]
+            sentence_length = len(sentence.split())
+            logger.debug(f"Processing sentence {i} with length {sentence_length} words.")
+            
+            if current_length + sentence_length <= window_size:
+                current_chunk.append(sentence)
+                current_length += sentence_length
+                i += 1
+            else:
+                chunks.append(" ".join(current_chunk))
+                # For overlap, step back a few sentences (heuristic: approx. 10 words per sentence)
+                overlap_count = max(1, overlap // 10)
+                current_chunk = current_chunk[-overlap_count:]
+                current_length = sum(len(s.split()) for s in current_chunk)
+        
+        if current_chunk:
+            chunks.append(" ".join(current_chunk))
+        
+        logger.info(f"Successfully created {len(chunks)} chunks")
+        return chunks
+    except Exception as e:
+        logger.error(f"Error in sliding_window_chunks: {e}")
+        return []
     
     

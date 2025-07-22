@@ -300,15 +300,25 @@ def _get_chroma_collection(cfg: dict, collection_name: str):
 
 @timer_wrap
 def semantic_chunk_text(
-    text: str, 
+    text: str,
     cfg_path: Optional[os.PathLike] | None = None,
-    model_name: str = "text-embedding-3-small"
+    model_name: str = "text-embedding-3-small",
+    chunk_size: Optional[int] = None,
+    chunk_overlap: Optional[int] = None,
 ) -> List[str]:
     """Return a list of semantic chunks for *text* (page or whole document)."""
     if not text:
         return []
 
+    # Load YAML config and allow overrides
     cfg = _load_cfg(cfg_path)
+    # Override token-based chunk size if provided
+    if chunk_size is not None:
+        cfg["max_tokens"] = chunk_size
+    # Override sentence-based overlap if provided
+    if chunk_overlap is not None:
+        cfg["overlap_sentences"] = chunk_overlap
+
     embedder = _build_embedder(cfg.get("embed_model", model_name))
     splitter = _build_splitter(cfg, embedder)
 
@@ -318,8 +328,10 @@ def semantic_chunk_text(
         cfg.get("similarity_threshold", 0.75),
     )
 
+    # Wrap raw text in LlamaIndex Document for splitting
     doc = Document(text=text)
     nodes = splitter.get_nodes_from_documents([doc])
+    # Extract text from each split node
     chunks = [node.text for node in nodes]
 
     logger.info("▸ Created %d semantic chunks", len(chunks))

@@ -45,16 +45,18 @@ app.add_middleware(
 )
 
 # Default database path
-DEFAULT_DUCKDB_PATH = os.path.join(project_root, "artifacts", "mdc_challenge.db")
+DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 # Remove module-level helper instantiation to defer until requests
 # DUCKDB_HELPER = get_duckdb_helper(DEFAULT_DUCKDB_PATH)
-DEFAULT_CHROMA_CONFIG = os.path.join(project_root, "configs", "chunking.yaml")
+DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
 
 @app.post("/create_chunks", response_model=List[str])
 async def create_chunks(
     text: str,
     cfg_path: Optional[str] = None,
     model_name: Optional[str] = None,
+    chunk_size: Optional[int] = 200,
+    chunk_overlap: Optional[int] = 20
 ):
     """
     Create a chunk from text.
@@ -64,9 +66,9 @@ async def create_chunks(
         if cfg_path is None:
             cfg_path = DEFAULT_CHROMA_CONFIG
         if model_name is None:
-            chunks = semantic_chunk_text(text, cfg_path)
+            chunks = semantic_chunk_text(text, cfg_path, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         else:
-            chunks = semantic_chunk_text(text, cfg_path, model_name)
+            chunks = semantic_chunk_text(text, cfg_path, model_name, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         logger.info(f"Created {len(chunks)} chunks")
         return chunks
     except Exception as e:
@@ -78,6 +80,8 @@ async def batch_create_chunks(
     texts: List[str],
     cfg_path: Optional[str] = None,
     model_name: Optional[str] = None,
+    chunk_size: Optional[int] = 200,
+    chunk_overlap: Optional[int] = 20
 ) -> Dict[str, List[str]]:
     """
     Create chunks for a list of texts.
@@ -86,7 +90,7 @@ async def batch_create_chunks(
         logger.info(f"Creating chunks for {len(texts)} texts.")
         chunks = {}
         for i, text in enumerate(texts):
-            chunks[i] = (semantic_chunk_text(text, cfg_path, model_name))
+            chunks[i] = (semantic_chunk_text(text, cfg_path, model_name, chunk_size=chunk_size, chunk_overlap=chunk_overlap))
         logger.info(f"Created {len(chunks)} chunks")
         return chunks
     except Exception as e:
@@ -147,9 +151,10 @@ async def run_pipeline(
         
         # Build parameters for the pipeline
         pipeline_params = {
-            "output_dir": payload.output_dir,
-            "output_files": payload.output_files,
-            "output_path": payload.output_path,
+            # Use provided output_dir or default to 'Data'
+            "output_dir": payload.output_dir or "Data",
+            # "output_files": payload.output_files,
+            # "output_path": payload.output_path,
             "chunk_size": payload.chunk_size,
             "chunk_overlap": payload.chunk_overlap,
             "collection_name": payload.collection_name,
@@ -157,7 +162,7 @@ async def run_pipeline(
             "subset": payload.subset,
             "subset_size": payload.subset_size,
             "db_path": payload.db_path or DEFAULT_DUCKDB_PATH,
-            "local_model": payload.local_model
+            # "local_model": payload.local_model
             }
         
         # Run the pipeline
