@@ -35,7 +35,6 @@ up: ## Start both services in detached mode
 down: ## Stop and remove both services
 	@echo "$(YELLOW)Stopping all services...$(NC)"
 	docker compose down
-	docker compose --profile api down
 	@echo "$(GREEN)Services stopped successfully!$(NC)"
 
 start: ## Start existing containers
@@ -94,7 +93,6 @@ main-shell: ## Open shell in main container
 clean: ## Stop and remove all containers, networks, and volumes
 	@echo "$(YELLOW)Cleaning up Docker resources...$(NC)"
 	docker compose down --volumes --remove-orphans
-	docker compose --profile api down --volumes --remove-orphans
 	docker compose --profile dev down --volumes --remove-orphans
 	@echo "$(GREEN)Cleanup completed!$(NC)"
 

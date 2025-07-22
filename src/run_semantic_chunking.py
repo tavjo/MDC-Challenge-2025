@@ -23,14 +23,13 @@ filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
 
 API_ENDPOINTS = {
-    "base_api_url": "http://localhost:3000",
+    "base_api_url": "http://localhost:8000",
     "create_chunks": "/create_chunks",
     "batch_create_chunks": "/batch_create_chunks",
     "embed_chunk": "/embed_chunk",
     "embed_chunks": "/embed_chunks",
     "run_semantic_chunking": "/run_semantic_chunking",
-    "chunk_specific_documents": "/chunk/documents",
-    "health": "/health"
+    "chunk_specific_documents": "/chunk/documents"
 }
 
 # Default database path
@@ -80,7 +79,9 @@ class SemanticChunkingPipeline:
     def run_pipeline(self) -> ChunkingResult:
         # let's the do the simplest iteration for now
         payload = self._construct_payload()
-        response = requests.post(self._get_api_url("run_semantic_chunking"), json=payload.model_dump())
+        full_url = self._get_api_url("run_semantic_chunking")
+        logger.info(f"Running semantic chunking pipeline with full url: {full_url}")
+        response = requests.post(full_url, json=payload.model_dump())
         if response.status_code == 200:
             return ChunkingResult.model_validate_json(response.json())
         else:

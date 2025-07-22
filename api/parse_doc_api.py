@@ -30,27 +30,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-DUCKDB_HELPER = get_duckdb_helper(os.path.join(project_root, "artifacts", "mdc_challenge.db"))
+# Remove module-level DuckDBHelper instantiation to defer until requests
+# DUCKDB_HELPER = get_duckdb_helper(os.path.join(project_root, "artifacts", "mdc_challenge.db"))
+DB_PATH = os.path.join(project_root, "artifacts", "mdc_challenge.db")
 
 # Parse a single document
 @app.get("/parse_doc")
 async def parse_doc(pdf_path: str):
+    helper = get_duckdb_helper(DB_PATH)
     try:
         document = build_document_object(pdf_path=pdf_path)
-        DUCKDB_HELPER.store_document(document)
+        helper.store_document(document)
         return {"message": "Document parsed and stored successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        helper.close()
 
 # Parse multiple documents at once
 @app.get("/bulk_parse_docs")
 async def parse_docs(pdf_paths: List[str], export_file: Optional[str] = None, export_path: Optional[str] = None):
+    helper = get_duckdb_helper(DB_PATH)
     try:
         documents = build_document_objects(pdf_paths=pdf_paths, subset=False)
         if not documents:
             raise HTTPException(status_code=400, detail="No document objects built")
-        DUCKDB_HELPER.store_documents(documents)
+        helper.store_documents(documents)
         # also export as a json file
         if export_file:
             export_docs(documents, output_file=export_file, output_dir=export_path)
@@ -63,45 +68,35 @@ async def parse_docs(pdf_paths: List[str], export_file: Optional[str] = None, ex
         return {"message": f"{len(documents)} Documents parsed and stored successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+    finally:
+        helper.close()
 
 @app.get("/health")
 async def health_check():
-    """
-    Simple health check for the document parsing microservice.
-    
-    Checks DuckDB connection and write permissions.
-    """
+    helper = get_duckdb_helper(DB_PATH)
     try:
-        # Test DuckDB helper connection
-        conn = DUCKDB_HELPER.conn
-        
+        conn = helper.engine
         # Test basic connection
-        result = conn.execute("SELECT 1").fetchone()
-        
+        conn.execute("SELECT 1")
         # Test that we can access the documents table
-        conn.execute("SELECT COUNT(*) FROM documents").fetchone()
-        
+        conn.execute("SELECT COUNT(*) FROM documents")
         duckdb_ok = True
         duckdb_error = None
-        
     except Exception as e:
         logger.error(f"DuckDB health check failed: {str(e)}")
         duckdb_ok = False
         duckdb_error = str(e)
-    
+    finally:
+        helper.close()
     status = "healthy" if duckdb_ok else "unhealthy"
-    
     response = {
         "status": status,
         "duckdb_connected": duckdb_ok,
         "service": "document_parsing",
-        "db_path": os.path.join(project_root, "artifacts", "mdc_challenge.db")
+        "db_path": DB_PATH
     }
-    
     if not duckdb_ok:
         response["error"] = duckdb_error
-    
     return response
 
 if __name__ == "__main__":

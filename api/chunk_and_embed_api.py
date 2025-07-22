@@ -46,7 +46,8 @@ app.add_middleware(
 
 # Default database path
 DEFAULT_DUCKDB_PATH = os.path.join(project_root, "artifacts", "mdc_challenge.db")
-DUCKDB_HELPER = get_duckdb_helper(DEFAULT_DUCKDB_PATH)
+# Remove module-level helper instantiation to defer until requests
+# DUCKDB_HELPER = get_duckdb_helper(DEFAULT_DUCKDB_PATH)
 DEFAULT_CHROMA_CONFIG = os.path.join(project_root, "configs", "chunking.yaml")
 
 @app.post("/create_chunks", response_model=List[str])
