@@ -1,9 +1,9 @@
 # conf/chunking.yaml
 splitter: semantic          # switch from "sliding" to "semantic"
-max_tokens: 200             # hard ceiling to prevent jumbo chunks
+max_tokens: 300             # hard ceiling to prevent jumbo chunks
 similarity_threshold: 0.75  # cosine drop that triggers a new chunk
 min_tokens: 80              # merge stragglers below this size
-overlap_sentences: 5        # no duplicated text → lower token bill
+overlap_sentences: 2        # no duplicated text → lower token bill
 
 # Embedding model configuration
 # For OpenAI models: text-embedding-3-small, text-embedding-3-large, text-embedding-ada-002

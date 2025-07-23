@@ -49,7 +49,7 @@ except ImportError:
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
-from src.helpers import initialize_logging  # noqa: E402
+from src.helpers import initialize_logging, sliding_window_chunks  # noqa: E402
 from src.models import Chunk, ChunkMetadata, CitationEntity
 
 filename = os.path.basename(__file__)
@@ -73,8 +73,8 @@ except Exception:  # pragma: no cover – stand-alone fallback
 
         return wrapper
 
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
+# logger.addHandler(logging.StreamHandler())
+# logger.setLevel(logging.INFO)
 
 # ---------------------------------------------------------------------------
 # Config helpers
@@ -278,8 +278,8 @@ def _build_splitter(cfg: dict, embedder) -> SemanticSplitterNodeParser:
     return SemanticSplitterNodeParser(
         embed_model=embedder,
         similarity_threshold=cfg.get("similarity_threshold", 0.75),
-        chunk_overlap=cfg.get("overlap_sentences", 10),
-        chunk_size=cfg.get("max_tokens", 400),
+        chunk_overlap=cfg.get("overlap_sentences", 2),
+        chunk_size=cfg.get("max_tokens", 300),
         min_chunk_size=cfg.get("min_tokens", 80),
     )
 
@@ -324,7 +324,7 @@ def semantic_chunk_text(
 
     logger.info(
         "▸ Splitting text with SemanticSplitterNodeParser (chunk_size=%s, τ=%s)",
-        cfg.get("max_tokens", 200),
+        cfg.get("max_tokens", 300),
         cfg.get("similarity_threshold", 0.75),
     )
 
@@ -395,7 +395,9 @@ def save_chunk_objs_to_chroma(
     chunk_objs: List["Chunk"],
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str | None = None,
-    model_name: str = "text-embedding-3-small"
+    model_name: str = "text-embedding-3-small",
+    chunk_size: int = 300,
+    chunk_overlap: int = 2
 ):
     """Persist a list of Chunk objects (text + metadata) to ChromaDB."""
     if not chunk_objs:
@@ -411,6 +413,17 @@ def save_chunk_objs_to_chroma(
     logger.info("▸ Embedding %d chunks for Chroma upsert", len(chunk_objs))
     documents = [c.text for c in chunk_objs]
     embeddings = [embedder.get_text_embedding(txt) for txt in documents]
+    # embeddings = []
+    # for txt in documents:
+    #     import tiktoken
+    #     tok = tiktoken.get_encoding("cl100k_base")
+    #     token_count = len(tok.encode(txt))
+    #     if token_count > chunk_size:
+    #         processed_chunks = sliding_window_chunks(txt, chunk_size, chunk_overlap)
+    #         for chunk in processed_chunks:
+    #             embeddings.append(embedder.get_text_embedding(chunk))
+    #     else:
+    #         embeddings.append(embedder.get_text_embedding(txt))
     metadatas = [_chunk_obj_to_metadata(c) for c in chunk_objs]
     ids = [c.chunk_id for c in chunk_objs]
 

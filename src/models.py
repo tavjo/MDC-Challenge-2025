@@ -248,8 +248,8 @@ class PreprocessingReport(BaseModel):
 
 class ChunkingPipelinePayload(BaseModel):
     """Payload for the chunking API"""
-    chunk_size: Optional[int] = Field(200, description="Target chunk size in tokens")
-    chunk_overlap: Optional[int] = Field(20, description="Overlap between chunks in tokens")
+    chunk_size: Optional[int] = Field(300, description="Target chunk size in tokens")
+    chunk_overlap: Optional[int] = Field(2, description="Overlap between chunks in tokens")
     collection_name: str = Field(..., description="Name of the collection in ChromaDB")
     local_model: Optional[bool] = Field(False, description="Whether to use the local model")
     cfg_path: str = Field(..., description="Path to the configuration file")

@@ -45,8 +45,8 @@ class SemanticChunkingPipeline:
                  db_path: Optional[str] = None, 
                  cfg_path: Optional[str] = None,
                  collection_name: Optional[str] = None,
-                 chunk_size: Optional[int] = 200,
-                 chunk_overlap: Optional[int] = 20,
+                 chunk_size: Optional[int] = 300,
+                 chunk_overlap: Optional[int] = 2,
                  local_model: Optional[bool] = False,
                  ):
         self.subset = subset

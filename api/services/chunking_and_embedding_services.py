@@ -22,11 +22,12 @@ sys.path.append(project_root)
 
 # Local imports
 from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult
-from src.helpers import initialize_logging, timer_wrap, load_docs, preprocess_text
+from src.helpers import initialize_logging, timer_wrap, load_docs, preprocess_text, sliding_window_chunks
 from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma
 # from src.get_citation_entities import CitationEntityExtractor
 import duckdb
 from api.utils.duckdb_utils import get_duckdb_helper
+import tiktoken
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
@@ -195,7 +196,7 @@ def create_pre_chunk_entity_inventory(document: Document, citation_entities: Lis
 
 @timer_wrap
 def create_chunks_from_document(document: Document, citation_entities: List[CitationEntity], 
-                                chunk_size: int = 200, chunk_overlap: int = 10) -> List[Chunk]:
+                                chunk_size: int = 300, chunk_overlap: int = 2) -> List[Chunk]:
     """
     Create chunks using semantic_chunking.py functions with citation assignment.
     
@@ -233,21 +234,19 @@ def create_chunks_from_document(document: Document, citation_entities: List[Cita
         chunk_overlap,
     )
     # Fallback: ensure no chunk exceeds the hard token limit
-    import tiktoken, math
+    # import tiktoken
     tok = tiktoken.get_encoding("cl100k_base")
     processed_chunks = []
     for chunk_text in raw_chunks:
         token_ids = tok.encode(chunk_text)
-        if len(token_ids) <= chunk_size:
+        if len(token_ids) <= 2000: 
             processed_chunks.append(chunk_text)
         else:
-            num_pieces = math.ceil(len(token_ids) / chunk_size)
-            logger.warning(f"Chunk too large ({len(token_ids)} tokens); splitting into {num_pieces} parts")
-            for i in range(0, len(token_ids), chunk_size):
-                sub_tokens = token_ids[i : i + chunk_size]
-                processed_chunks.append(tok.decode(sub_tokens))
+            logger.warning(f"Chunk too large ({len(token_ids)} tokens); splitting into smaller chunks using sliding window method.")
+            processed_chunk = sliding_window_chunks(chunk_text, chunk_size, chunk_overlap)
+            processed_chunks.extend(processed_chunk)
     # Preprocess text on all final chunks
-    text_chunks = [preprocess_text(c) for c in processed_chunks]
+    text_chunks = [pc for pc in processed_chunks]
     
     # Get citations for this document
     doc_citations = citations_by_doc.get(doc.doi, [])
@@ -264,7 +263,7 @@ def create_chunks_from_document(document: Document, citation_entities: List[Cita
                 chunk_citations.append(citation)
         
         # Use tiktoken for accurate token counting
-        import tiktoken
+        # import tiktoken
         tok = tiktoken.get_encoding("cl100k_base")
         token_count = len(tok.encode(chunk_text))
         
@@ -428,6 +427,101 @@ def validate_chunk_integrity(chunks: List[Chunk], pre_chunk_inventory: pd.DataFr
     return validation_passed, lost_citations
 
 # ---------------------------------------------------------------------------
+# Post-chunk repair to guarantee 100 % citation retention
+# ---------------------------------------------------------------------------
+from collections import defaultdict
+from typing import Dict, List, Tuple
+
+@timer_wrap
+@timer_wrap
+def repair_lost_citations_strict(
+    document: Document,
+    chunks: List[Chunk],
+    lost_citations: pd.DataFrame,
+    chunk_size: int = 300,
+    ctx_chars: int = 60,
+) -> Tuple[List[Chunk], Dict[str, int]]:
+    """
+    Strictly re-inserts *every* missing copy of every citation ID.
+    Keeps raw text (no preprocessing) so that validation works.
+    """
+    tok = tiktoken.get_encoding("cl100k_base")
+    if lost_citations.empty:
+        return chunks, {"inserted": 0, "merged": 0, "total_after": len(chunks)}
+
+    # ----- 0)  helpers ------------------------------------------------------
+    full_text = (
+        document.full_text if isinstance(document.full_text, str)
+        else " ".join(document.full_text)
+    )
+    pattern_cache = {
+        cid: make_pattern(cid) for cid in lost_citations["citation_id"].unique()
+    }
+
+    def snippet_around(match: re.Match) -> str:
+        """Return a raw snippet centred on the match, < chunk_size tokens."""
+        left = max(0, match.start() - ctx_chars)
+        right = min(len(full_text), match.end() + ctx_chars)
+        snippet = full_text[left:right]
+        # hard-trim if token budget blown
+        while len(tok.encode(snippet)) > chunk_size and ctx_chars:
+            left += ctx_chars // 4
+            right -= ctx_chars // 4
+            snippet = full_text[left:right]
+        return snippet
+
+    # ----- 1)  current per-ID counts ---------------------------------------
+    current_counts = defaultdict(int)
+    for ck in chunks:
+        for cid, pat in pattern_cache.items():
+            current_counts[cid] += len(pat.findall(ck.text))
+
+    # ----- 2)  process each missing ID -------------------------------------
+    new_chunks, inserted, merged = [], 0, 0
+    id2occ_snip_idx = defaultdict(int)  # how many snippets we already used
+
+    for row in lost_citations.itertuples():
+        cid, need = row.citation_id, row.count_pre - current_counts[row.citation_id]
+        if need <= 0:
+            continue
+        pat = pattern_cache[cid]
+        matches = list(pat.finditer(full_text))
+        if len(matches) < need:
+            logger.warning(f"⚠️  Only {len(matches)} occurrences of {cid} "
+                           f"found in raw text, needed {need}.")
+            need = len(matches)
+
+        for k in range(need):
+            m = matches[id2occ_snip_idx[cid] + k]
+            snip = snippet_around(m)
+            new_id = f"{document.doi}_fix_{cid}_{k+1}"
+            meta = ChunkMetadata(
+                chunk_id=new_id,
+                token_count=len(tok.encode(snip)),
+                citation_entities=[CitationEntity(document_id=document.doi,
+                                                  data_citation=cid)],
+                previous_chunk_id=None,
+                next_chunk_id=None,
+            )
+            new_chunks.append(
+                Chunk(
+                    chunk_id=new_id,
+                    document_id=document.doi,
+                    text=snip,             # RAW text – do *not* preprocess
+                    chunk_metadata=meta,
+                )
+            )
+            inserted += 1
+        id2occ_snip_idx[cid] += need
+
+    # ----- 3)  re-thread + return ------------------------------------------
+    repaired = link_adjacent_chunks([ck for ck in chunks] + new_chunks)
+    stats = {"inserted": inserted, "merged": merged, "total_after": len(repaired)}
+    return repaired, stats
+
+
+
+# ---------------------------------------------------------------------------
 # DuckDB Storage Functions
 # ---------------------------------------------------------------------------
 
@@ -521,8 +615,8 @@ def create_chunks_summary_csv(chunks: List[Chunk], export: bool = True, output_p
 def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_with_known_entities.json",
                                  citation_entities_path: str = "Data/citation_entities_known.json",
                                  output_dir: str = "Data",
-                                 chunk_size: int = 200,
-                                 chunk_overlap: int = 10,
+                                 chunk_size: int = 300,
+                                 chunk_overlap: int = 2,
                                  collection_name: str = "semantic_chunks",
                                  cfg_path: str = "configs/chunking.yaml",
                                  subset: bool = False,
@@ -591,21 +685,30 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
             if lost_citations is not None:
                 lost_entities_list.append(lost_citations)
             if not validation_passed:
-                logger.error("❌ QUALITY GATE FAILURE: Citation retention < 100%")
-                logger.error("   Pipeline aborted to prevent data loss")
-                result_list.append(ChunkingResult(
-                success=False,
-                error="Quality gate failure: Citation retention < 100%",
-                pipeline_completed_at=datetime.now().isoformat(),
-                total_documents=1,
-                total_unique_datasets=len(citation_entities),
-                total_chunks=len(chunks),
-                total_tokens=sum(chunk.chunk_metadata.token_count for chunk in chunks),
-                avg_tokens_per_chunk=sum(chunk.chunk_metadata.token_count for chunk in chunks) / len(chunks) if chunks else 0,
-                validation_passed=validation_passed,
-                entity_retention=0.0,
-                ))
-                continue
+                # attempt to repair lost citations
+                logger.info("Validation failed. Repairing lost citations...")
+                chunks, fix_stats = repair_lost_citations_strict(document, chunks, lost_citations)
+                logger.info(f"🔧 Repaired chunks – inserted: {fix_stats['inserted']}, "
+                            f"merged: {fix_stats['merged']}, total: {fix_stats['total_after']}")
+                # re-validate to be safe
+                validation_passed, _ = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
+                assert validation_passed, "Repair layer failed – citation still missing!"
+                if not validation_passed:
+                    logger.error("❌ QUALITY GATE FAILURE: Citation retention < 100%")
+                    logger.error("   Pipeline aborted to prevent data loss")
+                    result_list.append(ChunkingResult(
+                    success=False,
+                    error="Quality gate failure: Citation retention < 100%",
+                    pipeline_completed_at=datetime.now().isoformat(),
+                    total_documents=1,
+                    total_unique_datasets=len(citation_entities),
+                    total_chunks=len(chunks),
+                    total_tokens=sum(chunk.chunk_metadata.token_count for chunk in chunks),
+                    avg_tokens_per_chunk=sum(chunk.chunk_metadata.token_count for chunk in chunks) / len(chunks) if chunks else 0,
+                    validation_passed=validation_passed,
+                    entity_retention=0.0,
+                    ))
+                    continue
             all_validated_chunks.extend(chunks)
             # step 6: save chunks to chroma for document
             logger.info(f"\n📋 Step 6: Save Chunks to ChromaDB for {document.doi}")
