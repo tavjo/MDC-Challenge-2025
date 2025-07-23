@@ -50,8 +50,9 @@ class SemanticChunkingPipeline:
                  local_model: Optional[bool] = False,
                  ):
         self.subset = subset
-        if self.subset:
-            self.subset_size = subset_size if subset_size is not None else 5
+        self.subset_size = subset_size
+        # if self.subset:
+        #     self.subset_size = 5 if not self.subset_size else self.subset_size
         self.use_duckdb = use_duckdb
         self.db_path = db_path if db_path is not None else None
         self.cfg_path = cfg_path if cfg_path is not None else None
@@ -91,8 +92,7 @@ class SemanticChunkingPipeline:
 def main():
     # initialize the pipeline
     semantic_chunker = SemanticChunkingPipeline(
-        subset = True,
-        subset_size = 5,
+        subset = False,
         cfg_path = DEFAULT_CHROMA_CONFIG,
         db_path = DEFAULT_DUCKDB_PATH,
         collection_name = "mdc_training_data"

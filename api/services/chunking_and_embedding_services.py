@@ -611,6 +611,108 @@ def create_chunks_summary_csv(chunks: List[Chunk], export: bool = True, output_p
 # Main Pipeline Function
 # ---------------------------------------------------------------------------
 
+def semantic_chunking_pipeline(document: Document,
+                                 citation_entities: List[CitationEntity],
+                                 output_dir: str = "Data",
+                                 chunk_size: int = 300,
+                                 chunk_overlap: int = 2,
+                                 collection_name: str = "semantic_chunks",
+                                 cfg_path: str = "configs/chunking.yaml",
+                                 use_duckdb: bool = True,
+                                 db_path: str = "artifacts/mdc_challenge.db")-> ChunkingResult:
+    
+    """
+    Run the complete semantic chunking pipeline.
+    
+    Args:
+        documents_path: Path to documents JSON file (used when use_duckdb=False)
+        citation_entities_path: Path to citation entities JSON file (used when use_duckdb=False)
+        output_dir: Directory for output files
+        chunk_size: Target chunk size in tokens
+        chunk_overlap: Overlap between chunks in tokens
+        collection_name: ChromaDB collection name
+        cfg_path: Path to chunking configuration file
+        subset: Whether to use a subset of documents
+        subset_size: Size of subset to use
+        use_duckdb: Whether to use DuckDB for data I/O (default: True)
+        db_path: Path to DuckDB database file
+        
+    Returns:
+        ChunkingResult object with pipeline results
+    """
+    logger.info("=== Semantic Chunking Pipeline ===")
+    logger.info(f"Started at: {datetime.now()}")
+    logger.info(f"\n📋 Step 1: Create Pre-Chunk Entity Inventory for {document.doi}")
+    pre_chunk_inventory = create_pre_chunk_entity_inventory(document, citation_entities)
+    # step 2: create chunks
+    logger.info(f"\n📋 Step 2: Create Semantic Chunks for {document.doi}")
+    chunks = create_chunks_from_document(document, citation_entities, chunk_size, chunk_overlap)
+    # Step 3: Link adjacent chunks within document
+    logger.info(f"\n📋 Step 3: Link Adjacent Chunks for {document.doi}")
+    chunks = link_adjacent_chunks(chunks)
+    # post-chunk validation
+    logger.info(f"\n📋 Step 5: Validate Chunk Integrity for {document.doi}")
+    validation_passed, lost_citations = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
+    if not validation_passed:
+        # attempt to repair lost citations
+        logger.info("Validation failed. Repairing lost citations...")
+        chunks, fix_stats = repair_lost_citations_strict(document, chunks, lost_citations)
+        logger.info(f"🔧 Repaired chunks – inserted: {fix_stats['inserted']}, "
+                    f"merged: {fix_stats['merged']}, total: {fix_stats['total_after']}")
+        # re-validate to be safe
+        validation_passed, _ = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
+        assert validation_passed, "Repair layer failed – citation still missing!"
+        if not validation_passed:
+            logger.error("❌ QUALITY GATE FAILURE: Citation retention < 100%")
+            logger.error("   Pipeline aborted to prevent data loss")
+            result = ChunkingResult(
+            success=False,
+            error="Quality gate failure: Citation retention < 100%",
+            pipeline_completed_at=datetime.now().isoformat(),
+            total_documents=1,
+            total_unique_datasets=len(citation_entities),
+            total_chunks=len(chunks),
+            total_tokens=sum(chunk.chunk_metadata.token_count for chunk in chunks),
+            avg_tokens_per_chunk=sum(chunk.chunk_metadata.token_count for chunk in chunks) / len(chunks) if chunks else 0,
+            validation_passed=validation_passed,
+            entity_retention=0.0,
+            )
+    # step 4: save chunks to chroma for document
+    logger.info(f"\n📋 Step 4: Save Chunks to ChromaDB for {document.doi}")
+    save_chunk_objs_to_chroma(chunks, collection_name=collection_name,
+                        cfg_path=cfg_path)
+    # step 5: save chunks
+    output_path = Path(os.path.join(project_root, output_dir))
+    output_path.mkdir(parents=True, exist_ok=True)
+    if use_duckdb:
+        logger.info(f"\n📋 Step 5: Save Chunks to DuckDB for {document.doi}")
+        save_success = save_chunks_to_duckdb(chunks, db_path)
+        if not save_success:
+            logger.warning("⚠️  Failed to save chunks to DuckDB, saving to JSON instead...")
+            json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
+        else:
+            logger.info(f"✅ Successfully saved {len(chunks)} chunks to DuckDB")
+            json_file = None
+    else:
+        logger.info(f"\n📋 Step 6: Save Chunks to JSON for {document.doi}")
+        json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
+    csv_file = str(output_path / "chunks_for_embedding_summary.csv")
+    summary_df = create_chunks_summary_csv(chunks, export=True, output_path=csv_file)
+    result = ChunkingResult(
+        success=validation_passed,
+        error = None,
+        total_documents=1,
+        total_unique_datasets=len(pre_chunk_inventory["citation_id"].unique()),
+        total_chunks = len(chunks),
+        total_tokens = sum(chunk.chunk_metadata.token_count for chunk in chunks),
+        avg_tokens_per_chunk = sum(chunk.chunk_metadata.token_count for chunk in chunks) / len(chunks) if chunks else 0,
+        validation_passed = validation_passed,
+        entity_retention = 100.0 if len(lost_citations) == 0 else 0,
+        lost_entities = lost_citations.to_dict() if len(lost_citations) > 0 else None,
+        pipeline_completed_at = datetime.now().isoformat()
+    )
+    return result
+
 @timer_wrap
 def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_with_known_entities.json",
                                  citation_entities_path: str = "Data/citation_entities_known.json",
