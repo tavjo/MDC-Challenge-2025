@@ -203,8 +203,40 @@ class ChunkingResult(BaseModel):
     entity_retention: float = Field(..., description="Percentage of dataset IDs retained after chunking; aim is 100%.")
     output_path: Optional[str] = Field(None, description="Path to the output files.")
     output_files: Optional[List[str]] = Field(None, description="List of output file paths.")
-    lost_entities: Optional[Dict[str, Any]]= Field(None, description="List of dataset IDs that were lost during chunking; aim is 0. Keep for sanity check.") 
+    lost_entities: Optional[Dict[str, Any]] = Field(None, description="List of dataset IDs that were lost; aim is 0.")
     error: Optional[str] = Field(None, description="Error message if pipeline failed.")
+
+# New: per-document result model
+class DocumentChunkingResult(BaseModel):
+    document_id: str
+    success: bool
+    error: Optional[str] = None
+
+    # pipeline parameters
+    chunk_size: int
+    chunk_overlap: int
+    cfg_path: str
+    collection_name: str
+
+    # citation stats
+    pre_chunk_total_citations: int
+    post_chunk_total_citations: int
+    validation_passed: bool
+    entity_retention: float
+    lost_entities: Optional[Dict[str, Any]] = None
+
+    # chunk stats
+    total_chunks: int
+    total_tokens: int
+    avg_tokens_per_chunk: float
+
+    # outputs
+    output_path: Optional[str] = None
+    output_files: Optional[List[str]] = None
+
+    # timing
+    pipeline_started_at: str
+    pipeline_completed_at: str
 
 class Dataset(BaseModel):
     """Dataset Citation Extracted from Document text"""
@@ -259,6 +291,7 @@ class ChunkingPipelinePayload(BaseModel):
     output_dir: Optional[str] = Field(None, description="Path to the output directory")
     output_files: Optional[List[str]] = Field(None, description="List of output file paths")
     output_path: Optional[str] = Field(None, description="Path to the output file")
+    max_workers: Optional[int] = Field(1, description="Number of parallel worker threads")
 
 class EmbeddingPayload(BaseModel):
     """Payload for the embedding API"""

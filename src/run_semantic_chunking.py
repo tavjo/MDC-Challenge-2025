@@ -48,7 +48,7 @@ class SemanticChunkingPipeline:
                  chunk_size: Optional[int] = 300,
                  chunk_overlap: Optional[int] = 2,
                  local_model: Optional[bool] = False,
-                 ):
+                 max_workers: int = 8):
         self.subset = subset
         self.subset_size = subset_size
         # if self.subset:
@@ -60,6 +60,7 @@ class SemanticChunkingPipeline:
         self.chunk_size = chunk_size if chunk_size is not None else None
         self.chunk_overlap = chunk_overlap if chunk_overlap is not None else None
         self.local_model = local_model if local_model is not None else False
+        self.max_workers = max_workers
         self.base_api_url = base_api_url
         self.endpoints = API_ENDPOINTS
 
@@ -76,6 +77,7 @@ class SemanticChunkingPipeline:
             subset=self.subset,
             subset_size=self.subset_size,
             local_model=self.local_model
+            ,max_workers=self.max_workers
         )
     def run_pipeline(self) -> ChunkingResult:
         # let's the do the simplest iteration for now

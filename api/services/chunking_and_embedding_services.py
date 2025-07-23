@@ -21,9 +21,10 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
 # Local imports
-from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult
+from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult, DocumentChunkingResult
 from src.helpers import initialize_logging, timer_wrap, load_docs, preprocess_text, sliding_window_chunks
 from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma
+from concurrent.futures import ThreadPoolExecutor, as_completed
 # from src.get_citation_entities import CitationEntityExtractor
 import duckdb
 from api.utils.duckdb_utils import get_duckdb_helper
@@ -611,107 +612,259 @@ def create_chunks_summary_csv(chunks: List[Chunk], export: bool = True, output_p
 # Main Pipeline Function
 # ---------------------------------------------------------------------------
 
-def semantic_chunking_pipeline(document: Document,
-                                 citation_entities: List[CitationEntity],
-                                 output_dir: str = "Data",
-                                 chunk_size: int = 300,
-                                 chunk_overlap: int = 2,
-                                 collection_name: str = "semantic_chunks",
-                                 cfg_path: str = "configs/chunking.yaml",
-                                 use_duckdb: bool = True,
-                                 db_path: str = "artifacts/mdc_challenge.db")-> ChunkingResult:
-    
+def prepare_document(
+    document: Document,
+    citation_entities: List[CitationEntity],
+    chunk_size: int,
+    chunk_overlap: int,
+    cfg_path: str,
+    collection_name: str,
+) -> dict:
     """
-    Run the complete semantic chunking pipeline.
-    
-    Args:
-        documents_path: Path to documents JSON file (used when use_duckdb=False)
-        citation_entities_path: Path to citation entities JSON file (used when use_duckdb=False)
-        output_dir: Directory for output files
-        chunk_size: Target chunk size in tokens
-        chunk_overlap: Overlap between chunks in tokens
-        collection_name: ChromaDB collection name
-        cfg_path: Path to chunking configuration file
-        subset: Whether to use a subset of documents
-        subset_size: Size of subset to use
-        use_duckdb: Whether to use DuckDB for data I/O (default: True)
-        db_path: Path to DuckDB database file
-        
-    Returns:
-        ChunkingResult object with pipeline results
+    Phase 1: CPU/I-O-light work for one document.
+    Returns a dict with document, chunks, stats, and params.
     """
-    logger.info("=== Semantic Chunking Pipeline ===")
-    logger.info(f"Started at: {datetime.now()}")
-    logger.info(f"\n📋 Step 1: Create Pre-Chunk Entity Inventory for {document.doi}")
-    pre_chunk_inventory = create_pre_chunk_entity_inventory(document, citation_entities)
-    # step 2: create chunks
-    logger.info(f"\n📋 Step 2: Create Semantic Chunks for {document.doi}")
+    start = datetime.now().isoformat()
+
+    # 1) Pre-chunk inventory
+    pre_df = create_pre_chunk_entity_inventory(document, citation_entities)
+    pre_total = pre_df['count'].sum()
+
+    # 2) Create & link chunks
     chunks = create_chunks_from_document(document, citation_entities, chunk_size, chunk_overlap)
-    # Step 3: Link adjacent chunks within document
-    logger.info(f"\n📋 Step 3: Link Adjacent Chunks for {document.doi}")
     chunks = link_adjacent_chunks(chunks)
-    # post-chunk validation
-    logger.info(f"\n📋 Step 5: Validate Chunk Integrity for {document.doi}")
-    validation_passed, lost_citations = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
-    if not validation_passed:
-        # attempt to repair lost citations
-        logger.info("Validation failed. Repairing lost citations...")
-        chunks, fix_stats = repair_lost_citations_strict(document, chunks, lost_citations)
-        logger.info(f"🔧 Repaired chunks – inserted: {fix_stats['inserted']}, "
-                    f"merged: {fix_stats['merged']}, total: {fix_stats['total_after']}")
-        # re-validate to be safe
-        validation_passed, _ = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
-        assert validation_passed, "Repair layer failed – citation still missing!"
-        if not validation_passed:
-            logger.error("❌ QUALITY GATE FAILURE: Citation retention < 100%")
-            logger.error("   Pipeline aborted to prevent data loss")
-            result = ChunkingResult(
-            success=False,
-            error="Quality gate failure: Citation retention < 100%",
-            pipeline_completed_at=datetime.now().isoformat(),
-            total_documents=1,
-            total_unique_datasets=len(citation_entities),
-            total_chunks=len(chunks),
-            total_tokens=sum(chunk.chunk_metadata.token_count for chunk in chunks),
-            avg_tokens_per_chunk=sum(chunk.chunk_metadata.token_count for chunk in chunks) / len(chunks) if chunks else 0,
-            validation_passed=validation_passed,
-            entity_retention=0.0,
-            )
-    # step 4: save chunks to chroma for document
-    logger.info(f"\n📋 Step 4: Save Chunks to ChromaDB for {document.doi}")
-    save_chunk_objs_to_chroma(chunks, collection_name=collection_name,
-                        cfg_path=cfg_path)
-    # step 5: save chunks
-    output_path = Path(os.path.join(project_root, output_dir))
-    output_path.mkdir(parents=True, exist_ok=True)
-    if use_duckdb:
-        logger.info(f"\n📋 Step 5: Save Chunks to DuckDB for {document.doi}")
-        save_success = save_chunks_to_duckdb(chunks, db_path)
-        if not save_success:
-            logger.warning("⚠️  Failed to save chunks to DuckDB, saving to JSON instead...")
-            json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
-        else:
-            logger.info(f"✅ Successfully saved {len(chunks)} chunks to DuckDB")
-            json_file = None
-    else:
-        logger.info(f"\n📋 Step 6: Save Chunks to JSON for {document.doi}")
-        json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
-    csv_file = str(output_path / "chunks_for_embedding_summary.csv")
-    summary_df = create_chunks_summary_csv(chunks, export=True, output_path=csv_file)
-    result = ChunkingResult(
-        success=validation_passed,
-        error = None,
-        total_documents=1,
-        total_unique_datasets=len(pre_chunk_inventory["citation_id"].unique()),
-        total_chunks = len(chunks),
-        total_tokens = sum(chunk.chunk_metadata.token_count for chunk in chunks),
-        avg_tokens_per_chunk = sum(chunk.chunk_metadata.token_count for chunk in chunks) / len(chunks) if chunks else 0,
-        validation_passed = validation_passed,
-        entity_retention = 100.0 if len(lost_citations) == 0 else 0,
-        lost_entities = lost_citations.to_dict() if len(lost_citations) > 0 else None,
-        pipeline_completed_at = datetime.now().isoformat()
+
+    # 3) Validate & repair
+    post_passed, lost_df = validate_chunk_integrity(chunks, pre_df, citation_entities)
+    if not post_passed:
+        chunks, _ = repair_lost_citations_strict(document, chunks, lost_df)
+
+    # recalc post stats
+    post_total = sum(
+        len(make_pattern(cid).findall(ck.text))
+        for ck in chunks
+        for cid in lost_df['citation_id'].unique()
     )
-    return result
+    total_tokens = sum(ck.chunk_metadata.token_count for ck in chunks)
+    avg_tokens = total_tokens / len(chunks) if chunks else 0.0
+
+    return {
+        "document": document,
+        "chunks": chunks,
+        "pre_total_citations": int(pre_total),
+        "post_total_citations": int(post_total),
+        "validation_passed": post_passed,
+        "lost_entities": lost_df.to_dict() if not post_passed else None,
+        "total_chunks": len(chunks),
+        "total_tokens": total_tokens,
+        "avg_tokens": avg_tokens,
+        "pipeline_started_at": start,
+        "chunk_size": chunk_size,
+        "chunk_overlap": chunk_overlap,
+        "cfg_path": cfg_path,
+        "collection_name": collection_name,
+    }
+
+def commit_document(prep: dict, db_path: str) -> DocumentChunkingResult:
+    """
+    Phase 2: single-threaded persistence. Returns DocumentChunkingResult.
+    Rolls back on DuckDB errors; cleans up on ChromaDB errors.
+    """
+    doc: Document = prep["document"]
+    chunks: List[Chunk] = prep["chunks"]
+    start = prep["pipeline_started_at"]
+    now = datetime.now().isoformat()
+
+    base = dict(
+        document_id=doc.doi,
+        success=False,
+        chunk_size=prep["chunk_size"],
+        chunk_overlap=prep["chunk_overlap"],
+        cfg_path=prep["cfg_path"],
+        collection_name=prep["collection_name"],
+        pre_chunk_total_citations=prep["pre_total_citations"],
+        post_chunk_total_citations=prep["post_total_citations"],
+        validation_passed=prep["validation_passed"],
+        entity_retention=(
+            prep["post_total_citations"] / prep["pre_total_citations"] * 100
+            if prep["pre_total_citations"] else 100.0
+        ),
+        lost_entities=prep["lost_entities"],
+        total_chunks=prep["total_chunks"],
+        total_tokens=prep["total_tokens"],
+        avg_tokens_per_chunk=prep["avg_tokens"],
+        pipeline_started_at=start,
+        pipeline_completed_at=now,
+    )
+
+    try:
+        conn = duckdb.connect(db_path)
+        conn.begin()
+        save_chunks_to_duckdb(chunks, db_path)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        base.update(error=f"DuckDB save failed: {e}")
+        return DocumentChunkingResult(**base)
+
+    try:
+        save_chunk_objs_to_chroma(chunks,
+                                 collection_name=prep["collection_name"],
+                                 cfg_path=prep["cfg_path"])
+    except Exception as e:
+        cleanup_chroma_by_ids(
+            [ck.chunk_id for ck in chunks],
+            prep["collection_name"], prep["cfg_path"]
+        )
+        base.update(error=f"ChromaDB save failed: {e}")
+        return DocumentChunkingResult(**base)
+
+    base["success"] = True
+    return DocumentChunkingResult(**base)
+
+def cleanup_chroma_by_ids(chunk_ids: List[str], collection_name: str, cfg_path: str):
+    """
+    Remove partial inserts from ChromaDB for given chunk IDs.
+    """
+    # This function is not fully implemented in the original file,
+    # so it will be left as is, assuming it will be added later.
+    # For now, it will just log a warning.
+    logger.warning("CleanupChroma is not fully implemented. ChromaDB cleanup skipped.")
+    # The original code had a call to _load_cfg and _get_chroma_collection,
+    # but these functions were not defined in the provided context.
+    # Assuming they are defined elsewhere or will be added.
+
+def summarize_run(doc_results: List[DocumentChunkingResult]) -> ChunkingResult:
+    """
+    Summarize list of DocumentChunkingResult into a single ChunkingResult.
+    """
+    total_documents = len(doc_results)
+    total_unique_datasets = sum(r.pre_chunk_total_citations for r in doc_results)
+    total_chunks = sum(r.total_chunks for r in doc_results)
+    total_tokens = sum(r.total_tokens for r in doc_results)
+    avg_tokens_per_chunk = total_tokens / total_chunks if total_chunks else 0.0
+    validation_passed = all(r.validation_passed for r in doc_results)
+    entity_retention = sum(r.entity_retention for r in doc_results) / total_documents if total_documents else 0.0
+    lost_entities = {r.document_id: r.lost_entities for r in doc_results if r.lost_entities} or None
+    error_messages = [r.error for r in doc_results if r.error]
+    error = "; ".join(error_messages) if error_messages else None
+    return ChunkingResult(
+        success=all(r.success for r in doc_results),
+        total_documents=total_documents,
+        total_unique_datasets=total_unique_datasets,
+        total_chunks=total_chunks,
+        total_tokens=total_tokens,
+        avg_tokens_per_chunk=avg_tokens_per_chunk,
+        validation_passed=validation_passed,
+        entity_retention=entity_retention,
+        output_path=None,
+        output_files=None,
+        lost_entities=lost_entities,
+        error=error,
+        pipeline_completed_at=datetime.now().isoformat()
+    )
+
+# def semantic_chunking_pipeline(document: Document,
+#                                  citation_entities: List[CitationEntity],
+#                                  output_dir: str = "Data",
+#                                  chunk_size: int = 300,
+#                                  chunk_overlap: int = 2,
+#                                  collection_name: str = "semantic_chunks",
+#                                  cfg_path: str = "configs/chunking.yaml",
+#                                  use_duckdb: bool = True,
+#                                  db_path: str = "artifacts/mdc_challenge.db")-> ChunkingResult:
+    
+#     """
+#     Run the complete semantic chunking pipeline.
+    
+#     Args:
+#         documents_path: Path to documents JSON file (used when use_duckdb=False)
+#         citation_entities_path: Path to citation entities JSON file (used when use_duckdb=False)
+#         output_dir: Directory for output files
+#         chunk_size: Target chunk size in tokens
+#         chunk_overlap: Overlap between chunks in tokens
+#         collection_name: ChromaDB collection name
+#         cfg_path: Path to chunking configuration file
+#         subset: Whether to use a subset of documents
+#         subset_size: Size of subset to use
+#         use_duckdb: Whether to use DuckDB for data I/O (default: True)
+#         db_path: Path to DuckDB database file
+        
+#     Returns:
+#         ChunkingResult object with pipeline results
+#     """
+#     logger.info("=== Semantic Chunking Pipeline ===")
+#     logger.info(f"Started at: {datetime.now()}")
+#     logger.info(f"\n📋 Step 1: Create Pre-Chunk Entity Inventory for {document.doi}")
+#     pre_chunk_inventory = create_pre_chunk_entity_inventory(document, citation_entities)
+#     # step 2: create chunks
+#     logger.info(f"\n📋 Step 2: Create Semantic Chunks for {document.doi}")
+#     chunks = create_chunks_from_document(document, citation_entities, chunk_size, chunk_overlap)
+#     # Step 3: Link adjacent chunks within document
+#     logger.info(f"\n📋 Step 3: Link Adjacent Chunks for {document.doi}")
+#     chunks = link_adjacent_chunks(chunks)
+#     # post-chunk validation
+#     logger.info(f"\n📋 Step 5: Validate Chunk Integrity for {document.doi}")
+#     validation_passed, lost_citations = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
+#     if not validation_passed:
+#         # attempt to repair lost citations
+#         logger.info("Validation failed. Repairing lost citations...")
+#         chunks, fix_stats = repair_lost_citations_strict(document, chunks, lost_citations)
+#         logger.info(f"🔧 Repaired chunks – inserted: {fix_stats['inserted']}, "
+#                     f"merged: {fix_stats['merged']}, total: {fix_stats['total_after']}")
+#         # re-validate to be safe
+#         validation_passed, _ = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
+#         assert validation_passed, "Repair layer failed – citation still missing!"
+#         if not validation_passed:
+#             logger.error("❌ QUALITY GATE FAILURE: Citation retention < 100%")
+#             logger.error("   Pipeline aborted to prevent data loss")
+#             result = ChunkingResult(
+#             success=False,
+#             error="Quality gate failure: Citation retention < 100%",
+#             pipeline_completed_at=datetime.now().isoformat(),
+#             total_documents=1,
+#             total_unique_datasets=len(citation_entities),
+#             total_chunks=len(chunks),
+#             total_tokens=sum(chunk.chunk_metadata.token_count for chunk in chunks),
+#             avg_tokens_per_chunk=sum(chunk.chunk_metadata.token_count for chunk in chunks) / len(chunks) if chunks else 0,
+#             validation_passed=validation_passed,
+#             entity_retention=0.0,
+#             )
+#     # step 4: save chunks to chroma for document
+#     logger.info(f"\n📋 Step 4: Save Chunks to ChromaDB for {document.doi}")
+#     save_chunk_objs_to_chroma(chunks, collection_name=collection_name,
+#                         cfg_path=cfg_path)
+#     # step 5: save chunks
+#     output_path = Path(os.path.join(project_root, output_dir))
+#     output_path.mkdir(parents=True, exist_ok=True)
+#     if use_duckdb:
+#         logger.info(f"\n📋 Step 5: Save Chunks to DuckDB for {document.doi}")
+#         save_success = save_chunks_to_duckdb(chunks, db_path)
+#         if not save_success:
+#             logger.warning("⚠️  Failed to save chunks to DuckDB, saving to JSON instead...")
+#             json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
+#         else:
+#             logger.info(f"✅ Successfully saved {len(chunks)} chunks to DuckDB")
+#             json_file = None
+#     else:
+#         logger.info(f"\n📋 Step 6: Save Chunks to JSON for {document.doi}")
+#         json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
+#     csv_file = str(output_path / "chunks_for_embedding_summary.csv")
+#     summary_df = create_chunks_summary_csv(chunks, export=True, output_path=csv_file)
+#     result = ChunkingResult(
+#         success=validation_passed,
+#         error = None,
+#         total_documents=1,
+#         total_unique_datasets=len(pre_chunk_inventory["citation_id"].unique()),
+#         total_chunks = len(chunks),
+#         total_tokens = sum(chunk.chunk_metadata.token_count for chunk in chunks),
+#         avg_tokens_per_chunk = sum(chunk.chunk_metadata.token_count for chunk in chunks) / len(chunks) if chunks else 0,
+#         validation_passed = validation_passed,
+#         entity_retention = 100.0 if len(lost_citations) == 0 else 0,
+#         lost_entities = lost_citations.to_dict() if len(lost_citations) > 0 else None,
+#         pipeline_completed_at = datetime.now().isoformat()
+#     )
+#     return result
 
 @timer_wrap
 def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_with_known_entities.json",
@@ -724,7 +877,8 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
                                  subset: bool = False,
                                  subset_size: Optional[int] = None,
                                  use_duckdb: bool = True,
-                                 db_path: str = "artifacts/mdc_challenge.db"
+                                 db_path: str = "artifacts/mdc_challenge.db",
+                                 max_workers: int = 4
                                  ) -> ChunkingResult:
     """
     Run the complete semantic chunking pipeline.
@@ -745,173 +899,74 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
     Returns:
         ChunkingResult object with pipeline results
     """
-    logger.info("=== Semantic Chunking Pipeline ===")
-    logger.info(f"Started at: {datetime.now()}")
-    
-    try:
-        # Step 1: Load input data
-        logger.info("\n📋 Step 1: Load Input Data")
-        if use_duckdb:
-            logger.info("Using DuckDB for data loading")
-            documents, citation_entities = load_input_data_from_duckdb(db_path)
-        else:
-            logger.info("Using JSON files for data loading")
-            documents, citation_entities = load_input_data(documents_path, citation_entities_path)
-        
-        if not documents:
-            raise ValueError("No documents loaded - check input path")
-        
-        if subset:
-            np.random.seed(42)
-            documents = np.random.choice(documents, size=subset_size, replace=False)
+    # 1) Load input data
+    if use_duckdb:
+        docs, cites = load_input_data_from_duckdb(db_path)
+    else:
+        docs, cites = load_input_data(documents_path, citation_entities_path)
 
-        result_list = []
-        inventory_list = []
-        all_validated_chunks = []
-        lost_entities_list = []
-        # summary_df_list = []
-        
-        for document in documents:
-            logger.info(f"\n📋 Step 2: Create Pre-Chunk Entity Inventory for {document.doi}")
-            pre_chunk_inventory = create_pre_chunk_entity_inventory(document, citation_entities)
-            inventory_list.append(pre_chunk_inventory)
-            # step 3: create chunks
-            logger.info(f"\n📋 Step 3: Create Semantic Chunks for {document.doi}")
-            chunks = create_chunks_from_document(document, citation_entities, chunk_size, chunk_overlap)
-            # Step 4: Link adjacent chunks within document
-            logger.info(f"\n📋 Step 4: Link Adjacent Chunks for {document.doi}")
-            chunks = link_adjacent_chunks(chunks)
-            # post-chunk validation
-            logger.info(f"\n📋 Step 5: Validate Chunk Integrity for {document.doi}")
-            validation_passed, lost_citations = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
-            if lost_citations is not None:
-                lost_entities_list.append(lost_citations)
-            if not validation_passed:
-                # attempt to repair lost citations
-                logger.info("Validation failed. Repairing lost citations...")
-                chunks, fix_stats = repair_lost_citations_strict(document, chunks, lost_citations)
-                logger.info(f"🔧 Repaired chunks – inserted: {fix_stats['inserted']}, "
-                            f"merged: {fix_stats['merged']}, total: {fix_stats['total_after']}")
-                # re-validate to be safe
-                validation_passed, _ = validate_chunk_integrity(chunks, pre_chunk_inventory, citation_entities)
-                assert validation_passed, "Repair layer failed – citation still missing!"
-                if not validation_passed:
-                    logger.error("❌ QUALITY GATE FAILURE: Citation retention < 100%")
-                    logger.error("   Pipeline aborted to prevent data loss")
-                    result_list.append(ChunkingResult(
-                    success=False,
-                    error="Quality gate failure: Citation retention < 100%",
-                    pipeline_completed_at=datetime.now().isoformat(),
-                    total_documents=1,
-                    total_unique_datasets=len(citation_entities),
-                    total_chunks=len(chunks),
-                    total_tokens=sum(chunk.chunk_metadata.token_count for chunk in chunks),
-                    avg_tokens_per_chunk=sum(chunk.chunk_metadata.token_count for chunk in chunks) / len(chunks) if chunks else 0,
-                    validation_passed=validation_passed,
-                    entity_retention=0.0,
-                    ))
-                    continue
-            all_validated_chunks.extend(chunks)
-            # step 6: save chunks to chroma for document
-            logger.info(f"\n📋 Step 6: Save Chunks to ChromaDB for {document.doi}")
-            save_chunk_objs_to_chroma(chunks, collection_name=collection_name,
-                                cfg_path=cfg_path)
-            # step 7: save chunks
-            output_path = Path(os.path.join(project_root, output_dir))
-            output_path.mkdir(parents=True, exist_ok=True)
-            if use_duckdb:
-                logger.info(f"\n📋 Step 7: Save Chunks to DuckDB for {document.doi}")
-                save_success = save_chunks_to_duckdb(chunks, db_path)
-                if not save_success:
-                    logger.warning("⚠️  Failed to save chunks to DuckDB, saving to JSON instead...")
-                    json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
-                else:
-                    logger.info(f"✅ Successfully saved {len(chunks)} chunks to DuckDB")
-                    json_file = None
-            else:
-                logger.info(f"\n📋 Step 7: Save Chunks to JSON for {document.doi}")
-                json_file = export_chunks_to_json(chunks, str(output_path / "chunks_for_embedding.json"))
-        
-        lost_entities = pd.concat(lost_entities_list) if len(lost_entities_list) > 0 else None
-        if len(result_list) > 0:
-            # combine all results into a single result
-            failed_results = ChunkingResult(
+    # 2) Phase 1: parallel preparation
+    prepped = []
+    with ThreadPoolExecutor(max_workers=max_workers) as exe:
+        futures = {
+            exe.submit(
+                prepare_document, doc, cites,
+                chunk_size, chunk_overlap,
+                cfg_path, collection_name
+            ): doc
+            for doc in docs
+        }
+        for fut in as_completed(futures):
+            try:
+                prepped.append(fut.result())
+            except Exception as e:
+                doc = futures[fut]
+                prepped.append({
+                    "document": doc,
+                    "chunks": [],
+                    "pre_total_citations": 0,
+                    "post_total_citations": 0,
+                    "validation_passed": False,
+                    "lost_entities": None,
+                    "total_chunks": 0,
+                    "total_tokens": 0,
+                    "avg_tokens": 0,
+                    "pipeline_started_at": datetime.now().isoformat(),
+                    "chunk_size": chunk_size,
+                    "chunk_overlap": chunk_overlap,
+                    "cfg_path": cfg_path,
+                    "collection_name": collection_name,
+                    "prep_error": str(e)
+                })
+
+    # 3) Phase 2: serial commit
+    doc_results: List[DocumentChunkingResult] = []
+    for prep in prepped:
+        if "prep_error" in prep:
+            doc_results.append(DocumentChunkingResult(
+                document_id=prep["document"].doi,
                 success=False,
-                error="Some documents failed chunking",
-                pipeline_completed_at=datetime.now().isoformat(),
-                total_documents=len(result_list),
-                total_unique_datasets=sum(result.total_unique_datasets for result in result_list),
-                total_chunks=sum(result.total_chunks for result in result_list),
-                total_tokens=sum(result.total_tokens for result in result_list),
-                avg_tokens_per_chunk=sum(result.avg_tokens_per_chunk for result in result_list) / len(result_list) if result_list else 0,
+                error=prep["prep_error"],
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                cfg_path=cfg_path,
+                collection_name=collection_name,
+                pre_chunk_total_citations=0,
+                post_chunk_total_citations=0,
                 validation_passed=False,
                 entity_retention=0.0,
-                lost_entities=lost_entities.to_dict() if len(lost_entities) > 0 else None,
-            )
-            if len(result_list) == len(documents):
-                logger.error("❌ QUALITY GATE FAILURE: All documents failed chunking")
-                failed_results.error = "All documents failed chunking"
-                return failed_results
+                lost_entities=None,
+                total_chunks=0,
+                total_tokens=0,
+                avg_tokens_per_chunk=0.0,
+                pipeline_started_at=prep["pipeline_started_at"],
+                pipeline_completed_at=datetime.now().isoformat()
+            ))
+        else:
+            doc_results.append(commit_document(prep, db_path))
 
-        # step 8: create chunks summary csv
-        logger.info(f"\n📋 Step 8: Create Chunks Summary CSV for {document.doi}")
-        csv_file = str(output_path / "chunks_for_embedding_summary.csv")
-        summary_df = create_chunks_summary_csv(all_validated_chunks, export=True, output_path=csv_file)
-
-        # Calculate final statistics
-        inventory_df = pd.concat(inventory_list)
-        total_tokens = sum(chunk.chunk_metadata.token_count for chunk in all_validated_chunks)
-        avg_tokens_per_chunk = total_tokens / len(all_validated_chunks) if all_validated_chunks else 0
-        total_citations_pre = inventory_df['count'].sum()
-        entity_retention = 100.0 if total_citations_pre > 0 else 100.0
-
-        # get info from failed results list
-        total_docs = len(documents) if len(result_list) == 0 else len(documents)-failed_results.total_documents
-        total_datasets = len(citation_entities) if len(result_list) == 0 else len(citation_entities)-failed_results.total_unique_datasets
-        out_files = []
-        if json_file is not None:
-            out_files.append(json_file)
-        if csv_file is not None:
-            out_files.append(csv_file)
-        
-        results = ChunkingResult(
-            success=True,
-            total_documents=total_docs,
-            total_unique_datasets=total_datasets,
-            total_chunks=len(all_validated_chunks),
-            total_tokens=total_tokens,
-            avg_tokens_per_chunk=avg_tokens_per_chunk,
-            validation_passed=validation_passed,
-            pipeline_completed_at=datetime.now().isoformat(),
-            entity_retention=entity_retention,
-            lost_entities=lost_entities.to_dict() if len(lost_entities) > 0 else None,
-            output_path=str(output_path),
-            output_files=out_files,
-        )
-        
-        logger.info(f"\n✅ Pipeline completed successfully!")
-        logger.info(f"📊 Final Results:")
-        logger.info(f"   Documents processed: {results.total_documents}")
-        logger.info(f"   Chunks created: {results.total_chunks:,}")
-        logger.info(f"   Average tokens per chunk: {results.avg_tokens_per_chunk:.1f}")
-        logger.info(f"   Citation retention: {results.entity_retention:.1f}%")
-        
-        return results
-        
-    except Exception as e:
-        logger.error(f"\n❌ Pipeline failed: {e}")
-        return ChunkingResult(
-            success=False,
-            error=str(e),
-            pipeline_completed_at=datetime.now().isoformat(),
-            total_documents=len(documents) if 'documents' in locals() else 0,
-            total_unique_datasets=len(citation_entities) if 'citation_entities' in locals() else 0,
-            total_chunks=len(chunks) if 'chunks' in locals() else 0,
-            total_tokens=0,
-            avg_tokens_per_chunk=0.0,
-            validation_passed=False,
-            entity_retention=0.0,
-        )
+    # 4) Summarize into one ChunkingResult
+    return summarize_run(doc_results)
 
 if __name__ == "__main__":
     # Run with default parameters

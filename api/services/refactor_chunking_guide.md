@@ -348,20 +348,20 @@ If you drive via `src/run_semantic_chunking.py`, import the new runner directly 
 ## ✅ Final Checklist
 
 1. **src/models.py**  
-   – Add `DocumentChunkingResult`.  
+   – ✅ Add `DocumentChunkingResult`.  
    – Add `max_workers` to `ChunkingPipelinePayload`.  
 
 2. **api/services/chunking_and_embedding_services.py**  
-   – Implement `prepare_document` (phase 1).  
-   – Implement `commit_document` (phase 2).  
+   – ✅ Implement `prepare_document` (phase 1).  
+   – ✅ Implement `commit_document` (phase 2).  
    – Add `cleanup_chroma_by_ids`.  
    – Refactor `run_semantic_chunking_pipeline` into two phases + `summarize_run`.  
 
 3. **api/chunk_and_embed_api.py**  
-   – Accept and pass through `max_workers` in `/run_semantic_chunking`.  
+   – ✅ Accept and pass through `max_workers` in `/run_semantic_chunking`.  
 
 4. **src/run_semantic_chunking.py**  
-   – Add `max_workers` param and include it in `_construct_payload()`.  
+   – ✅ Add `max_workers` param and include it in `_construct_payload()`.  
 
 5. **Write tests**  
    – Unit-test `prepare_document` happy & error paths.  

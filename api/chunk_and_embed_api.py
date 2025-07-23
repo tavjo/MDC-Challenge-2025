@@ -162,9 +162,10 @@ async def run_pipeline(
             "subset": payload.subset,
             "subset_size": payload.subset_size,
             "db_path": payload.db_path or DEFAULT_DUCKDB_PATH,
-            # "local_model": payload.local_model
-            }
-        
+        }
+        # Pass through max_workers
+        pipeline_params["max_workers"] = payload.max_workers or 8
+
         # Run the pipeline
         result = run_semantic_chunking_pipeline(**pipeline_params)
         
