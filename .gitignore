@@ -1,7 +1,7 @@
 # Project-specific directories
 Data/
 logs/
-guides/
+# guides/
 
 # Python
 __pycache__/
@@ -146,7 +146,7 @@ Thumbs.db
 *.tgz
 *.rar
 *.7z
-tests/
+# tests/
 # artifacts/
 local_chroma/
 
