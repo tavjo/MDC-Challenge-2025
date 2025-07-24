@@ -118,17 +118,11 @@ def load_input_data_from_duckdb(db_path: str = "artifacts/mdc_challenge.db") -> 
 # ---------------------------------------------------------------------------
 
 def make_pattern(dataset_id: str) -> re.Pattern:
-    """Create exact pattern for dataset citation (from get_citation_entities.py)"""
-    # 1. escape *everything* first
-    pat = re.escape(dataset_id)
-    
-    # 2. then widen the single underscore
-    pat = pat.replace('_', r'[_/]')     # now [_/] stays "live"
-    
-    # 3. add word-boundaries only for simple accessions
-    if re.fullmatch(r'[A-Z]{1,4}\d+', dataset_id, re.I):
-        pat = rf'\b{pat}\b'
-    
+    """Create normalized pattern for dataset citation."""
+    # Normalize dataset ID: remove punctuation and lowercase
+    normalized = re.sub(r'[^\w\s]', '', dataset_id).lower()
+    # Escape normalized ID and add word boundaries
+    pat = rf'\b{re.escape(normalized)}\b'
     return re.compile(pat, flags=re.IGNORECASE)
 
 @timer_wrap
@@ -170,8 +164,8 @@ def create_pre_chunk_entity_inventory(document: Document, citation_entities: Lis
             pattern_cache[citation.data_citation] = make_pattern(citation.data_citation)
         
         pattern = pattern_cache[citation.data_citation]
-        # matches = pattern.findall(preprocess_text(text))
-        matches = pattern.findall(text)
+        # preprocess text before matching
+        matches = pattern.findall(preprocess_text(text))
         
         rows.append({
             'document_id': document.doi,
@@ -260,7 +254,8 @@ def create_chunks_from_document(document: Document, citation_entities: List[Cita
         chunk_citations = []
         for citation in doc_citations:
             pattern = make_pattern(citation.data_citation)
-            if pattern.search(chunk_text):  # Check if citation appears in chunk
+            # match against preprocessed chunk text
+            if pattern.search(preprocess_text(chunk_text)):
                 chunk_citations.append(citation)
         
         # Use tiktoken for accurate token counting
@@ -376,7 +371,8 @@ def validate_chunk_integrity(chunks: List[Chunk], pre_chunk_inventory: pd.DataFr
         
         for citation in doc_citations:
             pattern = make_pattern(citation.data_citation)
-            matches = pattern.findall(text)
+            # match against preprocessed chunk text
+            matches = pattern.findall(preprocess_text(text))
             
             post_chunk_rows.append({
                 'document_id': doc_id,
@@ -455,6 +451,8 @@ def repair_lost_citations_strict(
         document.full_text if isinstance(document.full_text, str)
         else " ".join(document.full_text)
     )
+    # preprocess full text for matching
+    normalized_full_text = preprocess_text(full_text)
     pattern_cache = {
         cid: make_pattern(cid) for cid in lost_citations["citation_id"].unique()
     }
@@ -471,11 +469,12 @@ def repair_lost_citations_strict(
             snippet = full_text[left:right]
         return snippet
 
-    # ----- 1)  current per-ID counts ---------------------------------------
+    # ----- 1)  current per-ID counts with normalized chunk text -----------
     current_counts = defaultdict(int)
     for ck in chunks:
+        norm_chunk = preprocess_text(ck.text)
         for cid, pat in pattern_cache.items():
-            current_counts[cid] += len(pat.findall(ck.text))
+            current_counts[cid] += len(pat.findall(norm_chunk))
 
     # ----- 2)  process each missing ID -------------------------------------
     new_chunks, inserted, merged = [], 0, 0
@@ -486,7 +485,7 @@ def repair_lost_citations_strict(
         if need <= 0:
             continue
         pat = pattern_cache[cid]
-        matches = list(pat.finditer(full_text))
+        matches = list(pat.finditer(normalized_full_text))
         if len(matches) < need:
             logger.warning(f"⚠️  Only {len(matches)} occurrences of {cid} "
                            f"found in raw text, needed {need}.")
@@ -639,11 +638,12 @@ def prepare_document(
     if not post_passed:
         chunks, _ = repair_lost_citations_strict(document, chunks, lost_df)
 
-    # recalc post stats
+    # recalc post stats across all citations
+    citation_ids = pre_df['citation_id'].unique()
     post_total = sum(
-        len(make_pattern(cid).findall(ck.text))
+        len(make_pattern(cid).findall(preprocess_text(ck.text)))
         for ck in chunks
-        for cid in lost_df['citation_id'].unique()
+        for cid in citation_ids
     )
     total_tokens = sum(ck.chunk_metadata.token_count for ck in chunks)
     avg_tokens = total_tokens / len(chunks) if chunks else 0.0
@@ -696,6 +696,10 @@ def commit_document(prep: dict, db_path: str) -> DocumentChunkingResult:
         pipeline_started_at=start,
         pipeline_completed_at=now,
     )
+    # Do not commit any chunks if entity retention validation failed
+    if not prep["validation_passed"]:
+        base.update(error="Validation failed: entity retention less than 100%")
+        return DocumentChunkingResult.model_validate(base)
 
     try:
         conn = duckdb.connect(db_path)
@@ -705,7 +709,7 @@ def commit_document(prep: dict, db_path: str) -> DocumentChunkingResult:
     except Exception as e:
         conn.rollback()
         base.update(error=f"DuckDB save failed: {e}")
-        return DocumentChunkingResult(**base)
+        return DocumentChunkingResult.model_validate(base)
 
     try:
         save_chunk_objs_to_chroma(chunks,
@@ -717,10 +721,10 @@ def commit_document(prep: dict, db_path: str) -> DocumentChunkingResult:
             prep["collection_name"], prep["cfg_path"]
         )
         base.update(error=f"ChromaDB save failed: {e}")
-        return DocumentChunkingResult(**base)
+        return DocumentChunkingResult.model_validate(base)
 
     base["success"] = True
-    return DocumentChunkingResult(**base)
+    return DocumentChunkingResult.model_validate(base)
 
 def cleanup_chroma_by_ids(chunk_ids: List[str], collection_name: str, cfg_path: str):
     """
@@ -748,8 +752,10 @@ def summarize_run(doc_results: List[DocumentChunkingResult]) -> ChunkingResult:
     lost_entities = {r.document_id: r.lost_entities for r in doc_results if r.lost_entities} or None
     error_messages = [r.error for r in doc_results if r.error]
     error = "; ".join(error_messages) if error_messages else None
+    # Only successful overall if entity retention is 100% and all commits succeeded
+    overall_success = validation_passed and all(r.success for r in doc_results)
     return ChunkingResult(
-        success=all(r.success for r in doc_results),
+        success=overall_success,
         total_documents=total_documents,
         total_unique_datasets=total_unique_datasets,
         total_chunks=total_chunks,
@@ -803,6 +809,24 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
         docs, cites = load_input_data_from_duckdb(db_path)
     else:
         docs, cites = load_input_data(documents_path, citation_entities_path)
+    
+    if subset:
+        if subset_size is None:
+            subset_size = 20
+            logger.warning(f"No subset size provided using default size of {subset_size}.")
+        np.random.seed(42)
+        # choose randomly from docs with citations
+        cite_ids = {c.document_id for c in cites}
+        docs_with_citations = [doc for doc in docs if doc.doi in cite_ids]
+        logger.info(f"Found {len(docs_with_citations)} documents with citations.")
+        logger.info(f"Choosing {subset_size} documents randomly from {len(docs_with_citations)} documents with citations.")
+        docs = np.random.choice(docs_with_citations, size=subset_size, replace=False)
+        if subset_size > len(docs_with_citations):
+            logger.warning(f"Requested {subset_size} docs but only {len(docs_with_citations)} documents with citations available; sampling all.")
+            subset_size = len(docs_with_citations)
+        # filter cites to only include those with document_id in docs
+        doc_ids = {doc.doi for doc in docs}
+        cites = [cite for cite in cites if cite.document_id in doc_ids]
 
     # 2) Phase 1: parallel preparation
     prepped = []
@@ -870,14 +894,18 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
 if __name__ == "__main__":
     # Run with default parameters
     results = run_semantic_chunking_pipeline(subset=False, use_duckdb=True, db_path=str(project_root / "artifacts" / "mdc_challenge.db"), cfg_path=str(project_root / "configs" / "chunking.yaml"))
-    
+    # Prepare output directory under project root
+    base_dir = os.getcwd()
+    output_dir = os.path.join(base_dir, "reports", "chunk_embed")
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "chunking_results.json")
     if results.success:
         logger.info("✅ Semantic chunking completed successfully!")
-        # save results to a json file
-        with open("chunking_results.json", "w") as f:
+        # save results to a json file in reports/chunk_embed
+        with open(output_file, "w") as f:
             json.dump(results.model_dump(), f)
     else:
         logger.error(f"❌ Pipeline failed: {results.error}")
-        # save results to a json file
-        with open("chunking_results.json", "w") as f:
+        # save results to a json file in reports/chunk_embed
+        with open(output_file, "w") as f:
             json.dump(results.model_dump(), f) 

@@ -7,8 +7,12 @@ from pydantic import BaseModel
 from typing_extensions import get_type_hints
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-# import nltk
-
+import nltk
+# Ensure the NLTK stopwords corpus is available
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords', quiet=True)
 
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))

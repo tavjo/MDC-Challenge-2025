@@ -17,6 +17,7 @@ services:
       - ./tests:/app/tests
       - ./configs:/app/configs
       - ./api:/app/api
+      - ./logs:/app/logs
     working_dir: /app
     ports:
       - "3000:3000"
@@ -60,6 +61,7 @@ services:
       - ./configs:/app/configs
       - ./src:/app/src
       - ./api:/app/api
+      - ./logs:/app/logs
     working_dir: /app
     ports:
       - "8000:8000"

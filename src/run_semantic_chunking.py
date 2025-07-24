@@ -94,25 +94,32 @@ class SemanticChunkingPipeline:
 def main():
     # initialize the pipeline
     semantic_chunker = SemanticChunkingPipeline(
-        subset = False,
+        subset = True,
+        subset_size = 20,
         cfg_path = DEFAULT_CHROMA_CONFIG,
         db_path = DEFAULT_DUCKDB_PATH,
-        collection_name = "mdc_training_data"
+        collection_name = "mdc_training_data",
+        max_workers = 4
     )
 
     # Run with default parameters
     results = semantic_chunker.run_pipeline()
-    
+    # Prepare output directory under project root
+    base_dir = os.getcwd()
+    output_dir = os.path.join(base_dir, "reports", "chunk_embed")
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "chunking_results.json")
+
     if results.success:
         logger.info("✅ Semantic chunking completed successfully!")
-        # save results to a json file
-        with open("chunking_results.json", "w") as f:
+        # save results to a json file in reports/chunk_embed
+        with open(output_file, "w") as f:
             json.dump(results.model_dump(), f)
     else:
         logger.error(f"❌ Pipeline failed: {results.error}")
-        # save results to a json file
-        with open("chunking_results.json", "w") as f:
-            json.dump(results.model_dump(), f) 
+        # save results to a json file in reports/chunk_embed
+        with open(output_file, "w") as f:
+            json.dump(results.model_dump(), f)  
 
 if __name__ == "__main__":
     main()
