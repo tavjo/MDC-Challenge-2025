@@ -65,6 +65,23 @@ services:
       - "8000:8000"
     command: ["uvicorn", "api.chunk_and_embed_api:app", "--host", "0.0.0.0", "--port", "8000"]
 
+  mdc-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: mdc-test
+    profiles:
+      - test
+    environment:
+      - PYTHONPATH=/app
+      - UV_CACHE_DIR=/tmp/uv-cache
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./:/app
+      - uv-cache:/tmp/uv-cache
+    working_dir: /app
+    command: ["pytest", "tests/test_chunking_and_embedding_services.py", "-q", "--disable-warnings", "--maxfail=1"]
 
 volumes:
   uv-cache:

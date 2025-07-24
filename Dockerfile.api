@@ -25,6 +25,7 @@ ENV PATH="/app/.venv/bin:${PATH}"
 COPY src/ /app/src/
 COPY api/ /app/api/
 COPY configs/ /app/configs/
+COPY tests/ /app/tests/
 
 # Create necessary directories
 RUN mkdir -p artifacts logs
