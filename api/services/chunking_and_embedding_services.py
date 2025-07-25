@@ -191,7 +191,7 @@ def create_pre_chunk_entity_inventory(document: Document, citation_entities: Lis
 
 @timer_wrap
 def create_chunks_from_document(document: Document, citation_entities: List[CitationEntity], 
-                                chunk_size: int = 300, chunk_overlap: int = 2) -> List[Chunk]:
+                                chunk_size: int = 300, chunk_overlap: int = 5) -> List[Chunk]:
     """
     Create chunks using semantic_chunking.py functions with citation assignment.
     
@@ -238,7 +238,7 @@ def create_chunks_from_document(document: Document, citation_entities: List[Cita
             processed_chunks.append(chunk_text)
         else:
             logger.warning(f"Chunk too large ({len(token_ids)} tokens); splitting into smaller chunks using sliding window method.")
-            processed_chunk = sliding_window_chunks(chunk_text, chunk_size, chunk_overlap)
+            processed_chunk = sliding_window_chunks(chunk_text, chunk_size)
             processed_chunks.extend(processed_chunk)
     # Preprocess text on all final chunks
     text_chunks = [pc for pc in processed_chunks]
@@ -674,6 +674,7 @@ def commit_document(prep: dict, db_path: str) -> DocumentChunkingResult:
     chunks: List[Chunk] = prep["chunks"]
     start = prep["pipeline_started_at"]
     now = datetime.now().isoformat()
+    summary_df = create_chunks_summary_csv(chunks, export=False)
 
     base = dict(
         document_id=doc.doi,
@@ -724,7 +725,7 @@ def commit_document(prep: dict, db_path: str) -> DocumentChunkingResult:
         return DocumentChunkingResult.model_validate(base)
 
     base["success"] = True
-    return DocumentChunkingResult.model_validate(base)
+    return DocumentChunkingResult.model_validate(base), summary_df
 
 def cleanup_chroma_by_ids(chunk_ids: List[str], collection_name: str, cfg_path: str):
     """
@@ -830,6 +831,7 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
 
     # 2) Phase 1: parallel preparation
     prepped = []
+    summary_dfs = []
     with ThreadPoolExecutor(max_workers=max_workers) as exe:
         futures = {
             exe.submit(
@@ -886,7 +888,12 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
                 pipeline_completed_at=datetime.now().isoformat()
             ))
         else:
-            doc_results.append(commit_document(prep, db_path))
+            doc_to_commit, summary_df = commit_document(prep, db_path)
+            doc_results.append(doc_to_commit)
+            summary_dfs.append(summary_df)
+        
+        summary = pd.concat(summary_dfs)
+        summary.to_csv(Path(os.path.join(project_root, output_dir, "chunks_for_embedding_summary.csv")), index=False)
 
     # 4) Summarize into one ChunkingResult
     return summarize_run(doc_results)

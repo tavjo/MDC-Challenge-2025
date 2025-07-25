@@ -319,7 +319,7 @@ def clean_text_for_urls(text: str) -> str:
     return text
 
 def normalise(page:str) -> str:
-    page = page.replace('-\n', '')   # undo soft-hyphen splits :contentReference[oaicite:6]{index=6}
+    page = page.replace('-\n', '')   # undo soft-hyphen splits
     page = page.replace('\n', ' ')
     return clean_text_for_urls(page)
 
@@ -377,7 +377,7 @@ def adjust_window_size(sentences: List[str], window_size: int, buffer: int) -> i
     return new_window_size
 
 @timer_wrap
-def sliding_window_chunks(text: str, window_size: int = 300, overlap: int = 10) -> List[str]:
+def sliding_window_chunks(text: str, window_size: int = 300, overlap: int = 20) -> List[str]:
     """
     Split the input text into sliding window chunks based on word count.
     """
