@@ -26,15 +26,21 @@ import sys
 import uuid
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Any, Sequence
 from datetime import datetime
 
 import yaml
 import chromadb
 from llama_index.embeddings.openai import OpenAIEmbedding
 from src.helpers import get_embedding, CustomOpenAIEmbedding
-from llama_index.core.node_parser import SemanticSplitterNodeParser
+from llama_index.core.node_parser import (
+    SentenceSplitter,
+    SemanticSplitterNodeParser,
+)
 from llama_index.core.schema import Document
+from llama_index.core.schema import BaseNode, Document , ObjectType , TextNode
+from llama_index.core.constants import DEFAULT_CHUNK_SIZE
+from llama_index.core.node_parser.text.sentence import SENTENCE_CHUNK_OVERLAP
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -49,7 +55,7 @@ except ImportError:
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
-from src.helpers import initialize_logging, sliding_window_chunks  # noqa: E402
+from src.helpers import initialize_logging#, sliding_window_chunks 
 from src.models import Chunk, ChunkMetadata, CitationEntity
 
 filename = os.path.basename(__file__)
@@ -223,6 +229,30 @@ class OfflineEmbedder:
         except Exception as e:
             logger.error("❌ Failed to download model %s: %s", model_name, str(e))
             return False
+
+class SafeSemanticSplitter(SemanticSplitterNodeParser):
+
+    safety_chunker : SentenceSplitter = SentenceSplitter(chunk_size=DEFAULT_CHUNK_SIZE*4,chunk_overlap=SENTENCE_CHUNK_OVERLAP)
+
+    def _parse_nodes(
+        self,
+        nodes: Sequence[BaseNode],
+        show_progress: bool = False,
+        **kwargs: Any,
+    ) -> List[BaseNode]:
+        all_nodes : List[BaseNode] = super()._parse_nodes(nodes=nodes,show_progress=show_progress,**kwargs)
+        all_good = True
+        for node in all_nodes:
+            if node.get_type()==ObjectType.TEXT:
+                node:TextNode=node
+                if self.safety_chunker._token_size(node.text)>self.safety_chunker.chunk_size:
+                    logging.info("Chunk size too big after semantic chunking: switching to static chunking")
+                    all_good = False
+                    break
+        if not all_good:
+            all_nodes = self.safety_chunker._parse_nodes(nodes,show_progress=show_progress,**kwargs)
+        return all_nodes
+        
 
 # ---------------------------------------------------------------------------
 # Builders
@@ -566,6 +596,7 @@ def save_chunks_to_chroma(
 # CLI helper (quick test)
 # ---------------------------------------------------------------------------
 
+@timer_wrap
 def download_offline_model(model_name: str = "bge-small-en-v1.5"):
     """Download and cache an offline model for use."""
     success = OfflineEmbedder.download_model(model_name)
@@ -574,6 +605,20 @@ def download_offline_model(model_name: str = "bge-small-en-v1.5"):
     else:
         logger.error("❌ Failed to download offline model %s", model_name)
     return success
+
+@timer_wrap
+def cleanup_chroma_by_ids(chunk_ids: List[str], collection_name: str, cfg_path: str):
+    """
+    Remove partial inserts from ChromaDB for given chunk IDs.
+    """
+    # TODO: implement this
+    # This function is not fully implemented in the original file,
+    # so it will be left as is, assuming it will be added later.
+    # For now, it will just log a warning.
+    logger.warning("CleanupChroma is not fully implemented. ChromaDB cleanup skipped.")
+    # The original code had a call to _load_cfg and _get_chroma_collection,
+    # but these functions were not defined in the provided context.
+    # Assuming they are defined elsewhere or will be added.
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -14,6 +14,7 @@ COPY pyproject.toml uv.lock ./
 
 RUN python -m venv --system-site-packages .venv \
     && . .venv/bin/activate \
+    && uv pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
     && uv pip install chromadb sentence-transformers \
     llama-index llama-index-core llama-index-embeddings-openai \
     && uv sync --locked --inexact

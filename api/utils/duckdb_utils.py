@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Iterable, Union, Tuple
 
 import duckdb
+import pandas as pd  # for bulk DataFrame-based upserts
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -324,9 +325,36 @@ class DuckDBHelper:
             
             logger.info(f"Stored {len(chunks)} chunks successfully")
             return True
-            
         except Exception as e:
-            logger.error(f"Failed to store chunks: {str(e)}")
+            logger.error(f"Failed to store chunks: {e}")
+            return False
+
+    def store_chunks_batch(self, chunks: List[Chunk]) -> bool:
+        """
+        Batch upsert chunks using a single DataFrame-based SQL query.
+
+        This avoids row-by-row INSERTs by registering a pandas DataFrame and
+        executing one INSERT OR REPLACE ... SELECT statement.
+        """
+        try:
+            # Convert chunk objects to a DataFrame
+            records = [chunk.to_duckdb_row() for chunk in chunks]
+            df = pd.DataFrame.from_records(records)
+            # Register as a temporary table
+            self.engine.register("chunks_buffer", df)
+            # Bulk upsert with one SQL command
+            self.engine.execute("""
+                INSERT OR REPLACE INTO chunks 
+                (chunk_id, document_id, chunk_text, score, chunk_metadata)
+                SELECT chunk_id, document_id, chunk_text, score, chunk_metadata
+                FROM chunks_buffer
+            """ )
+            logger.info(f"Batch upserted {len(chunks)} chunks via DataFrame.")
+            # Clean up the temp view
+            self.engine.unregister("chunks_buffer")
+            return True
+        except Exception as e:
+            logger.error(f"Batch upsert failed: {e}")
             return False
     
     def get_chunks_by_document_id(self, document_id: str) -> List[Chunk]:

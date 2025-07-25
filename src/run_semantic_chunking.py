@@ -93,13 +93,17 @@ class SemanticChunkingPipeline:
 @timer_wrap
 def main():
     # initialize the pipeline
+    # Determine default max_workers as half the CPU count, minimum 1
+    cpu_count = os.cpu_count() or 1
+    default_workers = max(1, cpu_count // 2)
+    logger.info(f"Using {default_workers} workers.")
     semantic_chunker = SemanticChunkingPipeline(
         subset = True,
         subset_size = 5,
         cfg_path = DEFAULT_CHROMA_CONFIG,
         db_path = DEFAULT_DUCKDB_PATH,
         collection_name = "mdc_training_data",
-        max_workers = 4
+        max_workers = default_workers,
     )
 
     # Run with default parameters

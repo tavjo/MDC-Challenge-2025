@@ -23,8 +23,8 @@ sys.path.append(project_root)
 # Local imports
 from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult, DocumentChunkingResult
 from src.helpers import initialize_logging, timer_wrap, load_docs, preprocess_text, sliding_window_chunks
-from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma, cleanup_chroma_by_ids
+from concurrent.futures import ProcessPoolExecutor, as_completed
 # from src.get_citation_entities import CitationEntityExtractor
 import duckdb
 from api.utils.duckdb_utils import get_duckdb_helper
@@ -541,8 +541,10 @@ def save_chunks_to_duckdb(chunks: List[Chunk], db_path: str = "artifacts/mdc_cha
     
     try:
         db_helper = get_duckdb_helper(db_path)
-        if db_helper.store_chunks(chunks):
-            logger.info(f"✅ Successfully saved {len(chunks)} chunks to DuckDB")
+        # Use batch upsert for better performance
+        if db_helper.store_chunks_batch(chunks):
+            logger.info(f"✅ Successfully batch-upserted {len(chunks)} chunks to DuckDB")
+            db_helper.close()
             return True
         else:
             logger.error(f"❌ Failed to save chunks to DuckDB")
@@ -611,6 +613,7 @@ def create_chunks_summary_csv(chunks: List[Chunk], export: bool = True, output_p
 # Main Pipeline Function
 # ---------------------------------------------------------------------------
 
+@timer_wrap
 def prepare_document(
     document: Document,
     citation_entities: List[CitationEntity],
@@ -665,7 +668,7 @@ def prepare_document(
         "collection_name": collection_name,
     }
 
-def commit_document(prep: dict, db_path: str) -> DocumentChunkingResult:
+def build_document_result(prep: dict, db_path: str) -> Tuple[DocumentChunkingResult, pd.DataFrame]:
     """
     Phase 2: single-threaded persistence. Returns DocumentChunkingResult.
     Rolls back on DuckDB errors; cleans up on ChromaDB errors.
@@ -697,10 +700,10 @@ def commit_document(prep: dict, db_path: str) -> DocumentChunkingResult:
         pipeline_started_at=start,
         pipeline_completed_at=now,
     )
-    # Do not commit any chunks if entity retention validation failed
+    # Only consider validation for result; no DuckDB or ChromaDB I/O here
     if not prep["validation_passed"]:
         base.update(error="Validation failed: entity retention less than 100%")
-        return DocumentChunkingResult.model_validate(base)
+        return DocumentChunkingResult.model_validate(base), summary_df
 
     try:
         conn = duckdb.connect(db_path)
@@ -710,34 +713,22 @@ def commit_document(prep: dict, db_path: str) -> DocumentChunkingResult:
     except Exception as e:
         conn.rollback()
         base.update(error=f"DuckDB save failed: {e}")
-        return DocumentChunkingResult.model_validate(base)
+        return DocumentChunkingResult.model_validate(base), summary_df
 
     try:
-        save_chunk_objs_to_chroma(chunks,
-                                 collection_name=prep["collection_name"],
-                                 cfg_path=prep["cfg_path"])
+        save_chunk_objs_to_chroma(chunks, collection_name=prep["collection_name"], cfg_path=prep["cfg_path"])
     except Exception as e:
         cleanup_chroma_by_ids(
             [getattr(ck, "chunk_id", ck) for ck in chunks],
             prep["collection_name"], prep["cfg_path"]
         )
         base.update(error=f"ChromaDB save failed: {e}")
-        return DocumentChunkingResult.model_validate(base)
+        return DocumentChunkingResult.model_validate(base), summary_df
 
+    # On validation passed, mark success; persistence happens in batch phase
     base["success"] = True
     return DocumentChunkingResult.model_validate(base), summary_df
 
-def cleanup_chroma_by_ids(chunk_ids: List[str], collection_name: str, cfg_path: str):
-    """
-    Remove partial inserts from ChromaDB for given chunk IDs.
-    """
-    # This function is not fully implemented in the original file,
-    # so it will be left as is, assuming it will be added later.
-    # For now, it will just log a warning.
-    logger.warning("CleanupChroma is not fully implemented. ChromaDB cleanup skipped.")
-    # The original code had a call to _load_cfg and _get_chroma_collection,
-    # but these functions were not defined in the provided context.
-    # Assuming they are defined elsewhere or will be added.
 
 def summarize_run(doc_results: List[DocumentChunkingResult]) -> ChunkingResult:
     """
@@ -829,23 +820,16 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
         doc_ids = {doc.doi for doc in docs}
         cites = [cite for cite in cites if cite.document_id in doc_ids]
 
-    # 2) Phase 1: parallel preparation
+    # 2) Phase 1: document preparation (sequential fallback if small, else parallel)
     prepped = []
     summary_dfs = []
-    with ThreadPoolExecutor(max_workers=max_workers) as exe:
-        futures = {
-            exe.submit(
-                prepare_document, doc, cites,
-                chunk_size, chunk_overlap,
-                cfg_path, collection_name
-            ): doc
-            for doc in docs
-        }
-        for fut in as_completed(futures):
+    if len(docs) < max_workers:
+        logger.info(f"Sequential document preparation for {len(docs)} docs (<{max_workers} workers)")
+        # Small job: sequential document prep
+        for doc in docs:
             try:
-                prepped.append(fut.result())
+                prepped.append(prepare_document(doc, cites, chunk_size, chunk_overlap, cfg_path, collection_name))
             except Exception as e:
-                doc = futures[fut]
                 prepped.append({
                     "document": doc,
                     "chunks": [],
@@ -863,6 +847,40 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
                     "collection_name": collection_name,
                     "prep_error": str(e)
                 })
+    else:
+        logger.info(f"Parallel document preparation with {max_workers} workers for {len(docs)} docs")
+        # Larger job: parallel processing
+        with ProcessPoolExecutor(max_workers=max_workers) as exe:
+            futures = {
+                exe.submit(
+                    prepare_document, doc, cites,
+                    chunk_size, chunk_overlap,
+                    cfg_path, collection_name
+                ): doc
+                for doc in docs
+            }
+            for fut in as_completed(futures):
+                try:
+                    prepped.append(fut.result())
+                except Exception as e:
+                    doc = futures[fut]
+                    prepped.append({
+                        "document": doc,
+                        "chunks": [],
+                        "pre_total_citations": 0,
+                        "post_total_citations": 0,
+                        "validation_passed": False,
+                        "lost_entities": None,
+                        "total_chunks": 0,
+                        "total_tokens": 0,
+                        "avg_tokens": 0,
+                        "pipeline_started_at": datetime.now().isoformat(),
+                        "chunk_size": chunk_size,
+                        "chunk_overlap": chunk_overlap,
+                        "cfg_path": cfg_path,
+                        "collection_name": collection_name,
+                        "prep_error": str(e)
+                    })
 
     # 3) Phase 2: serial commit
     doc_results: List[DocumentChunkingResult] = []
@@ -888,14 +906,24 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
                 pipeline_completed_at=datetime.now().isoformat()
             ))
         else:
-            doc_to_commit, summary_df = commit_document(prep, db_path)
+            doc_to_commit, summary_df = build_document_result(prep, db_path)
             doc_results.append(doc_to_commit)
             summary_dfs.append(summary_df)
         
         summary = pd.concat(summary_dfs)
         summary.to_csv(Path(os.path.join(project_root, output_dir, "chunks_for_embedding_summary.csv")), index=False)
 
-    # 4) Summarize into one ChunkingResult
+    # 4) Phase 3: batch persistence of all validated chunks
+    valid_chunks: List[Chunk] = []
+    for prep in prepped:
+        if prep.get("validation_passed"):
+            valid_chunks.extend(prep["chunks"])
+    logger.info(f"Batch storing {len(valid_chunks)} validated chunks to DuckDB")
+    save_chunks_to_duckdb(valid_chunks, db_path)
+    logger.info(f"Batch storing {len(valid_chunks)} validated chunks to ChromaDB")
+    save_chunk_objs_to_chroma(valid_chunks, collection_name=collection_name, cfg_path=cfg_path)
+
+    # 5) Summarize into one ChunkingResult
     return summarize_run(doc_results)
 
 if __name__ == "__main__":

@@ -732,6 +732,8 @@ def analyze_collection_entities(
     except Exception as e:
         logger.error("Error analyzing collection: %s", e)
         return {"error": str(e)}
+    finally:
+        db_helper.close()
 
 
 if __name__ == "__main__":

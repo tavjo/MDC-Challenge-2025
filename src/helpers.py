@@ -377,7 +377,7 @@ def adjust_window_size(sentences: List[str], window_size: int, buffer: int) -> i
     return new_window_size
 
 @timer_wrap
-def sliding_window_chunks(text: str, window_size: int = 300, overlap: int = 20) -> List[str]:
+def sliding_window_chunks(text: str, window_size: int = 300, overlap: int = 30) -> List[str]:
     """
     Split the input text into sliding window chunks based on word count.
     """

@@ -22,7 +22,7 @@ from src.models import Document, ChunkingResult, EmbeddingResult, ChunkingPipeli
 from api.services.chunking_and_embedding_services import run_semantic_chunking_pipeline
 from src.helpers import initialize_logging
 from src.semantic_chunking import semantic_chunk_text
-from api.utils.duckdb_utils import get_duckdb_helper
+# from api.utils.duckdb_utils import get_duckdb_helper
 from api.services.embeddings_services import embed_chunk, embed_chunks
 
 # Initialize logging
