@@ -16,7 +16,7 @@ from typing import List, Dict, Any
 import sys, os
 
 # Add the parent directory to the path to import from src
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.models import Document, CitationEntity
 from api.database.duckdb_schema import DuckDBSchemaInitializer

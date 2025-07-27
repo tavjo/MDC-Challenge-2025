@@ -208,8 +208,9 @@ class OfflineEmbedder:
             
             logger.info("▸ Downloading model %s to %s", model_name, cache_dir)
             
-            # Download the model
-            model = SentenceTransformer(model_name, cache_folder=str(cache_path))
+            # Download the model (ensure correct HF namespace for BAAI models)
+            repo = model_name if "/" in model_name else f"BAAI/{model_name}"
+            model = SentenceTransformer(repo, cache_folder=str(cache_path))
             
             # Test the model
             test_embedding = model.encode("test")
@@ -292,9 +293,13 @@ def _build_embedder(model_name: str, cfg: dict = None):
     if model_name.startswith("offline:"):
         # Remove offline: prefix
         actual_model = model_name[8:]
-        return OfflineEmbedder(actual_model, cache_dir=cache_dir)
+        # Prepend BAAI namespace if no repo path provided
+        repo = actual_model if "/" in actual_model else f"BAAI/{actual_model}"
+        return OfflineEmbedder(repo, cache_dir=cache_dir)
     elif model_name in offline_models:
-        return OfflineEmbedder(model_name, cache_dir=cache_dir)
+        # Map bare model names to their HuggingFace repo under BAAI
+        repo = f"BAAI/{model_name}"
+        return OfflineEmbedder(repo, cache_dir=cache_dir)
     else:
         # Use OpenAI embedding
         api_key = os.getenv("OPENAI_API_KEY")

@@ -13,11 +13,10 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # create venv & install deps (one layer)
-RUN python -m venv .venv \
- && . .venv/bin/activate \
+RUN python -m venv .venv && . .venv/bin/activate \
  && uv pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
-                   chromadb sentence-transformers accelerate \
-                   llama-index llama-index-core llama-index-embeddings-openai \
+ && uv pip install --no-cache-dir chromadb sentence-transformers accelerate \
+                  llama-index llama-index-core llama-index-embeddings-openai \
  && uv sync --locked --inexact
 
 # -------- download BGE once --------

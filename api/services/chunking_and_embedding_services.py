@@ -900,8 +900,11 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
             doc_results.append(doc_to_commit)
             summary_dfs.append(summary_df)
     logger.info(f"Phase 2 complete in {time.time() - phase2_start:.2f}s")
-    summary = pd.concat(summary_dfs)
-    summary.to_csv(Path(os.path.join(project_root, output_dir, "chunks_for_embedding_summary.csv")), index=False)
+    if len(summary_dfs) > 0:
+        summary = pd.concat(summary_dfs)
+        summary.to_csv(Path(os.path.join(project_root, output_dir, "chunks_for_embedding_summary.csv")), index=False)
+    else:
+        logger.warning("No summary data to export.")
 
     # 4) Phase 3: batch persistence of validated chunks
     phase3_start = time.time()
