@@ -306,7 +306,8 @@ class ChromaRetriever:
         cfg: Dict[str, Any], 
         collection_name: str, 
         symbolic_boost: float = 0.15,
-        use_fusion_scoring: bool = True
+        use_fusion_scoring: bool = True,
+        model_name: str = "offline:bge-small-en-v1.5"
     ):
         """
         Initialize the hybrid retriever.
@@ -320,7 +321,7 @@ class ChromaRetriever:
         """
         self.cfg = cfg
         _, self.collection = _get_chroma_collection(cfg, collection_name)
-        self.model_name = cfg.get("embed_model", "text-embedding-3-small")  # Default to OpenAI model
+        self.model_name = model_name
         self.db_helper = get_duckdb_helper(os.path.join(project_root, "artifacts", "mdc_challenge.db"))
         
         # Fusion scoring parameters

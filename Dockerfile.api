@@ -1,35 +1,43 @@
 FROM python:3.12-slim
 
 ENV UV_CACHE_DIR=/tmp/uv-cache \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    SENTENCE_TRANSFORMERS_HOME=/app/offline_models \
+    HF_HOME=/app/offline_models
 
 RUN pip install --no-cache-dir uv
 
-# Set working directory
 WORKDIR /app
 
-# Install only the specific dependencies needed for the API service
-# Using uv pip install instead of uv add for Docker builds (no project context needed)
+# project metadata
 COPY pyproject.toml uv.lock ./
 
-RUN python -m venv --system-site-packages .venv \
-    && . .venv/bin/activate \
-    && uv pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
-    && uv pip install chromadb sentence-transformers \
-    llama-index llama-index-core llama-index-embeddings-openai \
-    && uv sync --locked --inexact
+# create venv & install deps (one layer)
+RUN python -m venv .venv \
+ && . .venv/bin/activate \
+ && uv pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+                   chromadb sentence-transformers accelerate \
+                   llama-index llama-index-core llama-index-embeddings-openai \
+ && uv sync --locked --inexact
 
-# Expose venv on PATH for *all* subsequent RUN/CMD layers
-ENV PATH="/app/.venv/bin:${PATH}"
+# -------- download BGE once --------
+RUN . .venv/bin/activate \
+ && python - <<'PY'
+from sentence_transformers import SentenceTransformer
+import pathlib
+path = pathlib.Path("/app/offline_models")
+path.mkdir(parents=True, exist_ok=True)
+SentenceTransformer("BAAI/bge-small-en-v1.5").save(str(path))
+PY
 
-# Copy necessary files
+# copy code after deps to leverage Docker layer cache
 COPY src/ /app/src/
 COPY api/ /app/api/
 COPY configs/ /app/configs/
 COPY tests/ /app/tests/
 
-# Create necessary directories
 RUN mkdir -p artifacts logs
 
-# Run the API service
-CMD ["uvicorn", "api.chunk_and_embed_api:app", "--host", "0.0.0.0", "--port", "8000"] 
+ENV PATH="/app/.venv/bin:${PATH}"
+
+CMD ["uvicorn", "api.chunk_and_embed_api:app", "--host", "0.0.0.0", "--port", "8000"]

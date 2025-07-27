@@ -15,8 +15,9 @@ sys.path.append(project_root)
 
 # Local imports
 from src.helpers import initialize_logging
-from src.semantic_chunking import save_chunk_to_chroma, save_chunks_to_chroma
+from src.semantic_chunking import save_chunk_to_chroma, save_chunks_to_chroma, save_chunk_objs_to_chroma
 from src.models import EmbeddingResult
+from api.utils.duckdb_utils import get_duckdb_helper
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
@@ -27,7 +28,7 @@ def embed_chunk(chunk: str, collection_name: str = "text_embeddings", cfg_path: 
     logger.info(f"Embedding chunk")
     try:
         if local_model:
-            model_name = "bge-small-en-v1.5"
+            model_name = "offline:bge-small-en-v1.5"
         else:
             model_name = "text-embedding-3-small"
         response = save_chunk_to_chroma(chunk, cfg_path, collection_name, model_name=model_name)
@@ -66,7 +67,7 @@ def embed_chunks(chunks: List[str], collection_name: str = "text_embeddings", cf
     logger.info(f"Embedding {len(chunks)} chunks")
     try:
         if local_model:
-            model_name = "bge-small-en-v1.5"
+            model_name = "offline:bge-small-en-v1.5"
         else:
             model_name = "text-embedding-3-small"
         response = save_chunks_to_chroma(chunks, cfg_path, collection_name, model_name=model_name)
@@ -106,3 +107,10 @@ def embed_chunks(chunks: List[str], collection_name: str = "text_embeddings", cf
                 id=r.get("id", "")
             ) for r in response
         ]
+
+def embed_chunks_from_duckdb(db_path: str = "artifacts/mdc_challenge.db", collection_name: str = "text_embeddings", cfg_path: str = DEFAULT_CHROMA_CONFIG, local_model: bool = False):
+    db_helper = get_duckdb_helper(db_path)
+    chunks = db_helper.get_chunks_by_chunk_ids()
+    db_helper.close()
+    # save chunk objects to chroma
+    return save_chunk_objs_to_chroma(chunks, collection_name, cfg_path)

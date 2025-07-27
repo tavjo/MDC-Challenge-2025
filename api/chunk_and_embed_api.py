@@ -246,7 +246,7 @@ async def chunk_specific_documents(
         raise HTTPException(status_code=500, detail=f"Document processing failed: {str(e)}")
 
 @app.get("/health")
-async def health_check(db_path: Optional[str] = Query(DEFAULT_DUCKDB_PATH, description="Path to DuckDB database")):
+async def health_check(db_path: Optional[str] = Query(DEFAULT_DUCKDB_PATH, description="Path to DuckDB database"), model_name: Optional[str] = Query("offline:bge-small-en-v1.5", description="Model name")):
     """
     Simple health check for the microservice.
     
@@ -281,7 +281,7 @@ async def health_check(db_path: Optional[str] = Query(DEFAULT_DUCKDB_PATH, descr
         "status": status,
         "duckdb_connected": duckdb_ok,
         "chromadb_connected": chromadb_ok,
-        "embedding_model": "text-embedding-3-small",
+        "embedding_model": model_name,
         "db_path": db_path
     }
 

@@ -24,9 +24,10 @@ sys.path.append(project_root)
 from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult, DocumentChunkingResult
 from src.helpers import initialize_logging, timer_wrap, load_docs, preprocess_text, sliding_window_chunks
 from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma, cleanup_chroma_by_ids
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 # from src.get_citation_entities import CitationEntityExtractor
 import duckdb
+import time
 from api.utils.duckdb_utils import get_duckdb_helper
 import tiktoken
 
@@ -234,7 +235,7 @@ def create_chunks_from_document(document: Document, citation_entities: List[Cita
     processed_chunks = []
     for chunk_text in raw_chunks:
         token_ids = tok.encode(chunk_text)
-        if len(token_ids) <= 2000: 
+        if len(token_ids) <= 1500: 
             processed_chunks.append(chunk_text)
         else:
             logger.warning(f"Chunk too large ({len(token_ids)} tokens); splitting into smaller chunks using sliding window method.")
@@ -700,32 +701,12 @@ def build_document_result(prep: dict, db_path: str) -> Tuple[DocumentChunkingRes
         pipeline_started_at=start,
         pipeline_completed_at=now,
     )
-    # Only consider validation for result; no DuckDB or ChromaDB I/O here
+    # Only consider validation for result; persistence happens in batch phase
     if not prep["validation_passed"]:
         base.update(error="Validation failed: entity retention less than 100%")
         return DocumentChunkingResult.model_validate(base), summary_df
 
-    try:
-        conn = duckdb.connect(db_path)
-        conn.begin()
-        save_chunks_to_duckdb(chunks, db_path)
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        base.update(error=f"DuckDB save failed: {e}")
-        return DocumentChunkingResult.model_validate(base), summary_df
-
-    try:
-        save_chunk_objs_to_chroma(chunks, collection_name=prep["collection_name"], cfg_path=prep["cfg_path"])
-    except Exception as e:
-        cleanup_chroma_by_ids(
-            [getattr(ck, "chunk_id", ck) for ck in chunks],
-            prep["collection_name"], prep["cfg_path"]
-        )
-        base.update(error=f"ChromaDB save failed: {e}")
-        return DocumentChunkingResult.model_validate(base), summary_df
-
-    # On validation passed, mark success; persistence happens in batch phase
+    # Persistence of chunks is handled in batch Phase 3; no per-document DB or Chroma writes here
     base["success"] = True
     return DocumentChunkingResult.model_validate(base), summary_df
 
@@ -802,15 +783,17 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
     else:
         docs, cites = load_input_data(documents_path, citation_entities_path)
     
+    # find documents with citations
+    cite_ids = {c.document_id for c in cites}
+    docs_with_citations = [doc for doc in docs if doc.doi in cite_ids]
+    logger.info(f"Found {len(docs_with_citations)} documents with citations.")
+
     if subset:
         if subset_size is None:
             subset_size = 20
             logger.warning(f"No subset size provided using default size of {subset_size}.")
         np.random.seed(42)
         # choose randomly from docs with citations
-        cite_ids = {c.document_id for c in cites}
-        docs_with_citations = [doc for doc in docs if doc.doi in cite_ids]
-        logger.info(f"Found {len(docs_with_citations)} documents with citations.")
         logger.info(f"Choosing {subset_size} documents randomly from {len(docs_with_citations)} documents with citations.")
         docs = np.random.choice(docs_with_citations, size=subset_size, replace=False)
         if subset_size > len(docs_with_citations):
@@ -819,44 +802,19 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
         # filter cites to only include those with document_id in docs
         doc_ids = {doc.doi for doc in docs}
         cites = [cite for cite in cites if cite.document_id in doc_ids]
+    else:
+        docs = docs_with_citations
 
-    # 2) Phase 1: document preparation (sequential fallback if small, else parallel)
+    # 2) Phase 1: document preparation
+    phase1_start = time.time()
+    logger.info(f"Phase 1: starting preparation of {len(docs)} docs (threshold {max_workers})")
     prepped = []
     summary_dfs = []
     if len(docs) < max_workers:
-        logger.info(f"Sequential document preparation for {len(docs)} docs (<{max_workers} workers)")
-        # Small job: sequential document prep
-        for doc in docs:
-            try:
-                prepped.append(prepare_document(doc, cites, chunk_size, chunk_overlap, cfg_path, collection_name))
-            except Exception as e:
-                prepped.append({
-                    "document": doc,
-                    "chunks": [],
-                    "pre_total_citations": 0,
-                    "post_total_citations": 0,
-                    "validation_passed": False,
-                    "lost_entities": None,
-                    "total_chunks": 0,
-                    "total_tokens": 0,
-                    "avg_tokens": 0,
-                    "pipeline_started_at": datetime.now().isoformat(),
-                    "chunk_size": chunk_size,
-                    "chunk_overlap": chunk_overlap,
-                    "cfg_path": cfg_path,
-                    "collection_name": collection_name,
-                    "prep_error": str(e)
-                })
-    else:
-        logger.info(f"Parallel document preparation with {max_workers} workers for {len(docs)} docs")
-        # Larger job: parallel processing
-        with ProcessPoolExecutor(max_workers=max_workers) as exe:
+        logger.info(f"Phase 1: using ThreadPoolExecutor with {min(max_workers, len(docs))} threads for {len(docs)} docs")
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(docs))) as exe:
             futures = {
-                exe.submit(
-                    prepare_document, doc, cites,
-                    chunk_size, chunk_overlap,
-                    cfg_path, collection_name
-                ): doc
+                exe.submit(prepare_document, doc, cites, chunk_size, chunk_overlap, cfg_path, collection_name): doc
                 for doc in docs
             }
             for fut in as_completed(futures):
@@ -881,8 +839,40 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
                         "collection_name": collection_name,
                         "prep_error": str(e)
                     })
+    else:
+        logger.info(f"Phase 1: using ProcessPoolExecutor with {max_workers} processes for {len(docs)} docs")
+        with ProcessPoolExecutor(max_workers=max_workers) as exe:
+            futures = {
+                exe.submit(prepare_document, doc, cites, chunk_size, chunk_overlap, cfg_path, collection_name): doc
+                for doc in docs
+            }
+            for fut in as_completed(futures):
+                try:
+                    prepped.append(fut.result())
+                except Exception as e:
+                    doc = futures[fut]
+                    prepped.append({
+                        "document": doc,
+                        "chunks": [],
+                        "pre_total_citations": 0,
+                        "post_total_citations": 0,
+                        "validation_passed": False,
+                        "lost_entities": None,
+                        "total_chunks": 0,
+                        "total_tokens": 0,
+                        "avg_tokens": 0,
+                        "pipeline_started_at": datetime.now().isoformat(),
+                        "chunk_size": chunk_size,
+                        "chunk_overlap": chunk_overlap,
+                        "cfg_path": cfg_path,
+                        "collection_name": collection_name,
+                        "prep_error": str(e)
+                    })
+    logger.info(f"Phase 1 complete in {time.time() - phase1_start:.2f}s")
 
-    # 3) Phase 2: serial commit
+    # 3) Phase 2: build document results
+    phase2_start = time.time()
+    logger.info("Phase 2: building document results and summaries")
     doc_results: List[DocumentChunkingResult] = []
     for prep in prepped:
         if "prep_error" in prep:
@@ -909,11 +899,13 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
             doc_to_commit, summary_df = build_document_result(prep, db_path)
             doc_results.append(doc_to_commit)
             summary_dfs.append(summary_df)
-        
-        summary = pd.concat(summary_dfs)
-        summary.to_csv(Path(os.path.join(project_root, output_dir, "chunks_for_embedding_summary.csv")), index=False)
+    logger.info(f"Phase 2 complete in {time.time() - phase2_start:.2f}s")
+    summary = pd.concat(summary_dfs)
+    summary.to_csv(Path(os.path.join(project_root, output_dir, "chunks_for_embedding_summary.csv")), index=False)
 
-    # 4) Phase 3: batch persistence of all validated chunks
+    # 4) Phase 3: batch persistence of validated chunks
+    phase3_start = time.time()
+    logger.info("Phase 3: batch persistence starting")
     valid_chunks: List[Chunk] = []
     for prep in prepped:
         if prep.get("validation_passed"):
@@ -922,6 +914,7 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
     save_chunks_to_duckdb(valid_chunks, db_path)
     logger.info(f"Batch storing {len(valid_chunks)} validated chunks to ChromaDB")
     save_chunk_objs_to_chroma(valid_chunks, collection_name=collection_name, cfg_path=cfg_path)
+    logger.info(f"Phase 3 complete in {time.time() - phase3_start:.2f}s")
 
     # 5) Summarize into one ChunkingResult
     return summarize_run(doc_results)

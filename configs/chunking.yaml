@@ -9,7 +9,8 @@ overlap_sentences: 2        # no duplicated text → lower token bill
 # For OpenAI models: text-embedding-3-small, text-embedding-3-large, text-embedding-ada-002
 # For offline models: bge-small-en-v1.5, all-MiniLM-L6-v2, all-mpnet-base-v2
 # Use offline: prefix for explicit offline models: offline:bge-small-en-v1.5
-embed_model: text-embedding-3-small
+# embed_model: text-embedding-3-small
+embed_model: offline:bge-small-en-v1.5
 
 # Offline model configuration (used when embed_model is offline)
 offline_model:

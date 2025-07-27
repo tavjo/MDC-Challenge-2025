@@ -95,7 +95,8 @@ def main():
     # initialize the pipeline
     # Determine default max_workers as half the CPU count, minimum 1
     cpu_count = os.cpu_count() or 1
-    default_workers = max(1, cpu_count // 2)
+    # default_workers = max(1, cpu_count // 2)
+    default_workers = max(1, cpu_count - 1)
     logger.info(f"Using {default_workers} workers.")
     semantic_chunker = SemanticChunkingPipeline(
         subset = True,

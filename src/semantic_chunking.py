@@ -32,7 +32,7 @@ from datetime import datetime
 import yaml
 import chromadb
 from llama_index.embeddings.openai import OpenAIEmbedding
-from src.helpers import get_embedding, CustomOpenAIEmbedding
+# from src.helpers import get_embedding, CustomOpenAIEmbedding
 from llama_index.core.node_parser import (
     SentenceSplitter,
     SemanticSplitterNodeParser,
@@ -89,6 +89,10 @@ except Exception:  # pragma: no cover – stand-alone fallback
 DEFAULT_CFG_PATH = Path(
     os.getenv("CHUNKING_CONFIG", os.path.join(project_root, "configs/chunking.yaml"))
 )
+
+def batched(seq, n=100):
+    for i in range(0, len(seq), n):
+        yield seq[i:i+n]
 
 
 def _load_cfg(cfg_path: Optional[os.PathLike] | None = None) -> dict:
@@ -332,7 +336,7 @@ def _get_chroma_collection(cfg: dict, collection_name: str):
 def semantic_chunk_text(
     text: str,
     cfg_path: Optional[os.PathLike] | None = None,
-    model_name: str = "text-embedding-3-small",
+    model_name: str = "offline:bge-small-en-v1.5",
     chunk_size: Optional[int] = None,
     chunk_overlap: Optional[int] = None,
 ) -> List[str]:
@@ -394,7 +398,7 @@ def save_chunk_obj_to_chroma(
     chunk_obj: "Chunk",
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str | None = None,
-    model_name: str = "text-embedding-3-small"
+    model_name: str = "offline:bge-small-en-v1.5"
 ):
     """Persist a list of Chunk objects (text + metadata) to ChromaDB."""
     if not chunk_obj:
@@ -425,7 +429,7 @@ def save_chunk_objs_to_chroma(
     chunk_objs: List["Chunk"],
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str | None = None,
-    model_name: str = "text-embedding-3-small",
+    model_name: str = "offline:bge-small-en-v1.5",
     chunk_size: int = 300,
     chunk_overlap: int = 2
 ):
@@ -442,18 +446,11 @@ def save_chunk_objs_to_chroma(
 
     logger.info("▸ Embedding %d chunks for Chroma upsert", len(chunk_objs))
     documents = [c.text for c in chunk_objs]
-    embeddings = [embedder.get_text_embedding(txt) for txt in documents]
-    # embeddings = []
-    # for txt in documents:
-    #     import tiktoken
-    #     tok = tiktoken.get_encoding("cl100k_base")
-    #     token_count = len(tok.encode(txt))
-    #     if token_count > chunk_size:
-    #         processed_chunks = sliding_window_chunks(txt, chunk_size, chunk_overlap)
-    #         for chunk in processed_chunks:
-    #             embeddings.append(embedder.get_text_embedding(chunk))
-    #     else:
-    #         embeddings.append(embedder.get_text_embedding(txt))
+    # embeddings = [embedder.get_text_embedding(txt) for txt in documents]
+    embeddings = []
+    for batch in batched(documents, 100):
+        vecs = embedder.get_text_embeddings(batch)
+        embeddings.extend(vecs)
     metadatas = [_chunk_obj_to_metadata(c) for c in chunk_objs]
     ids = [c.chunk_id for c in chunk_objs]
 
@@ -517,7 +514,7 @@ def save_chunk_to_chroma(
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str = "chunks",
     metadata: Optional[List[dict]] = None,
-    model_name: str = "text-embedding-3-small"
+    model_name: str = "offline:bge-small-en-v1.5"
 ):
     """Embed raw *chunks* and upsert them into a ChromaDB collection."""
     if not chunk:
@@ -554,7 +551,7 @@ def save_chunks_to_chroma(
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str = "chunks",
     metadata: Optional[List[dict]] = None,
-    model_name: str = "text-embedding-3-small"
+    model_name: str = "offline:bge-small-en-v1.5"
 ):
     """Embed raw *chunks* and upsert them into a ChromaDB collection."""
     if not chunks:
