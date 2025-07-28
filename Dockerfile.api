@@ -3,7 +3,8 @@ FROM python:3.12-slim
 ENV UV_CACHE_DIR=/tmp/uv-cache \
     PYTHONUNBUFFERED=1 \
     SENTENCE_TRANSFORMERS_HOME=/app/offline_models \
-    HF_HOME=/app/offline_models
+    HF_HOME=/app/offline_models \
+    HUGGINGFACE_OFFLINE=1
 
 RUN pip install --no-cache-dir uv
 
@@ -16,18 +17,26 @@ COPY pyproject.toml uv.lock ./
 RUN python -m venv .venv && . .venv/bin/activate \
  && uv pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
  && uv pip install --no-cache-dir chromadb sentence-transformers accelerate \
-                  llama-index llama-index-core llama-index-embeddings-openai \
+                  llama-index llama-index-core \
  && uv sync --locked --inexact
 
-# -------- download BGE once --------
+# Install NLTK corpora needed by SentenceSplitter
 RUN . .venv/bin/activate \
  && python - <<'PY'
-from sentence_transformers import SentenceTransformer
-import pathlib
-path = pathlib.Path("/app/offline_models")
-path.mkdir(parents=True, exist_ok=True)
-SentenceTransformer("BAAI/bge-small-en-v1.5").save(str(path))
+import nltk
+nltk.download("punkt")
+nltk.download("wordnet")
+nltk.download("words")
 PY
+# -------- download BGE once --------
+# RUN . .venv/bin/activate \
+#  && python - <<'PY'
+# from huggingface_hub import snapshot_download
+# snapshot_download(
+#     repo_id="BAAI/bge-small-en-v1.5",
+#     cache_dir="/app/offline_models"
+# )
+# PY
 
 # copy code after deps to leverage Docker layer cache
 COPY src/ /app/src/

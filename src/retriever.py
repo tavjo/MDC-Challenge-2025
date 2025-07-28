@@ -307,7 +307,7 @@ class ChromaRetriever:
         collection_name: str, 
         symbolic_boost: float = 0.15,
         use_fusion_scoring: bool = True,
-        model_name: str = "offline:bge-small-en-v1.5"
+        model_name: str = "text-embedding-3-small"
     ):
         """
         Initialize the hybrid retriever.

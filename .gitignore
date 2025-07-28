@@ -1,6 +1,7 @@
 # Project-specific directories
 Data/
 logs/
+offline_models/
 # guides/
 
 # Python
@@ -122,6 +123,7 @@ models/weights/
 *.pt
 *.pth
 *.onnx
+*.safetensors
 
 # Data science and ML specific
 .wandb/

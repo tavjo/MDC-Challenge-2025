@@ -23,7 +23,7 @@ sys.path.append(project_root)
 # Local imports
 from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult, DocumentChunkingResult
 from src.helpers import initialize_logging, timer_wrap, load_docs, preprocess_text, sliding_window_chunks
-from src.semantic_chunking import semantic_chunk_text, save_chunk_objs_to_chroma, cleanup_chroma_by_ids
+from src.semantic_chunking import sliding_window_chunk_text, save_chunk_objs_to_chroma, cleanup_chroma_by_ids
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 # from src.get_citation_entities import CitationEntityExtractor
 import duckdb
@@ -222,13 +222,9 @@ def create_chunks_from_document(document: Document, citation_entities: List[Cita
         text = doc.full_text
 
     # Use semantic chunking with overrides from pipeline
-    raw_chunks = semantic_chunk_text(
-        text,
-        None,  # cfg_path default
-        None,  # model_name default
-        chunk_size,
-        chunk_overlap,
-    )
+    raw_chunks = sliding_window_chunk_text(
+        text
+        )
     # Fallback: ensure no chunk exceeds the hard token limit
     # import tiktoken
     tok = tiktoken.get_encoding("cl100k_base")

@@ -7,12 +7,12 @@ from pydantic import BaseModel
 from typing_extensions import get_type_hints
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-import nltk
-# Ensure the NLTK stopwords corpus is available
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords', quiet=True)
+# import nltk
+# # Ensure the NLTK stopwords corpus is available
+# try:
+#     nltk.data.find('corpora/stopwords')
+# except LookupError:
+#     nltk.download('stopwords', quiet=True)
 
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -327,11 +327,12 @@ def normalise(page:str) -> str:
 
 def preprocess_text(text):
     import re
-    from nltk.corpus import stopwords
+    # from nltk.corpus import stopwords
     text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
     text = text.lower()  # Lowercase
-    stop_words = set(stopwords.words("english"))
-    text = " ".join(word for word in text.split() if word not in stop_words)
+    text = text.replace("\n", " ")
+    # stop_words = set(stopwords.words("english"))
+    # text = " ".join(word for word in text.split() if word not in stop_words)
     return text
 
 

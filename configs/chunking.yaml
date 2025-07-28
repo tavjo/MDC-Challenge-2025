@@ -1,4 +1,4 @@
-# conf/chunking.yaml
+# configs/chunking.yaml
 splitter: semantic          # switch from "sliding" to "semantic"
 max_tokens: 300             # hard ceiling to prevent jumbo chunks
 similarity_threshold: 0.75  # cosine drop that triggers a new chunk
@@ -11,6 +11,7 @@ overlap_sentences: 2        # no duplicated text → lower token bill
 # Use offline: prefix for explicit offline models: offline:bge-small-en-v1.5
 # embed_model: text-embedding-3-small
 embed_model: offline:bge-small-en-v1.5
+#text-embedding-3-small
 
 # Offline model configuration (used when embed_model is offline)
 offline_model:

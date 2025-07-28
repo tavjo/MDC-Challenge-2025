@@ -31,16 +31,18 @@ from datetime import datetime
 
 import yaml
 import chromadb
-from llama_index.embeddings.openai import OpenAIEmbedding
+# from llama_index.embeddings.openai import OpenAIEmbedding
 # from src.helpers import get_embedding, CustomOpenAIEmbedding
+# from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.node_parser import (
-    SentenceSplitter,
-    SemanticSplitterNodeParser,
+    # SentenceSplitter,
+    SemanticSplitterNodeParser
 )
+from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.schema import Document
-from llama_index.core.schema import BaseNode, Document , ObjectType , TextNode
-from llama_index.core.constants import DEFAULT_CHUNK_SIZE
-from llama_index.core.node_parser.text.sentence import SENTENCE_CHUNK_OVERLAP
+# from llama_index.core.schema import BaseNode, Document , ObjectType , TextNode
+# from llama_index.core.constants import DEFAULT_CHUNK_SIZE
+# from llama_index.core.node_parser.text.sentence import SENTENCE_CHUNK_OVERLAP
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -52,10 +54,18 @@ try:
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
 
+# For error handling
+# try:
+#     from huggingface_hub import LocalEntryNotFoundError
+# except ImportError:
+#     # Fallback for older versions
+#     LocalEntryNotFoundError = OSError
+# import torch
+
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
-from src.helpers import initialize_logging#, sliding_window_chunks 
+from src.helpers import initialize_logging,sliding_window_chunks 
 from src.models import Chunk, ChunkMetadata, CitationEntity
 
 filename = os.path.basename(__file__)
@@ -89,6 +99,9 @@ except Exception:  # pragma: no cover – stand-alone fallback
 DEFAULT_CFG_PATH = Path(
     os.getenv("CHUNKING_CONFIG", os.path.join(project_root, "configs/chunking.yaml"))
 )
+DEFAULT_CACHE_DIR = Path(
+    os.path.join(project_root, "offline_models")
+)
 
 def batched(seq, n=100):
     for i in range(0, len(seq), n):
@@ -112,151 +125,153 @@ def _load_cfg(cfg_path: Optional[os.PathLike] | None = None) -> dict:
 # Offline Embedder Class
 # ---------------------------------------------------------------------------
 
-class OfflineEmbedder:
-    """
-    Offline embedding class using SentenceTransformers for local embeddings.
-    Compatible with llama_index embedding interface.
-    """
+# class OfflineEmbedder:
+#     """
+#     Offline embedding class using SentenceTransformers for local embeddings.
+#     Compatible with llama_index embedding interface.
+#     """
     
-    def __init__(self, model_name: str = "bge-small-en-v1.5", cache_dir: str = "./offline_models"):
-        """Initialize the offline embedder with a SentenceTransformer model."""
-        if not SENTENCE_TRANSFORMERS_AVAILABLE:
-            raise ImportError(
-                "sentence-transformers not available. Install with: pip install sentence-transformers"
-            )
+#     def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5", cache_dir: str = DEFAULT_CACHE_DIR):
+#         """Initialize the offline embedder with a SentenceTransformer model."""
+#         if not SENTENCE_TRANSFORMERS_AVAILABLE:
+#             raise ImportError(
+#                 "sentence-transformers not available. Install with: pip install sentence-transformers"
+#             )
+#         device = "cuda" if torch.cuda.is_available() else "cpu"
+#         self.model_name = model_name
+#         self.cache_dir = Path(cache_dir)
         
-        self.model_name = model_name
-        self.cache_dir = Path(cache_dir)
+#         # Create cache directory if it doesn't exist
+#         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create cache directory if it doesn't exist
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        
-        logger.info("▸ Loading offline embedding model %s (cache: %s)", model_name, cache_dir)
-        
-        # Download and cache model for offline use
-        self.model = SentenceTransformer(model_name, cache_folder=str(self.cache_dir))
-        
-        # Cache the model to ensure it's available offline
-        self._cache_model()
+#         logger.info("▸ Loading offline embedding model %s (cache: %s)", model_name, cache_dir)
+
+#         # Download and cache model for offline use
+#         self.model = SentenceTransformer(
+#             str(self.cache_dir)
+#         )
+
+#         # Cache the model to ensure it's available offline
+#         # self._cache_model()
     
-    def _cache_model(self):
-        """Cache the model for offline use."""
-        try:
-            # Test embedding to ensure model is fully loaded
-            test_embedding = self.model.encode("test")
-            logger.info("✅ Model %s cached successfully (embedding dim: %d)", 
-                       self.model_name, len(test_embedding))
+#     def _cache_model(self):
+#         """Cache the model for offline use."""
+#         try:
+#             # Test embedding to ensure model is fully loaded
+#             test_embedding = self.model.encode("test")
+#             logger.info("✅ Model %s cached successfully (embedding dim: %d)", 
+#                        self.model_name, len(test_embedding))
             
-            # Save model info to cache directory
-            model_info = {
-                "model_name": self.model_name,
-                "embedding_dim": len(test_embedding),
-                "cached_at": str(datetime.now()),
-                "cache_dir": str(self.cache_dir)
-            }
+#             # Save model info to cache directory
+#             model_info = {
+#                 "model_name": self.model_name,
+#                 "embedding_dim": len(test_embedding),
+#                 "cached_at": str(datetime.now()),
+#                 "cache_dir": str(self.cache_dir)
+#             }
             
-            info_file = self.cache_dir / f"{self.model_name.replace('/', '_')}_info.json"
-            with open(info_file, 'w') as f:
-                json.dump(model_info, f, indent=2)
+#             info_file = self.cache_dir / f"{self.model_name.replace('/', '_')}_info.json"
+#             with open(info_file, 'w') as f:
+#                 json.dump(model_info, f, indent=2)
                 
-        except Exception as e:
-            logger.error("❌ Failed to cache model %s: %s", self.model_name, str(e))
-            raise
+#         except Exception as e:
+#             logger.error("❌ Failed to cache model %s: %s", self.model_name, str(e))
+#             raise
     
-    def get_text_embedding(self, text: str) -> List[float]:
-        """Get embedding for a single text string."""
-        if not text:
-            return []
+#     def get_text_embedding(self, text: str) -> List[float]:
+#         """Get embedding for a single text string."""
+#         if not text:
+#             return []
         
-        # Clean text for embedding
-        text = text.replace("\n", " ").strip()
+#         # Clean text for embedding
+#         text = text.replace("\n", " ").strip()
         
-        # Generate embedding
-        embedding = self.model.encode(text)
-        return embedding.tolist()
+#         # Generate embedding
+#         embedding = self.model.encode(text)
+#         return embedding.tolist()
     
-    def get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """Get embeddings for multiple text strings."""
-        if not texts:
-            return []
+#     def get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
+#         """Get embeddings for multiple text strings."""
+#         if not texts:
+#             return []
         
-        # Clean texts
-        cleaned_texts = [text.replace("\n", " ").strip() for text in texts]
+#         # Clean texts
+#         cleaned_texts = [text.replace("\n", " ").strip() for text in texts]
         
-        # Generate embeddings in batch
-        embeddings = self.model.encode(cleaned_texts)
-        return embeddings.tolist()
+#         # Generate embeddings in batch
+#         embeddings = self.model.encode(cleaned_texts)
+#         return embeddings.tolist()
 
-    @staticmethod
-    def download_model(model_name: str, cache_dir: str = "./offline_models") -> bool:
-        """Download and cache a model for offline use.
+#     @staticmethod
+#     def download_model(model_name: str, cache_dir: str = "./offline_models") -> bool:
+#         """Download and cache a model for offline use.
         
-        Args:
-            model_name: Name of the SentenceTransformer model to download
-            cache_dir: Directory to cache the model
+#         Args:
+#             model_name: Name of the SentenceTransformer model to download
+#             cache_dir: Directory to cache the model
             
-        Returns:
-            True if successful, False otherwise
-        """
-        if not SENTENCE_TRANSFORMERS_AVAILABLE:
-            logger.error("sentence-transformers not available for model download")
-            return False
+#         Returns:
+#             True if successful, False otherwise
+#         """
+#         if not SENTENCE_TRANSFORMERS_AVAILABLE:
+#             logger.error("sentence-transformers not available for model download")
+#             return False
             
-        try:
-            cache_path = Path(cache_dir)
-            cache_path.mkdir(parents=True, exist_ok=True)
+#         try:
+#             cache_path = Path(cache_dir)
+#             cache_path.mkdir(parents=True, exist_ok=True)
             
-            logger.info("▸ Downloading model %s to %s", model_name, cache_dir)
+#             logger.info("▸ Downloading model %s to %s", model_name, cache_dir)
             
-            # Download the model (ensure correct HF namespace for BAAI models)
-            repo = model_name if "/" in model_name else f"BAAI/{model_name}"
-            model = SentenceTransformer(repo, cache_folder=str(cache_path))
+#             # Download the model (ensure correct HF namespace for BAAI models)
+#             repo = model_name if "/" in model_name else f"BAAI/{model_name}"
+#             model = SentenceTransformer(repo, cache_folder=str(cache_path))
             
-            # Test the model
-            test_embedding = model.encode("test")
-            logger.info("✅ Model %s downloaded successfully (embedding dim: %d)", 
-                       model_name, len(test_embedding))
+#             # Test the model
+#             test_embedding = model.encode("test")
+#             logger.info("✅ Model %s downloaded successfully (embedding dim: %d)", 
+#                        model_name, len(test_embedding))
             
-            # Save model info
-            model_info = {
-                "model_name": model_name,
-                "embedding_dim": len(test_embedding),
-                "downloaded_at": str(datetime.now()),
-                "cache_dir": str(cache_path)
-            }
+#             # Save model info
+#             model_info = {
+#                 "model_name": model_name,
+#                 "embedding_dim": len(test_embedding),
+#                 "downloaded_at": str(datetime.now()),
+#                 "cache_dir": str(cache_path)
+#             }
             
-            info_file = cache_path / f"{model_name.replace('/', '_')}_info.json"
-            with open(info_file, 'w') as f:
-                json.dump(model_info, f, indent=2)
+#             info_file = cache_path / f"{model_name.replace('/', '_')}_info.json"
+#             with open(info_file, 'w') as f:
+#                 json.dump(model_info, f, indent=2)
                 
-            return True
+#             return True
             
-        except Exception as e:
-            logger.error("❌ Failed to download model %s: %s", model_name, str(e))
-            return False
+#         except Exception as e:
+#             logger.error("❌ Failed to download model %s: %s", model_name, str(e))
+#             return False
 
-class SafeSemanticSplitter(SemanticSplitterNodeParser):
+# class SafeSemanticSplitter(SemanticSplitterNodeParser):
 
-    safety_chunker : SentenceSplitter = SentenceSplitter(chunk_size=DEFAULT_CHUNK_SIZE*4,chunk_overlap=SENTENCE_CHUNK_OVERLAP)
+#     safety_chunker : SentenceSplitter = SentenceSplitter(chunk_size=DEFAULT_CHUNK_SIZE*4,chunk_overlap=SENTENCE_CHUNK_OVERLAP)
 
-    def _parse_nodes(
-        self,
-        nodes: Sequence[BaseNode],
-        show_progress: bool = False,
-        **kwargs: Any,
-    ) -> List[BaseNode]:
-        all_nodes : List[BaseNode] = super()._parse_nodes(nodes=nodes,show_progress=show_progress,**kwargs)
-        all_good = True
-        for node in all_nodes:
-            if node.get_type()==ObjectType.TEXT:
-                node:TextNode=node
-                if self.safety_chunker._token_size(node.text)>self.safety_chunker.chunk_size:
-                    logging.info("Chunk size too big after semantic chunking: switching to static chunking")
-                    all_good = False
-                    break
-        if not all_good:
-            all_nodes = self.safety_chunker._parse_nodes(nodes,show_progress=show_progress,**kwargs)
-        return all_nodes
+#     def _parse_nodes(
+#         self,
+#         nodes: Sequence[BaseNode],
+#         show_progress: bool = False,
+#         **kwargs: Any,
+#     ) -> List[BaseNode]:
+#         all_nodes : List[BaseNode] = super()._parse_nodes(nodes=nodes,show_progress=show_progress,**kwargs)
+#         all_good = True
+#         for node in all_nodes:
+#             if node.get_type()==ObjectType.TEXT:
+#                 node:TextNode=node
+#                 if self.safety_chunker._token_size(node.text)>self.safety_chunker.chunk_size:
+#                     logging.info("Chunk size too big after semantic chunking: switching to static chunking")
+#                     all_good = False
+#                     break
+#         if not all_good:
+#             all_nodes = self.safety_chunker._parse_nodes(nodes,show_progress=show_progress,**kwargs)
+#         return all_nodes
         
 
 # ---------------------------------------------------------------------------
@@ -264,52 +279,155 @@ class SafeSemanticSplitter(SemanticSplitterNodeParser):
 # ---------------------------------------------------------------------------
 
 
+# def _build_embedder(model_name: str, cfg: dict = None):
+#     """Return an embedding instance (OpenAI or offline) based on model name.
+
+#     Args:
+#         model_name: Model name. If starts with 'offline:' or is in offline models list,
+#                    uses SentenceTransformer. Otherwise uses OpenAI.
+#         cfg: Configuration dictionary with offline model settings.
+    
+#     Returns:
+#         Embedding instance compatible with llama_index interface.
+#     """
+#     # List of known offline models
+#     offline_models = [
+#         "bge-small-en-v1.5",
+#         "all-MiniLM-L6-v2", 
+#         "all-mpnet-base-v2",
+#         "sentence-transformers/all-MiniLM-L6-v2",
+#         "sentence-transformers/all-mpnet-base-v2",
+#         "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+#     ]
+    
+#     # Get offline model configuration
+#     offline_cfg = cfg.get("offline_model", {}) if cfg else {}
+#     cache_dir = offline_cfg.get("cache_dir", "./offline_models")
+    
+#     # Check if this is an offline model
+#     if model_name.startswith("offline:"):
+#         # Remove offline: prefix
+#         actual_model = model_name[8:]
+#         # Prepend BAAI namespace if no repo path provided
+#         repo = actual_model if "/" in actual_model else f"BAAI/{actual_model}"
+#         return OfflineEmbedder(repo, cache_dir=cache_dir)
+#     elif model_name in offline_models:
+#         # Map bare model names to their HuggingFace repo under BAAI
+#         repo = f"BAAI/{model_name}"
+#         return OfflineEmbedder(repo, cache_dir=cache_dir)
+#     else:
+#         # Use OpenAI embedding
+#         api_key = os.getenv("OPENAI_API_KEY")
+#         if not api_key:
+#             raise EnvironmentError(
+#                 "OPENAI_API_KEY not found – please set it before calling this helper."
+#             )
+
+#         logger.info("▸ Loading OpenAI embedding model %s", model_name)
+#         return OpenAIEmbedding(model=model_name)
+
+
+# def _build_embedder(model_name: str, cfg: dict = None):
+#     """
+#     Return an embedding instance (OpenAI or offline) based on model name.
+#     Matches the pattern from semantic_chunking.py.
+
+#     Args:
+#         model_name: Model name. If starts with 'offline:' or is in offline models list,
+#                    uses SentenceTransformer. Otherwise uses OpenAI.
+#         cfg: Configuration dictionary with offline model settings.
+    
+#     Returns:
+#         Embedding instance compatible with llama_index interface.
+#     """
+#     # List of known offline models
+#     offline_models = [
+#         "BAAI/bge-small-en-v1.5",
+#         "all-MiniLM-L6-v2", 
+#         "all-mpnet-base-v2",
+#         "sentence-transformers/all-MiniLM-L6-v2",
+#         "sentence-transformers/all-mpnet-base-v2",
+#         "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+#     ]
+    
+#     # Get offline model configuration
+#     offline_cfg = cfg.get("offline_model", {}) if cfg else {}
+#     cache_dir = offline_cfg.get("cache_dir", DEFAULT_CACHE_DIR)
+    
+#     # Check if this is an offline model
+#     if model_name.startswith("offline:"):
+#         # Remove offline: prefix
+#         actual_model = model_name[8:]
+#         return _create_offline_embedder(actual_model, cache_dir)
+#     elif model_name in offline_models:
+#         return _create_offline_embedder(model_name, cache_dir)
+#     # else:
+#     #     # Use OpenAI embedding
+#     #     api_key = os.getenv("OPENAI_API_KEY")
+#     #     if not api_key:
+#     #         raise EnvironmentError(
+#     #             "OPENAI_API_KEY not found – please set it before calling this helper."
+#     #         )
+
+#     #     logger.info("▸ Loading OpenAI embedding model %s", model_name)
+#     #     return OpenAIEmbedding(model=model_name)
+
+
+def _create_offline_embedder(model_name: str, cache_dir: str):
+    """Create offline embedder using SentenceTransformer."""
+    if not SENTENCE_TRANSFORMERS_AVAILABLE:
+        raise ImportError(
+            "SentenceTransformers not available. Install with: pip install sentence-transformers"
+        )
+    
+    # Create a wrapper to match llama_index interface
+    class OfflineEmbedder(BaseEmbedding):
+        def __init__(self,cache_dir):
+            self.model = SentenceTransformer(str(cache_dir))
+
+         # Required sync methods
+        def _get_query_embedding(self, query: str):
+            return self.model.encode([query], convert_to_numpy=True)[0].tolist()
+
+        def _get_text_embedding(self, text: str):
+            return self._get_query_embedding(text)
+
+        def _get_text_embeddings(self, texts: list[str]):
+            return self.model.encode(texts, convert_to_numpy=True).tolist()
+
+         # Required async stubs (simple wrappers)
+        async def _aget_query_embedding(self, query: str):
+            return self._get_query_embedding(query)
+
+        async def _aget_text_embedding(self, text: str):
+            return self._get_text_embedding(text)
+    
+    return OfflineEmbedder(model_name, cache_dir)
+
 def _build_embedder(model_name: str, cfg: dict = None):
-    """Return an embedding instance (OpenAI or offline) based on model name.
+    """Return a HuggingFaceEmbedding instance on CPU (no CUDA required)."""
 
-    Args:
-        model_name: Model name. If starts with 'offline:' or is in offline models list,
-                   uses SentenceTransformer. Otherwise uses OpenAI.
-        cfg: Configuration dictionary with offline model settings.
+    logger.info("▸ Loading local embedding model %s", model_name)
     
-    Returns:
-        Embedding instance compatible with llama_index interface.
-    """
-    # List of known offline models
-    offline_models = [
-        "bge-small-en-v1.5",
-        "all-MiniLM-L6-v2", 
-        "all-mpnet-base-v2",
-        "sentence-transformers/all-MiniLM-L6-v2",
-        "sentence-transformers/all-mpnet-base-v2",
-        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    ]
-    
-    # Get offline model configuration
-    offline_cfg = cfg.get("offline_model", {}) if cfg else {}
-    cache_dir = offline_cfg.get("cache_dir", "./offline_models")
-    
-    # Check if this is an offline model
+    # Handle offline: prefix from config
+    actual_model_name = model_name
     if model_name.startswith("offline:"):
-        # Remove offline: prefix
-        actual_model = model_name[8:]
-        # Prepend BAAI namespace if no repo path provided
-        repo = actual_model if "/" in actual_model else f"BAAI/{actual_model}"
-        return OfflineEmbedder(repo, cache_dir=cache_dir)
-    elif model_name in offline_models:
-        # Map bare model names to their HuggingFace repo under BAAI
-        repo = f"BAAI/{model_name}"
-        return OfflineEmbedder(repo, cache_dir=cache_dir)
-    else:
-        # Use OpenAI embedding
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise EnvironmentError(
-                "OPENAI_API_KEY not found – please set it before calling this helper."
-            )
+        actual_model_name = model_name[8:]  # Remove "offline:" prefix
+        logger.info("▸ Stripped offline prefix: %s -> %s", model_name, actual_model_name)
+    
+    # Get cache directory from config or use default
+    # if cfg and "offline_model" in cfg:
+    #     cache_dir = cfg["offline_model"].get("cache_dir", DEFAULT_CACHE_DIR)
+    # else:
+    cache_dir = os.path.join(project_root, "offline_models")
+    
+    return _create_offline_embedder(actual_model_name, cache_dir)
 
-        logger.info("▸ Loading OpenAI embedding model %s", model_name)
-        return OpenAIEmbedding(model=model_name)
+# @functools.lru_cache(maxsize=1)
+def _load_embedder(model_name: str, cfg: dict = None):
+    """Load embedding model with caching."""
+    logger.info("Loading embedding model: %s", model_name)
+    return _build_embedder(model_name, cfg)
 
 
 def _build_splitter(cfg: dict, embedder) -> SemanticSplitterNodeParser:
@@ -341,7 +459,7 @@ def _get_chroma_collection(cfg: dict, collection_name: str):
 def semantic_chunk_text(
     text: str,
     cfg_path: Optional[os.PathLike] | None = None,
-    model_name: str = "offline:bge-small-en-v1.5",
+    model_name: str = "BAAI/bge-small-en-v1.5",
     chunk_size: Optional[int] = None,
     chunk_overlap: Optional[int] = None,
 ) -> List[str]:
@@ -358,7 +476,7 @@ def semantic_chunk_text(
     if chunk_overlap is not None:
         cfg["overlap_sentences"] = chunk_overlap
 
-    embedder = _build_embedder(cfg.get("embed_model", model_name))
+    embedder = _load_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"), cfg) #_build_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"))
     splitter = _build_splitter(cfg, embedder)
 
     logger.info(
@@ -376,6 +494,33 @@ def semantic_chunk_text(
     logger.info("▸ Created %d semantic chunks", len(chunks))
     return chunks
 
+def sliding_window_chunk_text(text: str,
+               cfg_path: Optional[os.PathLike] | None = None,
+               chunk_size: Optional[int] = None,
+               chunk_overlap: Optional[int] = None) -> List[str]:
+    """
+    Return a list of chunks for *text* (page or whole document).
+    """
+    if not text:
+        return []
+    
+    # Load YAML config and allow overrides
+    cfg = _load_cfg(cfg_path)
+    # Override token-based chunk size if provided
+    if chunk_size is not None:
+        cfg["max_tokens"] = chunk_size
+    # Override sentence-based overlap if provided
+    if chunk_overlap is not None:
+        cfg["overlap_words"] = chunk_overlap
+
+    logger.info(
+        "▸ Splitting text with sliding window chunks (chunk_size=%s, overlap=%s)",
+        cfg.get("max_tokens", 300),
+        cfg.get("overlap_words", 30),
+    )
+    chunks = sliding_window_chunks(text, cfg.get("max_tokens", 300), cfg.get("overlap_words", 30))
+    logger.info("▸ Created %d chunks", len(chunks))
+    return chunks
 
 @staticmethod
 def _chunk_obj_to_metadata(chunk_obj: "Chunk") -> dict:
@@ -403,7 +548,7 @@ def save_chunk_obj_to_chroma(
     chunk_obj: "Chunk",
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str | None = None,
-    model_name: str = "offline:bge-small-en-v1.5"
+    model_name: str = "BAAI/bge-small-en-v1.5"
 ):
     """Persist a list of Chunk objects (text + metadata) to ChromaDB."""
     if not chunk_obj:
@@ -411,14 +556,17 @@ def save_chunk_obj_to_chroma(
         return
 
     cfg = _load_cfg(cfg_path)
-    embedder = _build_embedder(cfg.get("embed_model", model_name))
+    # embedder = _build_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"))
+    # embedder = _load_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"), cfg)
+    embedder = SentenceTransformer(str(DEFAULT_CACHE_DIR))
     _, collection = _get_chroma_collection(
         cfg, collection_name or chunk_obj.document_id
     )
 
     logger.info("▸ Embedding %d chunks for Chroma upsert")
     documents =chunk_obj.text
-    embeddings = embedder.get_text_embedding(documents)
+    # embeddings = embedder.get_text_embedding(documents)
+    embeddings = embedder.encode(documents, convert_to_numpy=True)[0].tolist()
     metadatas = _chunk_obj_to_metadata(chunk_obj)
     ids = chunk_obj.chunk_id
 
@@ -434,7 +582,7 @@ def save_chunk_objs_to_chroma(
     chunk_objs: List["Chunk"],
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str | None = None,
-    model_name: str = "offline:bge-small-en-v1.5",
+    model_name: str = "BAAI/bge-small-en-v1.5",
     chunk_size: int = 300,
     chunk_overlap: int = 2
 ):
@@ -444,7 +592,9 @@ def save_chunk_objs_to_chroma(
         return
 
     cfg = _load_cfg(cfg_path)
-    embedder = _build_embedder(cfg.get("embed_model", model_name))
+    # embedder = _build_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"))
+    # embedder = _load_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"), cfg)
+    embedder = SentenceTransformer(str(DEFAULT_CACHE_DIR))
     _, collection = _get_chroma_collection(
         cfg, collection_name or chunk_objs[0].document_id
     )
@@ -452,10 +602,13 @@ def save_chunk_objs_to_chroma(
     logger.info("▸ Embedding %d chunks for Chroma upsert", len(chunk_objs))
     documents = [c.text for c in chunk_objs]
     # embeddings = [embedder.get_text_embedding(txt) for txt in documents]
-    embeddings = []
-    for batch in batched(documents, 100):
-        vecs = embedder.get_text_embeddings(batch)
-        embeddings.extend(vecs)
+    if len(documents) > 100:
+        embeddings = []
+        for batch in batched(documents, 100):
+            vecs = embedder.encode(batch, convert_to_numpy=True).tolist()
+            embeddings.extend(vecs)
+    else:
+        embeddings = embedder.encode(documents, convert_to_numpy=True).tolist()
     metadatas = [_chunk_obj_to_metadata(c) for c in chunk_objs]
     ids = [c.chunk_id for c in chunk_objs]
 
@@ -519,7 +672,7 @@ def save_chunk_to_chroma(
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str = "chunks",
     metadata: Optional[List[dict]] = None,
-    model_name: str = "offline:bge-small-en-v1.5"
+    model_name: str = "BAAI/bge-small-en-v1.5"
 ):
     """Embed raw *chunks* and upsert them into a ChromaDB collection."""
     if not chunk:
@@ -527,10 +680,13 @@ def save_chunk_to_chroma(
         return
 
     cfg = _load_cfg(cfg_path)
-    embedder = _build_embedder(cfg.get("embed_model", model_name))
+    # embedder = _build_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"))
+    # embedder = _load_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"), cfg)
+    embedder = SentenceTransformer(str(DEFAULT_CACHE_DIR))
 
     logger.info("▸ Embedding %d chunks for Chroma upsert")
-    embeddings = embedder.get_text_embedding(chunk)
+    # embeddings = embedder.get_text_embedding(chunk)
+    embeddings = embedder.encode(chunk, convert_to_numpy=True)[0].tolist()
     if metadata is None:
         metadata = {"chunk_index": 0}
 
@@ -556,7 +712,7 @@ def save_chunks_to_chroma(
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str = "chunks",
     metadata: Optional[List[dict]] = None,
-    model_name: str = "offline:bge-small-en-v1.5"
+    model_name: str = "BAAI/bge-small-en-v1.5"
 ):
     """Embed raw *chunks* and upsert them into a ChromaDB collection."""
     if not chunks:
@@ -564,10 +720,19 @@ def save_chunks_to_chroma(
         return
 
     cfg = _load_cfg(cfg_path)
-    embedder = _build_embedder(cfg.get("embed_model", model_name))
+    # embedder = _build_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"))
+    # embedder = _load_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"), cfg)
+    embedder = SentenceTransformer(str(DEFAULT_CACHE_DIR))
+
 
     logger.info("▸ Embedding %d chunks for Chroma upsert", len(chunks))
-    embeddings = [embedder.get_text_embedding(ch) for ch in chunks]
+    if len(chunks) > 100:
+        embeddings = []
+        for batch in batched(chunks, 100):
+            vecs = embedder.encode(batch, convert_to_numpy=True).tolist()
+            embeddings.extend(vecs)
+    else:
+        embeddings = embedder.encode(chunks, convert_to_numpy=True).tolist()
 
     if metadata is None:
         metadata = [{"chunk_index": i} for i in range(len(chunks))]
@@ -598,15 +763,15 @@ def save_chunks_to_chroma(
 # CLI helper (quick test)
 # ---------------------------------------------------------------------------
 
-@timer_wrap
-def download_offline_model(model_name: str = "bge-small-en-v1.5"):
-    """Download and cache an offline model for use."""
-    success = OfflineEmbedder.download_model(model_name)
-    if success:
-        logger.info("✅ Offline model %s ready for use", model_name)
-    else:
-        logger.error("❌ Failed to download offline model %s", model_name)
-    return success
+# @timer_wrap
+# def download_offline_model(model_name: str = "bge-small-en-v1.5"):
+#     """Download and cache an offline model for use."""
+#     success = OfflineEmbedder.download_model(model_name)
+#     if success:
+#         logger.info("✅ Offline model %s ready for use", model_name)
+#     else:
+#         logger.error("❌ Failed to download offline model %s", model_name)
+#     return success
 
 @timer_wrap
 def cleanup_chroma_by_ids(chunk_ids: List[str], collection_name: str, cfg_path: str):
@@ -623,23 +788,23 @@ def cleanup_chroma_by_ids(chunk_ids: List[str], collection_name: str, cfg_path: 
     # Assuming they are defined elsewhere or will be added.
 
 
-if __name__ == "__main__":  # pragma: no cover
-    import sys
-    import textwrap
+# if __name__ == "__main__":  # pragma: no cover
+#     import sys
+#     import textwrap
 
-    # Check if we're being asked to download a model
-    if len(sys.argv) > 1 and sys.argv[1] == "download":
-        model_name = sys.argv[2] if len(sys.argv) > 2 else "bge-small-en-v1.5"
-        download_offline_model(model_name)
-    else:
-        # Default demo
-        sample_text = textwrap.dedent(
-            """
-            Semantic chunking splits text along **topic changes** instead of raw
-            token counts.  This standalone demo embeds the chunks via OpenAI and
-            stores them in a local ChromaDB collection named 'test'.
-            """
-        ).strip()
+#     # Check if we're being asked to download a model
+#     if len(sys.argv) > 1 and sys.argv[1] == "download":
+#         model_name = sys.argv[2] if len(sys.argv) > 2 else "bge-small-en-v1.5"
+#         download_offline_model(model_name)
+#     else:
+#         # Default demo
+#         sample_text = textwrap.dedent(
+#             """
+#             Semantic chunking splits text along **topic changes** instead of raw
+#             token counts.  This standalone demo embeds the chunks via OpenAI and
+#             stores them in a local ChromaDB collection named 'test'.
+#             """
+#         ).strip()
 
-        cks = semantic_chunk_text(sample_text)
-        save_chunks_to_chroma(cks, collection_name="test")
+#         cks = semantic_chunk_text(sample_text)
+#         save_chunks_to_chroma(cks, collection_name="test")
