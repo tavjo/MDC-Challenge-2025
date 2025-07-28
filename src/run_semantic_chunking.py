@@ -99,8 +99,8 @@ def main():
     # default_workers = max(1, cpu_count - 1)
     logger.info(f"Using {default_workers} workers.")
     semantic_chunker = SemanticChunkingPipeline(
-        subset = True,
-        subset_size = 5,
+        subset = False,
+        # subset_size = 5,
         cfg_path = DEFAULT_CHROMA_CONFIG,
         db_path = DEFAULT_DUCKDB_PATH,
         collection_name = "mdc_training_data",

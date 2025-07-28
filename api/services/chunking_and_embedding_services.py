@@ -23,7 +23,7 @@ sys.path.append(project_root)
 # Local imports
 from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult, DocumentChunkingResult
 from src.helpers import initialize_logging, timer_wrap, load_docs, preprocess_text, sliding_window_chunks
-from src.semantic_chunking import sliding_window_chunk_text, save_chunk_objs_to_chroma, cleanup_chroma_by_ids
+from src.semantic_chunking import sliding_window_chunk_text, save_chunk_objs_to_chroma
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 # from src.get_citation_entities import CitationEntityExtractor
 import duckdb
