@@ -52,21 +52,26 @@ except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 # Add project root to path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(project_root)
 
 from src.models import Chunk, ChunkMetadata, CitationEntity
-from src.helpers import initialize_logging
+from src.helpers import initialize_logging, timer_wrap, preprocess_text
 from api.utils.duckdb_utils import get_duckdb_helper
 
 # Initialize logging
 filename = os.path.basename(__file__)
 logger = initialize_logging(log_file=filename)
 
+DEFAULT_CACHE_DIR = Path(
+    os.path.join(project_root, "offline_models")
+)
+
 # ---------------------------------------------------------------------------
 # Configuration and Setup
 # ---------------------------------------------------------------------------
 
+@timer_wrap
 def _load_cfg(cfg_path: os.PathLike | None = None) -> Dict[str, Any]:
     """Load YAML config matching existing semantic_chunking.py pattern."""
     default_path = Path("configs/chunking.yaml")
@@ -83,6 +88,7 @@ def _load_cfg(cfg_path: os.PathLike | None = None) -> Dict[str, Any]:
     return cfg
 
 
+@timer_wrap
 def _get_chroma_collection(cfg: Dict[str, Any], collection_name: str):
     """Get ChromaDB collection using existing project pattern."""
     chroma_path = Path(cfg["vector_store"].get("path", "./local_chroma")).expanduser()
@@ -176,31 +182,38 @@ def _load_embedder(model_name: str, cfg: dict = None):
     return _build_embedder(model_name, cfg)
 
 
-def _embed_text(texts: Sequence[str], model_name: str, cfg: dict = None) -> List[List[float]]:
-    """
-    Generate embeddings for text queries using OpenAI or offline models.
+# def _embed_text(texts: Sequence[str], model_name: str, cfg: dict = None) -> List[List[float]]:
+#     """
+#     Generate embeddings for text queries using OpenAI or offline models.
     
-    Args:
-        texts: List of text strings to embed
-        model_name: Name of the embedding model
-        cfg: Configuration dictionary
+#     Args:
+#         texts: List of text strings to embed
+#         model_name: Name of the embedding model
+#         cfg: Configuration dictionary
         
-    Returns:
-        List of embedding vectors
-    """
-    embedder = _load_embedder(model_name, cfg)
+#     Returns:
+#         List of embedding vectors
+#     """
+#     embedder = _load_embedder(model_name, cfg)
     
-    # Handle both OpenAI and offline embedders
-    if hasattr(embedder, 'get_text_embeddings'):
-        # Offline embedder with batch method
-        return embedder.get_text_embeddings(list(texts))
-    else:
-        # OpenAI embedder - process one by one
-        embeddings = []
-        for text in texts:
-            embedding = embedder.get_text_embedding(text)
-            embeddings.append(embedding)
-        return embeddings
+#     # Handle both OpenAI and offline embedders
+#     if hasattr(embedder, 'get_text_embeddings'):
+#         # Offline embedder with batch method
+#         return embedder.get_text_embeddings(list(texts))
+#     else:
+#         # OpenAI embedder - process one by one
+#         embeddings = []
+#         for text in texts:
+#             embedding = embedder.get_text_embedding(text)
+#             embeddings.append(embedding)
+#         return embeddings
+
+@timer_wrap
+def _embed_text(texts: Sequence[str], model_name: str = DEFAULT_CACHE_DIR) -> List[List[float]]:
+    embedder = SentenceTransformer(str(model_name))
+    embeddings = embedder.encode(texts, convert_to_numpy=True).tolist()
+    return embeddings
+
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +251,7 @@ DATA_CITATION_KEYWORDS = {
     ]
 }
 
-
+@timer_wrap
 def _detect_data_citation_entities(meta: Dict[str, Any], chunk_text: str = None) -> Dict[str, Any]:
     """
     Detect data citation indicators in chunk metadata and text.
@@ -267,7 +280,7 @@ def _detect_data_citation_entities(meta: Dict[str, Any], chunk_text: str = None)
     
     # Analyze chunk text if available
     if chunk_text:
-        text_lower = chunk_text.lower()
+        text_lower = preprocess_text(chunk_text)
         
         # Check each keyword category
         for category, keywords in DATA_CITATION_KEYWORDS.items():
@@ -307,7 +320,7 @@ class ChromaRetriever:
         collection_name: str, 
         symbolic_boost: float = 0.15,
         use_fusion_scoring: bool = True,
-        model_name: str = "text-embedding-3-small"
+        model_name: str = DEFAULT_CACHE_DIR
     ):
         """
         Initialize the hybrid retriever.
@@ -333,7 +346,7 @@ class ChromaRetriever:
             collection_name, self.model_name, use_fusion_scoring
         )
     
-    def retrieve_chunks(self, query_texts: List[str], k: int = 4) -> List[Chunk]:
+    def retrieve_chunks(self, query_texts: List[str], k: int = 3) -> List[Chunk]:
         """
         Retrieve top-K chunks using ChromaDB search + DuckDB data retrieval.
         
@@ -352,7 +365,7 @@ class ChromaRetriever:
         
         # Step 1: Generate embeddings for queries
         logger.info("Generating embeddings for queries")
-        query_embeddings = _embed_text(query_texts, self.model_name, self.cfg)
+        query_embeddings = _embed_text(query_texts, self.model_name)
         
         # Step 2: Search ChromaDB for chunk IDs and metadata
         candidate_results = []
@@ -580,6 +593,34 @@ def retrieve_top_chunks(
     except Exception as e:
         logger.error("Error in retrieve_top_chunks: %s", e)
         return []
+
+def batched(seq, n=100):
+    for i in range(0, len(seq), n):
+        yield seq[i:i+n]
+
+@timer_wrap
+def batch_retrieve_top_chunks(
+        query_texts: List[str],
+        max_workers: int = 1,
+        collection_name: str = "test_collection",
+        k: int = 3,
+        cfg_path: os.PathLike | None = Path(os.path.join(project_root, "configs", "chunking.yaml")),
+        symbolic_boost: float = 0.15,
+        use_fusion_scoring: bool = True,
+) -> List[Chunk]:
+    """
+    Retrieve top-k chunks for a list of query texts in parallel.
+    Args:
+        query_texts: List of query texts to search for
+        max_workers: Number of parallel worker threads
+        collection_name: ChromaDB collection name
+        k: Number of chunks to retrieve
+        cfg_path: Path to chunking config file (defaults to configs/chunking.yaml)
+        symbolic_boost: Multiplier for symbolic boosting (0.0 to disable)
+        use_fusion_scoring: Whether to enable fusion scoring with entity boosting
+        analyze_chunk_text: Whether to perform enhanced text analysis (slower but more accurate)
+    """
+    pass
 
 
 # ---------------------------------------------------------------------------

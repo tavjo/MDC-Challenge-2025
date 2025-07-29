@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 
 # Add project root to path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.append(project_root)
 
 # Local imports

@@ -309,3 +309,40 @@ class EmbeddingResult(BaseModel):
     model_name: Optional[str] = Field(None, description="Name of the model used for embedding")
     collection_name: Optional[str] = Field(None, description="Name of the collection in ChromaDB")
     id: str = Field(..., description="ID of the embedding in ChromaDB if not associated with a chunk")
+
+class RetrievalPayload(BaseModel):
+    """Payload for the retrieval API"""
+    query_texts: Dict[str, List[str]] = Field(..., description="Dictionary of dataset ID to query texts to search for")
+    collection_name: str = Field(..., description="Name of the collection in ChromaDB")
+    k: int = Field(3, description="Number of chunks to retrieve")
+    cfg_path: Optional[str] = Field(None, description="Path to the configuration file")
+    model_name: Optional[str] = Field(None, description="Name of the model used for embedding or the path to the local model")
+    symbolic_boost: Optional[float] = Field(0.15, description="Symbolic boost for the retrieval")
+    use_fusion_scoring: Optional[bool] = Field(True, description="Whether to use fusion scoring")
+    analyze_chunk_text: Optional[bool] = Field(False, description="Whether to analyze the chunk text")
+    max_workers: Optional[int] = Field(1, description="Number of parallel worker threads")
+
+class RetrievalResult(BaseModel):
+    """Single query retrieval result"""
+    collection_name: Optional[str] = Field(None, description="Name of the collection in ChromaDB")
+    success: bool = Field(..., description="Whether the retrieval pipeline completed successfully.")
+    error: Optional[str] = Field(None, description="Error message if pipeline failed.")
+    k: int = Field(3, description="Number of chunks retrieved")
+    chunk_ids: List[str] = Field([], description="List of chunk IDs retrieved if any")
+    median_score: Optional[float] = Field(None, description="Median score of the retrieved chunks")
+    max_score: Optional[float] = Field(None, description="Maximum score of the retrieved chunks")
+    retrieval_time: Optional[float] = Field(None, description="Time taken to retrieve the chunks")
+
+class BatchRetrievalResult(BaseModel):
+    """Batch retrieval result"""
+    collection_name: Optional[str] = Field(None, description="Name of the collection in ChromaDB")
+    total_queries: int = Field(..., description="Total number of queries")
+    success: bool = Field(..., description="Whether the retrieval pipeline completed successfully.")
+    error: Optional[str] = Field(None, description="Error message if pipeline failed.")
+    k: int = Field(3, description="Number of chunks retrieved")
+    chunk_ids: dict[str, List[str]] = Field({}, description="Dictionary of dataset ID to chunk IDs retrieved if any")
+    median_score: Optional[float] = Field(None, description="Median score of the retrieved chunks")
+    max_score: Optional[float] = Field(None, description="Maximum score of the retrieved chunks")
+    avg_retrieval_time: Optional[float] = Field(None, description="Time taken to retrieve the chunks")
+    max_retrieval_time: Optional[float] = Field(None, description="Maximum time taken to retrieve the chunks")
+    total_failed_queries: Optional[int] = Field(None, description="Total number of failed queries")
