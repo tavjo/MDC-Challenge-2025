@@ -313,6 +313,7 @@ class EmbeddingResult(BaseModel):
 class RetrievalPayload(BaseModel):
     """Payload for the retrieval API"""
     query_texts: Dict[str, List[str]] = Field(..., description="Dictionary of dataset ID to query texts to search for")
+    doc_id_map: Dict[str, str] = Field({}, description="Dictionary of dataset ID to document ID")
     collection_name: str = Field(..., description="Name of the collection in ChromaDB")
     k: int = Field(3, description="Number of chunks to retrieve")
     cfg_path: Optional[str] = Field(None, description="Path to the configuration file")

@@ -18,8 +18,9 @@ import duckdb
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from src.models import Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload
+from src.models import Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload, RetrievalPayload, BatchRetrievalResult
 from api.services.chunking_and_embedding_services import run_semantic_chunking_pipeline
+from api.services.retriever_services import batch_retrieve_top_chunks
 from src.helpers import initialize_logging
 from src.semantic_chunking import semantic_chunk_text
 # from api.utils.duckdb_utils import get_duckdb_helper
@@ -135,6 +136,29 @@ async def embed_chunks(
     except Exception as e:
         logger.error(f"Chunk creation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Chunk creation failed: {str(e)}")
+
+# New Batch Retrieval endpoint
+@app.post("/batch_retrieve", response_model=BatchRetrievalResult)
+async def batch_retrieve(payload: RetrievalPayload) -> BatchRetrievalResult:
+    """
+    Batch retrieve top-k chunks for multiple keys.
+    """
+    try:
+        logger.info(f"Starting batch retrieval for {len(payload.query_texts)} keys")
+        return batch_retrieve_top_chunks(
+            query_texts=payload.query_texts,
+            max_workers=payload.max_workers or 1,
+            collection_name=payload.collection_name,
+            k=payload.k,
+            cfg_path=payload.cfg_path or DEFAULT_CHROMA_CONFIG,
+            symbolic_boost=payload.symbolic_boost or 0.15,
+            use_fusion_scoring=payload.use_fusion_scoring or True,
+            analyze_chunk_text=payload.analyze_chunk_text or False,
+            doc_id_map=payload.doc_id_map or {}
+        )
+    except Exception as e:
+        logger.error("Batch retrieval failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/run_semantic_chunking", response_model=ChunkingResult)
 async def run_pipeline(

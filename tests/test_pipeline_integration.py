@@ -23,8 +23,8 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from preprocessing import PreprocessingPipeline
-from src.pipeline_config import ConfigurationManager, PipelineConfig
-from src.pipeline_visualization import PipelineVisualizer
+from src.tools.pipeline_config import ConfigurationManager, PipelineConfig
+from src.tools.pipeline_visualization import PipelineVisualizer
 
 
 class TestFullPipelineExecution(unittest.TestCase):

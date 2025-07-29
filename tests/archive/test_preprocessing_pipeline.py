@@ -25,8 +25,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from preprocessing import PreprocessingPipeline, StepStatus, ErrorType
-from src.pipeline_config import ConfigurationManager, PipelineConfig, StepConfig
-from src.pipeline_visualization import PipelineVisualizer
+from src.tools.pipeline_config import ConfigurationManager, PipelineConfig, StepConfig
+from src.tools.pipeline_visualization import PipelineVisualizer
 
 
 class TestPreprocessingPipeline(unittest.TestCase):

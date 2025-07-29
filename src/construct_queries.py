@@ -16,11 +16,12 @@ from api.utils.duckdb_utils import get_duckdb_helper
 from src.models import RetrievalPayload
 
 # Add project root to path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.append(project_root)
+print(project_root)
 
 # Local imports
-from src.models import RetrievalPayload, RetrievalResult, BatchRetrievalResult
+from src.models import RetrievalPayload, BatchRetrievalResult
 from src.helpers import initialize_logging, timer_wrap
 import requests
 
@@ -41,7 +42,7 @@ def main():
         help="Base URL for the retrieval API"
     )
     parser.add_argument(
-        "--collection-name", required=True,
+        "--collection-name", default="mdc_training_data",
         help="ChromaDB collection name for retrieval"
     )
     parser.add_argument(
@@ -58,9 +59,11 @@ def main():
 
     # Build mapping of dataset ID to its enriched query text
     query_texts: dict[str, list[str]] = {}
+    document_ids = set()
     for ce in citations:
         # Retrieve all chunks for the document
         chunks = db_helper.get_chunks_by_document_id(ce.document_id)
+        document_ids.add(ce.document_id)
         # Find the chunk containing this dataset citation
         target = None
         for c in chunks:
@@ -84,8 +87,26 @@ def main():
         query_text = " ".join(parts)
         query_texts[ce.data_citation] = [query_text]
 
+    if len(document_ids) != 95:
+        logger.error(f"Expected 95 document IDs, got {len(document_ids)}")
+        raise ValueError(f"Expected 95 document IDs, got {len(document_ids)}")
+    else:
+        logger.info(f"Found {len(document_ids)} document IDs with dataset citations.")
+    
+    # build map of document IDs to dataset IDs
+    doc_id_map = {}
+    for doc_id in document_ids:
+        for ce in citations:
+            if ce.document_id == doc_id:
+                doc_id_map[ce.data_citation] = doc_id
+    
+    if len(doc_id_map) != len(citations):
+        logger.error(f"ID map length mismatch: expected {len(citations)}, got {len(doc_id_map)}")
+        raise ValueError(f"ID map length mismatch: expected {len(citations)}, got {len(doc_id_map)}")
+    else:
+        logger.info(f"Mapped {len(doc_id_map)} document IDs with dataset citations.")
     # Call the batch retrieval API endpoint with Pydantic payload
-    url = f"{args.base_url}/batch_retrieve_top_chunks"
+    url = f"{args.base_url}/batch_retrieve"
     # Determine default max_workers as half the CPU count, minimum 1
     cpu_count = os.cpu_count() or 1
     default_workers = max(1, cpu_count // 2)
@@ -94,6 +115,7 @@ def main():
         collection_name=args.collection_name,
         k=args.k,
         max_workers=default_workers,
+        doc_id_map=doc_id_map
     )
     payload_data = payload_obj.model_dump(exclude_none=True)
     response = requests.post(url, json=payload_data)
