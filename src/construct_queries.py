@@ -105,6 +105,7 @@ def main():
         raise ValueError(f"ID map length mismatch: expected {len(citations)}, got {len(doc_id_map)}")
     else:
         logger.info(f"Mapped {len(doc_id_map)} document IDs with dataset citations.")
+    logger.info(f"---Starting Batch retrieval of top {args.k} chunks for {len(query_texts)} dataset IDs across {len(set(doc_id_map.values()))} documents---")
     # Call the batch retrieval API endpoint with Pydantic payload
     url = f"{args.base_url}/batch_retrieve"
     # Determine default max_workers as half the CPU count, minimum 1

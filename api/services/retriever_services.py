@@ -68,7 +68,7 @@ import statistics
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.models import RetrievalResult, BatchRetrievalResult
 
-# Thread-local retriever to avoid multiple DuckDB initializations per thread
+# Thread-local retriever to avoid multiple ChromaDB initializations per thread
 _thread_local = threading.local()
 # Shared cache of Chroma collections
 _chroma_cache: dict[str, chromadb.Collection] = {}
@@ -567,6 +567,7 @@ def batch_retrieve_top_chunks(
         use_fusion_scoring: Whether to enable fusion scoring with entity boosting
         analyze_chunk_text: Whether to perform enhanced text analysis (slower but more accurate)
     """
+    logger.info(f"---Starting Batch retrieval of top {k} chunks for {len(query_texts)} dataset IDs across {len(set(doc_id_map.values()))} documents---")
     if len(doc_id_map) < 1:
         logger.warning("No document IDs mapped to Dataset IDs. Retrieval will be performed without document ID filtering.")
     else:

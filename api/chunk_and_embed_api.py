@@ -22,7 +22,7 @@ from src.models import Document, ChunkingResult, EmbeddingResult, ChunkingPipeli
 from api.services.chunking_and_embedding_services import run_semantic_chunking_pipeline
 from api.services.retriever_services import batch_retrieve_top_chunks
 from src.helpers import initialize_logging
-from src.semantic_chunking import semantic_chunk_text
+from src.semantic_chunking import sliding_window_chunk_text
 # from api.utils.duckdb_utils import get_duckdb_helper
 from api.services.embeddings_services import embed_chunk, embed_chunks
 
@@ -67,9 +67,9 @@ async def create_chunks(
         if cfg_path is None:
             cfg_path = DEFAULT_CHROMA_CONFIG
         if model_name is None:
-            chunks = semantic_chunk_text(text, cfg_path, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            chunks = sliding_window_chunk_text(text, cfg_path, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         else:
-            chunks = semantic_chunk_text(text, cfg_path, model_name, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            chunks = sliding_window_chunk_text(text, cfg_path,chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         logger.info(f"Created {len(chunks)} chunks")
         return chunks
     except Exception as e:
@@ -91,7 +91,7 @@ async def batch_create_chunks(
         logger.info(f"Creating chunks for {len(texts)} texts.")
         chunks = {}
         for i, text in enumerate(texts):
-            chunks[i] = (semantic_chunk_text(text, cfg_path, model_name, chunk_size=chunk_size, chunk_overlap=chunk_overlap))
+            chunks[i] = (sliding_window_chunk_text(text, cfg_path, chunk_size=chunk_size, chunk_overlap=chunk_overlap))
         logger.info(f"Created {len(chunks)} chunks")
         return chunks
     except Exception as e:
@@ -148,7 +148,7 @@ async def batch_retrieve(payload: RetrievalPayload) -> BatchRetrievalResult:
         return batch_retrieve_top_chunks(
             query_texts=payload.query_texts,
             max_workers=payload.max_workers or 1,
-            collection_name=payload.collection_name,
+            collection_name=payload.collection_name or "mdc_training_data",
             k=payload.k,
             cfg_path=payload.cfg_path or DEFAULT_CHROMA_CONFIG,
             symbolic_boost=payload.symbolic_boost or 0.15,
@@ -181,7 +181,7 @@ async def run_pipeline(
             # "output_path": payload.output_path,
             "chunk_size": payload.chunk_size,
             "chunk_overlap": payload.chunk_overlap,
-            "collection_name": payload.collection_name,
+            "collection_name": payload.collection_name or "mdc_training_data",
             "cfg_path": payload.cfg_path or DEFAULT_CHROMA_CONFIG,
             "subset": payload.subset,
             "subset_size": payload.subset_size,
@@ -204,7 +204,7 @@ async def run_pipeline(
 async def chunk_specific_documents(
     documents: List[Document],
     db_path: Optional[str] = Query(DEFAULT_DUCKDB_PATH, description="Path to DuckDB database"),
-    collection_name: Optional[str] = Query("semantic_chunks", description="ChromaDB collection name"),
+    collection_name: Optional[str] = Query("mdc_training_data", description="ChromaDB collection name"),
     chunk_size: Optional[int] = Query(200, description="Target chunk size in tokens"),
     chunk_overlap: Optional[int] = Query(20, description="Overlap between chunks in tokens")
 ):

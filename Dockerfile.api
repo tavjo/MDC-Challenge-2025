@@ -44,7 +44,7 @@ COPY api/ /app/api/
 COPY configs/ /app/configs/
 COPY tests/ /app/tests/
 
-RUN mkdir -p artifacts logs
+RUN mkdir -p artifacts logs Data local_chroma
 
 ENV PATH="/app/.venv/bin:${PATH}"
 

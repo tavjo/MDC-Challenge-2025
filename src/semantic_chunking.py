@@ -44,6 +44,8 @@ from llama_index.core.schema import Document
 # from llama_index.core.constants import DEFAULT_CHUNK_SIZE
 # from llama_index.core.node_parser.text.sentence import SENTENCE_CHUNK_OVERLAP
 from dotenv import load_dotenv
+import threading
+import numpy as np
 
 load_dotenv()
 
@@ -53,14 +55,6 @@ try:
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
-
-# For error handling
-# try:
-#     from huggingface_hub import LocalEntryNotFoundError
-# except ImportError:
-#     # Fallback for older versions
-#     LocalEntryNotFoundError = OSError
-# import torch
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
@@ -89,8 +83,6 @@ except Exception:  # pragma: no cover – stand-alone fallback
 
         return wrapper
 
-# logger.addHandler(logging.StreamHandler())
-# logger.setLevel(logging.INFO)
 
 # ---------------------------------------------------------------------------
 # Config helpers
@@ -108,17 +100,100 @@ def batched(seq, n=100):
         yield seq[i:i+n]
 
 
-def _load_cfg(cfg_path: Optional[os.PathLike] | None = None) -> dict:
-    """Load YAML config and sanity-check required keys."""
-    path = Path(cfg_path or DEFAULT_CFG_PATH).expanduser()
-    if not path.exists():
-        raise FileNotFoundError(f"Chunking config not found: {path}")
-    with open(path, "r", encoding="utf-8") as fh:
-        cfg: dict = yaml.safe_load(fh) or {}
+# def _load_cfg(cfg_path: Optional[os.PathLike] | None = None) -> dict:
+#     """Load YAML config and sanity-check required keys."""
+#     path = Path(cfg_path or DEFAULT_CFG_PATH).expanduser()
+#     if not path.exists():
+#         raise FileNotFoundError(f"Chunking config not found: {path}")
+#     with open(path, "r", encoding="utf-8") as fh:
+#         cfg: dict = yaml.safe_load(fh) or {}
 
-    if cfg.get("splitter", "semantic") != "semantic":
-        raise ValueError("cfg['splitter'] must be 'semantic' for this helper")
+#     if cfg.get("splitter", "semantic") != "semantic":
+#         raise ValueError("cfg['splitter'] must be 'semantic' for this helper")
+#     return cfg
+# Thread-local retriever to avoid multiple ChromaDB initializations per thread
+_thread_local = threading.local()
+# Shared cache of Chroma collections
+_chroma_cache: dict[str, chromadb.Collection] = {}
+# Lock to guard shared Chroma collection cache
+_chroma_cache_lock = threading.Lock()
+
+def get_retriever(cfg_path, collection_name, symbolic_boost, use_fusion_scoring):
+    if not hasattr(_thread_local, "retriever"):
+        cfg = _load_cfg(cfg_path)
+        _thread_local.retriever = ChromaRetriever(
+            cfg,
+            collection_name,
+            symbolic_boost=symbolic_boost,
+            use_fusion_scoring=use_fusion_scoring
+        )
+    return _thread_local.retriever
+
+# Initialize logging
+filename = os.path.basename(__file__)
+logger = initialize_logging(log_file=filename)
+
+DEFAULT_CACHE_DIR = Path(
+    os.path.join(project_root, "offline_models")
+)
+# Lazy-load embedder to avoid repeated heavy loads
+_embedder_lock = threading.Lock()
+_EMBEDDER: Optional[SentenceTransformer] = None
+
+def _get_embedder(model_path: str) -> SentenceTransformer:
+    global _EMBEDDER
+    if _EMBEDDER is None:
+        with _embedder_lock:
+            if _EMBEDDER is None:
+                _EMBEDDER = SentenceTransformer(model_path)
+    return _EMBEDDER
+
+@timer_wrap
+def _load_cfg(cfg_path: os.PathLike | None = None) -> Dict[str, Any]:
+    """Load YAML config matching existing semantic_chunking.py pattern."""
+    default_path = Path("configs/chunking.yaml")
+    path = Path(cfg_path or default_path).expanduser()
+    
+    if not path.exists():
+        raise FileNotFoundError(f"Config not found: {path}")
+        
+    with path.open("r", encoding="utf-8") as fh:
+        cfg: Dict[str, Any] = yaml.safe_load(fh) or {}
+    
+    if "vector_store" not in cfg:
+        raise KeyError("YAML must define a 'vector_store' section")
     return cfg
+
+
+@timer_wrap
+def _get_chroma_collection(cfg: Dict[str, Any], collection_name: str):
+    """Return a *shared* Collection instance (thread-safe)"""
+    # Guard shared cache with a lock
+    with _chroma_cache_lock:
+        if collection_name in _chroma_cache:
+            return _chroma_cache[collection_name]
+
+        chroma_path = Path(cfg["vector_store"].get("path", "./local_chroma")).expanduser()
+        chroma_path.mkdir(parents=True, exist_ok=True)
+        client = chromadb.PersistentClient(path=str(chroma_path))
+        _chroma_cache[collection_name] = client.get_or_create_collection(collection_name)
+        return _chroma_cache[collection_name]
+
+
+# ---------------------------------------------------------------------------
+# Embedding Functions (Adapted from semantic_chunking.py)
+# ---------------------------------------------------------------------------
+
+@timer_wrap
+def _embed_text(texts: List[str], model_name: Optional[str] = None, batch_size: int = 100) -> np.ndarray:
+    embedder = _get_embedder(str(model_name or DEFAULT_CACHE_DIR))
+    embeddings = embedder.encode(texts, convert_to_numpy=True, batch_size=batch_size)
+    # Ensure embeddings array is not empty
+    if embeddings is None or (isinstance(embeddings, np.ndarray) and embeddings.size == 0):
+        logger.error("No embeddings generated for %d texts", len(texts))
+        return []
+    return embeddings
+
 
 
 # ---------------------------------------------------------------------------
@@ -373,61 +448,61 @@ def _load_cfg(cfg_path: Optional[os.PathLike] | None = None) -> dict:
 #     #     return OpenAIEmbedding(model=model_name)
 
 
-def _create_offline_embedder(model_name: str, cache_dir: str):
-    """Create offline embedder using SentenceTransformer."""
-    if not SENTENCE_TRANSFORMERS_AVAILABLE:
-        raise ImportError(
-            "SentenceTransformers not available. Install with: pip install sentence-transformers"
-        )
+# def _create_offline_embedder(model_name: str, cache_dir: str):
+#     """Create offline embedder using SentenceTransformer."""
+#     if not SENTENCE_TRANSFORMERS_AVAILABLE:
+#         raise ImportError(
+#             "SentenceTransformers not available. Install with: pip install sentence-transformers"
+#         )
     
-    # Create a wrapper to match llama_index interface
-    class OfflineEmbedder(BaseEmbedding):
-        def __init__(self,cache_dir):
-            self.model = SentenceTransformer(str(cache_dir))
+#     # Create a wrapper to match llama_index interface
+#     class OfflineEmbedder(BaseEmbedding):
+#         def __init__(self,cache_dir):
+#             self.model = SentenceTransformer(str(cache_dir))
 
-         # Required sync methods
-        def _get_query_embedding(self, query: str):
-            return self.model.encode([query], convert_to_numpy=True)[0].tolist()
+#          # Required sync methods
+#         def _get_query_embedding(self, query: str):
+#             return self.model.encode([query], convert_to_numpy=True)[0].tolist()
 
-        def _get_text_embedding(self, text: str):
-            return self._get_query_embedding(text)
+#         def _get_text_embedding(self, text: str):
+#             return self._get_query_embedding(text)
 
-        def _get_text_embeddings(self, texts: list[str]):
-            return self.model.encode(texts, convert_to_numpy=True).tolist()
+#         def _get_text_embeddings(self, texts: list[str]):
+#             return self.model.encode(texts, convert_to_numpy=True).tolist()
 
-         # Required async stubs (simple wrappers)
-        async def _aget_query_embedding(self, query: str):
-            return self._get_query_embedding(query)
+#          # Required async stubs (simple wrappers)
+#         async def _aget_query_embedding(self, query: str):
+#             return self._get_query_embedding(query)
 
-        async def _aget_text_embedding(self, text: str):
-            return self._get_text_embedding(text)
+#         async def _aget_text_embedding(self, text: str):
+#             return self._get_text_embedding(text)
     
-    return OfflineEmbedder(model_name, cache_dir)
+#     return OfflineEmbedder(model_name, cache_dir)
 
-def _build_embedder(model_name: str, cfg: dict = None):
-    """Return a HuggingFaceEmbedding instance on CPU (no CUDA required)."""
+# def _build_embedder(model_name: str, cfg: dict = None):
+#     """Return a HuggingFaceEmbedding instance on CPU (no CUDA required)."""
 
-    logger.info("▸ Loading local embedding model %s", model_name)
+#     logger.info("▸ Loading local embedding model %s", model_name)
     
-    # Handle offline: prefix from config
-    actual_model_name = model_name
-    if model_name.startswith("offline:"):
-        actual_model_name = model_name[8:]  # Remove "offline:" prefix
-        logger.info("▸ Stripped offline prefix: %s -> %s", model_name, actual_model_name)
+#     # Handle offline: prefix from config
+#     actual_model_name = model_name
+#     if model_name.startswith("offline:"):
+#         actual_model_name = model_name[8:]  # Remove "offline:" prefix
+#         logger.info("▸ Stripped offline prefix: %s -> %s", model_name, actual_model_name)
     
-    # Get cache directory from config or use default
-    # if cfg and "offline_model" in cfg:
-    #     cache_dir = cfg["offline_model"].get("cache_dir", DEFAULT_CACHE_DIR)
-    # else:
-    cache_dir = os.path.join(project_root, "offline_models")
+#     # Get cache directory from config or use default
+#     # if cfg and "offline_model" in cfg:
+#     #     cache_dir = cfg["offline_model"].get("cache_dir", DEFAULT_CACHE_DIR)
+#     # else:
+#     cache_dir = os.path.join(project_root, "offline_models")
     
-    return _create_offline_embedder(actual_model_name, cache_dir)
+#     return _create_offline_embedder(actual_model_name, cache_dir)
 
 # @functools.lru_cache(maxsize=1)
-def _load_embedder(model_name: str, cfg: dict = None):
-    """Load embedding model with caching."""
-    logger.info("Loading embedding model: %s", model_name)
-    return _build_embedder(model_name, cfg)
+# def _load_embedder(model_name: str, cfg: dict = None):
+#     """Load embedding model with caching."""
+#     logger.info("Loading embedding model: %s", model_name)
+#     return _build_embedder(model_name, cfg)
 
 
 def _build_splitter(cfg: dict, embedder) -> SemanticSplitterNodeParser:
@@ -455,44 +530,44 @@ def _get_chroma_collection(cfg: dict, collection_name: str):
 # ---------------------------------------------------------------------------
 
 
-@timer_wrap
-def semantic_chunk_text(
-    text: str,
-    cfg_path: Optional[os.PathLike] | None = None,
-    model_name: str = "BAAI/bge-small-en-v1.5",
-    chunk_size: Optional[int] = None,
-    chunk_overlap: Optional[int] = None,
-) -> List[str]:
-    """Return a list of semantic chunks for *text* (page or whole document)."""
-    if not text:
-        return []
+# @timer_wrap
+# def semantic_chunk_text(
+#     text: str,
+#     cfg_path: Optional[os.PathLike] | None = None,
+#     model_name: str = "BAAI/bge-small-en-v1.5",
+#     chunk_size: Optional[int] = None,
+#     chunk_overlap: Optional[int] = None,
+# ) -> List[str]:
+#     """Return a list of semantic chunks for *text* (page or whole document)."""
+#     if not text:
+#         return []
 
-    # Load YAML config and allow overrides
-    cfg = _load_cfg(cfg_path)
-    # Override token-based chunk size if provided
-    if chunk_size is not None:
-        cfg["max_tokens"] = chunk_size
-    # Override sentence-based overlap if provided
-    if chunk_overlap is not None:
-        cfg["overlap_sentences"] = chunk_overlap
+#     # Load YAML config and allow overrides
+#     cfg = _load_cfg(cfg_path)
+#     # Override token-based chunk size if provided
+#     if chunk_size is not None:
+#         cfg["max_tokens"] = chunk_size
+#     # Override sentence-based overlap if provided
+#     if chunk_overlap is not None:
+#         cfg["overlap_sentences"] = chunk_overlap
 
-    embedder = _load_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"), cfg) #_build_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"))
-    splitter = _build_splitter(cfg, embedder)
+#     embedder = _load_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"), cfg) #_build_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"))
+#     splitter = _build_splitter(cfg, embedder)
 
-    logger.info(
-        "▸ Splitting text with SemanticSplitterNodeParser (chunk_size=%s, τ=%s)",
-        cfg.get("max_tokens", 300),
-        cfg.get("similarity_threshold", 0.75),
-    )
+#     logger.info(
+#         "▸ Splitting text with SemanticSplitterNodeParser (chunk_size=%s, τ=%s)",
+#         cfg.get("max_tokens", 300),
+#         cfg.get("similarity_threshold", 0.75),
+#     )
 
-    # Wrap raw text in LlamaIndex Document for splitting
-    doc = Document(text=text)
-    nodes = splitter.get_nodes_from_documents([doc])
-    # Extract text from each split node
-    chunks = [node.text for node in nodes]
+#     # Wrap raw text in LlamaIndex Document for splitting
+#     doc = Document(text=text)
+#     nodes = splitter.get_nodes_from_documents([doc])
+#     # Extract text from each split node
+#     chunks = [node.text for node in nodes]
 
-    logger.info("▸ Created %d semantic chunks", len(chunks))
-    return chunks
+#     logger.info("▸ Created %d semantic chunks", len(chunks))
+#     return chunks
 
 def sliding_window_chunk_text(text: str,
                cfg_path: Optional[os.PathLike] | None = None,
@@ -581,7 +656,7 @@ def save_chunk_obj_to_chroma(
 def save_chunk_objs_to_chroma(
     chunk_objs: List["Chunk"],
     cfg_path: Optional[os.PathLike] | None = None,
-    collection_name: str | None = None,
+    collection_name: Optional[str] = None,
     model_name: str = "BAAI/bge-small-en-v1.5",
     chunk_size: int = 300,
     chunk_overlap: int = 2
@@ -594,7 +669,8 @@ def save_chunk_objs_to_chroma(
     cfg = _load_cfg(cfg_path)
     # embedder = _build_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"))
     # embedder = _load_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"), cfg)
-    embedder = SentenceTransformer(str(DEFAULT_CACHE_DIR))
+    # embedder = SentenceTransformer(str(DEFAULT_CACHE_DIR))
+
     _, collection = _get_chroma_collection(
         cfg, collection_name or chunk_objs[0].document_id
     )
@@ -602,13 +678,14 @@ def save_chunk_objs_to_chroma(
     logger.info("▸ Embedding %d chunks for Chroma upsert", len(chunk_objs))
     documents = [c.text for c in chunk_objs]
     # embeddings = [embedder.get_text_embedding(txt) for txt in documents]
-    if len(documents) > 100:
-        embeddings = []
-        for batch in batched(documents, 100):
-            vecs = embedder.encode(batch, convert_to_numpy=True).tolist()
-            embeddings.extend(vecs)
-    else:
-        embeddings = embedder.encode(documents, convert_to_numpy=True).tolist()
+    # if len(documents) > 100:
+    #     embeddings = []
+    #     for batch in batched(documents, 100):
+    #         vecs = embedder.encode(batch, convert_to_numpy=True).tolist()
+    #         embeddings.extend(vecs)
+    # else:
+    # embeddings = embedder.encode(documents, convert_to_numpy=True).tolist()
+    embeddings = _embed_text(documents, batch_size=100)
     metadatas = [_chunk_obj_to_metadata(c) for c in chunk_objs]
     ids = [c.chunk_id for c in chunk_objs]
 
@@ -682,14 +759,14 @@ def save_chunk_to_chroma(
     cfg = _load_cfg(cfg_path)
     # embedder = _build_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"))
     # embedder = _load_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"), cfg)
-    embedder = SentenceTransformer(str(DEFAULT_CACHE_DIR))
+    # embedder = SentenceTransformer(str(DEFAULT_CACHE_DIR))
 
     logger.info("▸ Embedding %d chunks for Chroma upsert")
     # embeddings = embedder.get_text_embedding(chunk)
-    embeddings = embedder.encode(chunk, convert_to_numpy=True)[0].tolist()
+    # embeddings = embedder.encode(chunk, convert_to_numpy=True)[0].tolist()
+    embeddings = _embed_text(chunk)
     if metadata is None:
         metadata = {"chunk_index": 0}
-
     client, collection = _get_chroma_collection(cfg, collection_name)
     id = str(uuid.uuid4())
 
@@ -726,13 +803,14 @@ def save_chunks_to_chroma(
 
 
     logger.info("▸ Embedding %d chunks for Chroma upsert", len(chunks))
-    if len(chunks) > 100:
-        embeddings = []
-        for batch in batched(chunks, 100):
-            vecs = embedder.encode(batch, convert_to_numpy=True).tolist()
-            embeddings.extend(vecs)
-    else:
-        embeddings = embedder.encode(chunks, convert_to_numpy=True).tolist()
+    # if len(chunks) > 100:
+    #     embeddings = []
+    #     for batch in batched(chunks, 100):
+    #         vecs = embedder.encode(batch, convert_to_numpy=True).tolist()
+    #         embeddings.extend(vecs)
+    # else:
+    # embeddings = embedder.encode(chunks, convert_to_numpy=True).tolist()
+    embeddings = _embed_text(chunks, batch_size=100)
 
     if metadata is None:
         metadata = [{"chunk_index": i} for i in range(len(chunks))]

@@ -746,7 +746,7 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
                                  output_dir: str = "Data",
                                  chunk_size: int = 300,
                                  chunk_overlap: int = 2,
-                                 collection_name: str = "semantic_chunks",
+                                 collection_name: Optional[str] = None,
                                  cfg_path: str = "configs/chunking.yaml",
                                  subset: bool = False,
                                  subset_size: Optional[int] = None,
@@ -912,6 +912,8 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
     logger.info(f"Batch storing {len(valid_chunks)} validated chunks to DuckDB")
     save_chunks_to_duckdb(valid_chunks, db_path)
     logger.info(f"Batch storing {len(valid_chunks)} validated chunks to ChromaDB")
+    if collection_name is None:
+        collection_name = "mdc_training_data"
     save_chunk_objs_to_chroma(valid_chunks, collection_name=collection_name, cfg_path=cfg_path)
     logger.info(f"Phase 3 complete in {time.time() - phase3_start:.2f}s")
 
