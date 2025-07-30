@@ -134,7 +134,7 @@ def _get_chroma_collection(cfg: Dict[str, Any], collection_name: str):
         if collection_name in _chroma_cache:
             return _chroma_cache[collection_name]
 
-        chroma_path = Path(cfg["vector_store"].get("path", "./local_chroma")).expanduser()
+        chroma_path = (Path(__file__).resolve().parents[2] / cfg["vector_store"].get("path", "./local_chroma")).expanduser()
         chroma_path.mkdir(parents=True, exist_ok=True)
         client = chromadb.PersistentClient(path=str(chroma_path))
         _chroma_cache[collection_name] = client.get_or_create_collection(collection_name)

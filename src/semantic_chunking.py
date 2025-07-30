@@ -26,7 +26,7 @@ import sys
 import uuid
 import json
 from pathlib import Path
-from typing import List, Optional, Any, Sequence
+from typing import List, Optional, Any, Sequence, Dict
 from datetime import datetime
 
 import yaml
@@ -38,8 +38,8 @@ from llama_index.core.node_parser import (
     # SentenceSplitter,
     SemanticSplitterNodeParser
 )
-from llama_index.core.base.embeddings.base import BaseEmbedding
-from llama_index.core.schema import Document
+# from llama_index.core.base.embeddings.base import BaseEmbedding
+# from llama_index.core.schema import Document
 # from llama_index.core.schema import BaseNode, Document , ObjectType , TextNode
 # from llama_index.core.constants import DEFAULT_CHUNK_SIZE
 # from llama_index.core.node_parser.text.sentence import SENTENCE_CHUNK_OVERLAP
@@ -112,22 +112,11 @@ def batched(seq, n=100):
 #         raise ValueError("cfg['splitter'] must be 'semantic' for this helper")
 #     return cfg
 # Thread-local retriever to avoid multiple ChromaDB initializations per thread
-_thread_local = threading.local()
-# Shared cache of Chroma collections
-_chroma_cache: dict[str, chromadb.Collection] = {}
-# Lock to guard shared Chroma collection cache
-_chroma_cache_lock = threading.Lock()
-
-def get_retriever(cfg_path, collection_name, symbolic_boost, use_fusion_scoring):
-    if not hasattr(_thread_local, "retriever"):
-        cfg = _load_cfg(cfg_path)
-        _thread_local.retriever = ChromaRetriever(
-            cfg,
-            collection_name,
-            symbolic_boost=symbolic_boost,
-            use_fusion_scoring=use_fusion_scoring
-        )
-    return _thread_local.retriever
+# _thread_local = threading.local()
+# # Shared cache of Chroma collections
+# _chroma_cache: dict[str, chromadb.Collection] = {}
+# # Lock to guard shared Chroma collection cache
+# _chroma_cache_lock = threading.Lock()
 
 # Initialize logging
 filename = os.path.basename(__file__)
@@ -165,19 +154,19 @@ def _load_cfg(cfg_path: os.PathLike | None = None) -> Dict[str, Any]:
     return cfg
 
 
-@timer_wrap
-def _get_chroma_collection(cfg: Dict[str, Any], collection_name: str):
-    """Return a *shared* Collection instance (thread-safe)"""
-    # Guard shared cache with a lock
-    with _chroma_cache_lock:
-        if collection_name in _chroma_cache:
-            return _chroma_cache[collection_name]
+# @timer_wrap
+# def _get_chroma_collection(cfg: Dict[str, Any], collection_name: str):
+#     """Return a *shared* Collection instance (thread-safe)"""
+#     # Guard shared cache with a lock
+#     with _chroma_cache_lock:
+#         if collection_name in _chroma_cache:
+#             return _chroma_cache[collection_name]
 
-        chroma_path = Path(cfg["vector_store"].get("path", "./local_chroma")).expanduser()
-        chroma_path.mkdir(parents=True, exist_ok=True)
-        client = chromadb.PersistentClient(path=str(chroma_path))
-        _chroma_cache[collection_name] = client.get_or_create_collection(collection_name)
-        return _chroma_cache[collection_name]
+#         chroma_path = Path(cfg["vector_store"].get("path", "./local_chroma")).expanduser()
+#         chroma_path.mkdir(parents=True, exist_ok=True)
+#         client = chromadb.PersistentClient(path=str(chroma_path))
+#         _chroma_cache[collection_name] = client.get_or_create_collection(collection_name)
+#         return _chroma_cache[collection_name]
 
 
 # ---------------------------------------------------------------------------
