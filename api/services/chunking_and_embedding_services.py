@@ -119,11 +119,8 @@ def load_input_data_from_duckdb(db_path: str = "artifacts/mdc_challenge.db") -> 
 # ---------------------------------------------------------------------------
 
 def make_pattern(dataset_id: str) -> re.Pattern:
-    """Create normalized pattern for dataset citation."""
-    # Normalize dataset ID: remove punctuation and lowercase
-    normalized = re.sub(r'[^\w\s]', '', dataset_id).lower()
-    # Escape normalized ID and add word boundaries
-    pat = rf'\b{re.escape(normalized)}\b'
+    """Create pattern for dataset citation: substring match anywhere, case-insensitive."""
+    pat = re.escape(dataset_id)
     return re.compile(pat, flags=re.IGNORECASE)
 
 @timer_wrap
@@ -167,6 +164,8 @@ def create_pre_chunk_entity_inventory(document: Document, citation_entities: Lis
         pattern = pattern_cache[citation.data_citation]
         # preprocess text before matching
         matches = pattern.findall(preprocess_text(text))
+        if not matches:
+            matches = find_citation_in_chunk(citation.data_citation, text)
         
         rows.append({
             'document_id': document.doi,
@@ -177,18 +176,25 @@ def create_pre_chunk_entity_inventory(document: Document, citation_entities: Lis
     inventory_df = pd.DataFrame(rows)
     
     # Summary statistics
-    total_citations = inventory_df['count'].sum()
+    total_citations = len(doc_citations)
     citations_found = len(inventory_df[inventory_df['count'] > 0])
     
     logger.info(f"✅ Created entity inventory:")
-    logger.info(f"📊 Total citations found: {total_citations}")
-    logger.info(f"📊 Citations with matches: {citations_found}/{len(doc_citations)}")
+    logger.info(f"📊 Total citations in document: {total_citations}")
+    logger.info(f"📊 Citations with matches: {citations_found}/{total_citations}")
     
-    return inventory_df 
+    return inventory_df
 
 # ---------------------------------------------------------------------------
 # Chunk Creation (Using Semantic Chunking)
 # ---------------------------------------------------------------------------
+
+def find_citation_in_chunk(citation: str, chunk_text: str) -> bool:
+    """Robust dual matching: raw substring or preprocessed substring."""
+    lower_cit = citation.lower()
+    raw_match = lower_cit in chunk_text.lower()
+    preprocessed_match = lower_cit in preprocess_text(chunk_text)
+    return raw_match or preprocessed_match
 
 @timer_wrap
 def create_chunks_from_document(document: Document, citation_entities: List[CitationEntity], 
@@ -254,6 +260,10 @@ def create_chunks_from_document(document: Document, citation_entities: List[Cita
             # match against preprocessed chunk text
             if pattern.search(preprocess_text(chunk_text)):
                 chunk_citations.append(citation)
+            elif find_citation_in_chunk(citation.data_citation, chunk_text):
+                chunk_citations.append(citation)
+            else:
+                logger.debug(f"No match found for citation {citation.data_citation} in chunk {chunk_id}. Returning empty list.")
         
         # Use tiktoken for accurate token counting
         # import tiktoken
@@ -359,6 +369,11 @@ def validate_chunk_integrity(chunks: List[Chunk], pre_chunk_inventory: pd.DataFr
     #     citations_by_doc[citation.document_id].append(citation)
     
     # Count citations AFTER chunking
+    # before we do any of the things below, check if the pre_chunk_inventory is empty
+    if pre_chunk_inventory.empty:
+        logger.info(f"Pre-chunk inventory is empty, skipping validation")
+        return True, pd.DataFrame(columns=['document_id', 'citation_id', 'count'])
+    
     post_chunk_rows = []
     
     for chunk in chunks:
@@ -370,6 +385,8 @@ def validate_chunk_integrity(chunks: List[Chunk], pre_chunk_inventory: pd.DataFr
             pattern = make_pattern(citation.data_citation)
             # match against preprocessed chunk text
             matches = pattern.findall(preprocess_text(text))
+            if not matches:
+                matches = find_citation_in_chunk(citation.data_citation, text)
             
             post_chunk_rows.append({
                 'document_id': doc_id,
@@ -495,8 +512,7 @@ def repair_lost_citations_strict(
             meta = ChunkMetadata(
                 chunk_id=new_id,
                 token_count=len(tok.encode(snip)),
-                citation_entities=[CitationEntity(document_id=document.doi,
-                                                  data_citation=cid)],
+                citation_entities=[CitationEntity(document_id=document.doi, data_citation=cid)],
                 previous_chunk_id=None,
                 next_chunk_id=None,
             )

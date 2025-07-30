@@ -21,12 +21,62 @@ sys.path.append(project_root)
 print(project_root)
 
 # Local imports
-from src.models import RetrievalPayload, BatchRetrievalResult
+from src.models import RetrievalPayload, BatchRetrievalResult, CitationEntity
 from src.helpers import initialize_logging, timer_wrap
 import requests
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
+
+# Add helper function to add target chunk ID and its neighbors to the results from the batch retrieval API for a given dataset ID
+def add_target_chunk_and_neighbors(results, dataset_target_chunk_ids: dict[str, list[str]]) -> BatchRetrievalResult:
+    """
+    Add target chunk ID and its neighbors to the results from the batch retrieval API for a given dataset ID
+    """
+    # check first if target chunk ID or neighbor chunk IDs are in the results
+    for dataset_id, chunk_ids in dataset_target_chunk_ids.items():
+        if dataset_id in list(results.chunk_ids.keys()):
+            results.chunk_ids[dataset_id].extend(chunk_ids)
+        else:
+            results.chunk_ids[dataset_id] = chunk_ids
+    results.chunk_ids = {k: list(set(v)) for k, v in results.chunk_ids.items()}
+    return BatchRetrievalResult.model_validate(results)
+
+def get_query_texts(data_citation: CitationEntity, db_helper):
+    """
+    Get the query text for a given dataset ID
+    """
+    ce = data_citation
+    # Retrieve all chunks for the document
+    chunks = db_helper.get_chunks_by_document_id(ce.document_id)
+    # Find the chunk containing this dataset citation
+    target = None
+    for c in chunks:
+        ents = c.chunk_metadata.citation_entities or []
+        if any(ent.data_citation == ce.data_citation for ent in ents):
+            target = c
+            break
+    if not target:
+        print(f"Warning: no chunk found for citation {ce.data_citation} in document {ce.document_id}")
+        return "", []
+
+    # Fetch neighbor chunks
+    neighbor_ids = [cid for cid in (
+        target.chunk_metadata.previous_chunk_id,
+        target.chunk_metadata.next_chunk_id
+    ) if cid]
+    # neighbors = db_helper.get_chunks_by_chunk_ids(neighbor_ids)
+    # get neighboring chunks from chunks that are in the same document --> no need to get from DB
+    neighbors = [c for c in chunks if c.chunk_id in neighbor_ids]
+    query_chunk_ids = neighbor_ids + [target.chunk_id]
+    # Construct the query string
+    if len(neighbors) > 0:
+        parts = [target.text] + [n.text for n in neighbors]
+    else:
+        parts = [target.text]
+    query_text = " ".join(parts)
+    return query_text, query_chunk_ids
+
 
 @timer_wrap
 def main():
@@ -60,32 +110,15 @@ def main():
     # Build mapping of dataset ID to its enriched query text
     query_texts: dict[str, list[str]] = {}
     document_ids = set()
+    dataset_target_chunk_ids = {} # map of dataset ID to target chunk ID (and its neighbors)
     for ce in citations:
-        # Retrieve all chunks for the document
-        chunks = db_helper.get_chunks_by_document_id(ce.document_id)
         document_ids.add(ce.document_id)
-        # Find the chunk containing this dataset citation
-        target = None
-        for c in chunks:
-            ents = c.chunk_metadata.citation_entities or []
-            if any(ent.data_citation == ce.data_citation for ent in ents):
-                target = c
-                break
-        if not target:
-            print(f"Warning: no chunk found for citation {ce.data_citation} in document {ce.document_id}")
+        query_text, query_chunk_ids = get_query_texts(ce, db_helper)
+        if query_text == "" or len(query_chunk_ids) == 0:
+            logger.warning(f"Skipping citation {ce.data_citation} - no valid query text or chunk IDs generated")
             continue
-
-        # Fetch neighbor chunks
-        neighbor_ids = [cid for cid in (
-            target.chunk_metadata.previous_chunk_id,
-            target.chunk_metadata.next_chunk_id
-        ) if cid]
-        neighbors = db_helper.get_chunks_by_chunk_ids(neighbor_ids)
-
-        # Construct the query string
-        parts = [target.text] + [n.text for n in neighbors]
-        query_text = " ".join(parts)
         query_texts[ce.data_citation] = [query_text]
+        dataset_target_chunk_ids[ce.data_citation] = query_chunk_ids
 
     if len(document_ids) != 95:
         logger.error(f"Expected 95 document IDs, got {len(document_ids)}")
@@ -128,8 +161,8 @@ def main():
     output_dir = os.path.join(base_dir, "reports", "retrieval")
     os.makedirs(output_dir, exist_ok=True)
     output_file = os.path.join(output_dir, "retrieval_results.json")
-
     results = BatchRetrievalResult.model_validate(response.json())
+    results = add_target_chunk_and_neighbors(results, dataset_target_chunk_ids)
 
     if results.success:
         logger.info("✅ Retrieval completed successfully!")

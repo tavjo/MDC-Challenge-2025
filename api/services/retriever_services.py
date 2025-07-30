@@ -365,10 +365,13 @@ class ChromaRetriever:
             logger.error("No DuckDB helper provided - cannot retrieve chunk data")
             return []
         
-        for score, chunk_id in top_chunk_data:
+        # TODO: Update this to get the chunks from the database in one step rather than iterate through each chunk ID. 
+        
+        for score, chunk_id in top_chunk_data: 
             try:
-                chunk = self.db_helper.get_chunks_by_chunk_ids(chunk_id)
-                if chunk:
+                chunk_list = self.db_helper.get_chunks_by_chunk_ids(chunk_id)
+                if chunk_list:
+                    chunk = chunk_list[0]
                     chunk.score = score  # Set retrieval score
                     chunk_objects.append(chunk)
                     logger.info("Retrieved chunk %s with score %.3f", chunk_id, score)
@@ -527,10 +530,10 @@ def retrieve_top_chunks(
         # Retrieve chunks
         if analyze_chunk_text:
             logger.info("Retrieving chunks with text analysis")
-            chunks = retriever.retrieve_chunks_with_text_analysis(query_texts, k, doc_id_filter=doc_id_filter, query_embeddings=query_embeddings)
+            chunks = retriever.retrieve_chunks_with_text_analysis(query_texts, query_embeddings=query_embeddings, k=k, doc_id_filter=doc_id_filter)
         else:
             logger.info("Retrieving chunks without text analysis")
-            chunks = retriever.retrieve_chunks(query_texts, k, doc_id_filter=doc_id_filter, query_embeddings=query_embeddings)
+            chunks = retriever.retrieve_chunks(query_texts, query_embeddings=query_embeddings, k=k, doc_id_filter=doc_id_filter)
         
         logger.info("Retrieved %d chunks for collection %s", len(chunks), collection_name)
         return chunks
@@ -586,7 +589,7 @@ def batch_retrieve_top_chunks(
         query_embeddings_map[identifier] = embeddings[row_idx]
 
     # Phase 2: parallel retrieval per identifier
-    def _retrieve_single(identifier: str, queries: List[str], doc_id_filter: Optional[str] = None, query_embeddings: Optional[List[List[float]]] = None) -> RetrievalResult:
+    def _retrieve_single(identifier: str, queries: List[str], doc_id_filter: Optional[str] = None, query_embeddings: Optional[np.ndarray] = None) -> RetrievalResult:
         start = time.time()
         try:
             logger.info(f"Retrieving top {k} chunks for {identifier}")
@@ -594,9 +597,9 @@ def batch_retrieve_top_chunks(
             # Use the thread-local retriever instance to avoid re-initialization
             if analyze_chunk_text:
                 # perform text-analysis enhanced retrieval
-                chunks = retriever.retrieve_chunks_with_text_analysis(queries, k, analyze_text=True, doc_id_filter=doc_id_filter, query_embeddings=query_embeddings)
+                chunks = retriever.retrieve_chunks_with_text_analysis(query_texts=queries, k=k, analyze_text=True, doc_id_filter=doc_id_filter, query_embeddings=[query_embeddings])
             else:
-                chunks = retriever.retrieve_chunks(queries, k, doc_id_filter=doc_id_filter, query_embeddings=query_embeddings)
+                chunks = retriever.retrieve_chunks(query_texts=queries, k=k, doc_id_filter=doc_id_filter, query_embeddings=[query_embeddings])
             if len(chunks) == 0:
                 elapsed = time.time() - start
                 logger.warning(f"No chunks retrieved for {identifier}")
