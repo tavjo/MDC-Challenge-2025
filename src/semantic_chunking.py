@@ -788,7 +788,7 @@ def save_chunks_to_chroma(
     cfg = _load_cfg(cfg_path)
     # embedder = _build_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"))
     # embedder = _load_embedder(cfg.get("embed_model", "BAAI/bge-small-en-v1.5"), cfg)
-    embedder = SentenceTransformer(str(DEFAULT_CACHE_DIR))
+    # embedder = SentenceTransformer(str(DEFAULT_CACHE_DIR))
 
 
     logger.info("▸ Embedding %d chunks for Chroma upsert", len(chunks))

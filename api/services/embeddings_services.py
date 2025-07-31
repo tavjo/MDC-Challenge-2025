@@ -6,7 +6,11 @@ Creates chunks from Document objects using semantic chunking + ChromaDB storage
 
 import os
 import sys
-from typing import List
+from typing import List, Optional
+import threading
+from sentence_transformers import SentenceTransformer
+import numpy as np
+import uuid
 
 
 # Add project root to path
@@ -14,101 +18,69 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
 # Local imports
-from src.helpers import initialize_logging
-from src.semantic_chunking import save_chunk_to_chroma, save_chunks_to_chroma, save_chunk_objs_to_chroma
+from src.helpers import initialize_logging, timer_wrap
+from src.semantic_chunking import save_chunk_objs_to_chroma, save_chunks_to_chroma
 from src.models import EmbeddingResult
 from api.utils.duckdb_utils import get_duckdb_helper
+from pathlib import Path
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
 
 DEFAULT_CHROMA_CONFIG = os.path.join(project_root, "configs", "chunking.yaml")
 
-def embed_chunk(chunk: str, collection_name: str = "text_embeddings", cfg_path: str = DEFAULT_CHROMA_CONFIG, local_model: bool = False) -> EmbeddingResult:
-    logger.info(f"Embedding chunk")
+# Default database path
+DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
+
+DEFAULT_CACHE_DIR = Path(
+    os.path.join(project_root, "offline_models")
+)
+
+# Lazy-load embedder to avoid repeated heavy loads
+_embedder_lock = threading.Lock()
+_EMBEDDER: Optional[SentenceTransformer] = None
+
+def _get_embedder(model_path: str) -> SentenceTransformer:
+    global _EMBEDDER
+    if _EMBEDDER is None:
+        with _embedder_lock:
+            if _EMBEDDER is None:
+                _EMBEDDER = SentenceTransformer(model_path)
+    return _EMBEDDER
+
+@timer_wrap
+def embed_text(texts: List[str], model_name: Optional[str] = None, batch_size: int = 100) -> np.ndarray:
+    embedder = _get_embedder(str(model_name or DEFAULT_CACHE_DIR))
+    embeddings = embedder.encode(texts, convert_to_numpy=True, batch_size=batch_size)
+    # Ensure embeddings array is not empty
+    if embeddings is None or (isinstance(embeddings, np.ndarray) and embeddings.size == 0):
+        logger.error("No embeddings generated for %d texts", len(texts))
+        return []
+    return embeddings
+
+@timer_wrap
+def get_embedding_result(text: str, collection_name: str = None, model_name: Optional[str] = None, save_to_chroma: bool = False) -> EmbeddingResult:
+    if save_to_chroma:
+        res = save_chunks_to_chroma([text], collection_name, model_name)
     try:
-        if local_model:
-            model_name = "offline:bge-small-en-v1.5"
-        else:
-            model_name = "text-embedding-3-small"
-        response = save_chunk_to_chroma(chunk, cfg_path, collection_name, model_name=model_name)
-        if response["id"] is not None:
-            logger.info(f"Created and saved chunk {response["id"]} embeddings to ChromaDB collection {collection_name} using model {model_name}")
-            return EmbeddingResult(
-                success=True,
-                error=None,
-                embeddings=response.get("embeddings", None),
-                model_name=model_name,
-                collection_name=collection_name,
-                id=response.get("id", "")
-            )
-        else:
-            logger.error(f"Failed to create and save chunk {response["id"]} embeddings to ChromaDB collection {collection_name} using model {model_name}")
-            return EmbeddingResult(
-                success=False,
-                error=f"Failed to create and save chunk {response["id"]} embeddings to ChromaDB collection {collection_name} using model {model_name}",
-                embeddings=response.get("embeddings", None),
-                model_name=model_name,
-                collection_name=collection_name,
-                id=response.get("id", "")
-            )
+        embeddings = embed_text([text])
     except Exception as e:
-        logger.error(f"Error embedding chunk: {str(e)}")
+        logger.error("Error embedding text: %s", e)
         return EmbeddingResult(
-                success=False,
-                error=f"Error embedding chunk: {str(e)}",
-                embeddings=response.get("embeddings", None),
-                model_name=model_name,
-                collection_name=collection_name,
-                id=response.get("id", "")
-            )
+            success=False,
+            error=str(e),
+            model_name=model_name,
+            collection_name=collection_name,
+        )
+    return EmbeddingResult(
+        success=True,
+        embeddings=embeddings,
+        model_name=model_name,
+        collection_name=collection_name,
+        id=None
+    )
 
-def embed_chunks(chunks: List[str], collection_name: str = "text_embeddings", cfg_path: str = DEFAULT_CHROMA_CONFIG, local_model: bool = False) -> List[EmbeddingResult]:
-    logger.info(f"Embedding {len(chunks)} chunks")
-    try:
-        if local_model:
-            model_name = "offline:bge-small-en-v1.5"
-        else:
-            model_name = "text-embedding-3-small"
-        response = save_chunks_to_chroma(chunks, cfg_path, collection_name, model_name=model_name)
-        if response is not None:
-            logger.info(f"Created and saved {len(response)} chunks to ChromaDB collection {collection_name} using model {model_name}")
-            return [
-                EmbeddingResult(
-                    success=True,
-                    error=None,
-                    embeddings=r.get("embeddings", None),
-                    model_name=model_name,
-                    collection_name=collection_name,
-                    id=r.get("id", "")
-                ) for r in response
-            ]
-        else:
-            logger.error(f"Failed to create and save {len(chunks)} chunks to ChromaDB collection {collection_name} using model {model_name}")
-            return [
-                EmbeddingResult(
-                    success=False,
-                    error=f"Failed to create and save {len(chunks)} chunks to ChromaDB collection {collection_name} using model {model_name}",
-                    embeddings=None,
-                    model_name=model_name,
-                    collection_name=collection_name,
-                    id=r.get("id", "")
-                ) for r in response
-            ]
-    except Exception as e:
-        logger.error(f"Error embedding chunks: {str(e)}")
-        return [
-            EmbeddingResult(
-                success=False,
-                error=f"Error embedding chunks: {str(e)}",
-                embeddings=None,
-                model_name=model_name,
-                collection_name=collection_name,
-                id=r.get("id", "")
-            ) for r in response
-        ]
-
-def embed_chunks_from_duckdb(db_path: str = "artifacts/mdc_challenge.db", collection_name: str = "text_embeddings", cfg_path: str = DEFAULT_CHROMA_CONFIG, local_model: bool = False):
+def embed_chunks_from_duckdb(db_path: str = DEFAULT_DUCKDB_PATH, collection_name: str = "mdc_training_data", cfg_path: str = DEFAULT_CHROMA_CONFIG):
     db_helper = get_duckdb_helper(db_path)
     chunks = db_helper.get_chunks_by_chunk_ids()
     db_helper.close()
