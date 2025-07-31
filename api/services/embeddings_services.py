@@ -10,7 +10,6 @@ from typing import List, Optional
 import threading
 from sentence_transformers import SentenceTransformer
 import numpy as np
-import uuid
 
 
 # Add project root to path
@@ -62,6 +61,24 @@ def embed_text(texts: List[str], model_name: Optional[str] = None, batch_size: i
 def get_embedding_result(text: str, collection_name: str = None, model_name: Optional[str] = None, save_to_chroma: bool = False) -> EmbeddingResult:
     if save_to_chroma:
         res = save_chunks_to_chroma([text], collection_name, model_name)
+        if res:
+            return EmbeddingResult(
+                success=True,
+                embeddings=res.embeddings,
+                id=res.id,
+                model_name=model_name,
+                collection_name=collection_name,
+                error=None
+            )
+        else:
+            return EmbeddingResult(
+                success=False,
+                error="Failed to save to chroma",
+                model_name=model_name,
+                collection_name=collection_name,
+                embeddings=None,
+                id=None
+            )
     try:
         embeddings = embed_text([text])
     except Exception as e:
@@ -71,6 +88,7 @@ def get_embedding_result(text: str, collection_name: str = None, model_name: Opt
             error=str(e),
             model_name=model_name,
             collection_name=collection_name,
+            id=None
         )
     return EmbeddingResult(
         success=True,

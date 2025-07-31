@@ -18,13 +18,13 @@ import duckdb
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from src.models import Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload, RetrievalPayload, BatchRetrievalResult
+from src.models import Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload, RetrievalPayload, BatchRetrievalResult, EmbeddingPayload
 from api.services.chunking_and_embedding_services import run_semantic_chunking_pipeline
 from api.services.retriever_services import batch_retrieve_top_chunks
 from src.helpers import initialize_logging
 from src.semantic_chunking import sliding_window_chunk_text
 # from api.utils.duckdb_utils import get_duckdb_helper
-from api.services.embeddings_services import embed_chunk, embed_chunks
+from api.services.embeddings_services import get_embedding_result, embed_chunks_from_duckdb
 
 # Initialize logging
 logger = initialize_logging("chunk_and_embed_api")
@@ -60,7 +60,7 @@ async def create_chunks(
     chunk_overlap: Optional[int] = 20
 ):
     """
-    Create a chunk from text.
+    Create chunks from a document.
     """
     try:
         logger.info(f"Creating chunk from text.")
@@ -85,7 +85,7 @@ async def batch_create_chunks(
     chunk_overlap: Optional[int] = 20
 ) -> Dict[str, List[str]]:
     """
-    Create chunks for a list of texts.
+    Create chunks for a list of texts/documents.
     """
     try:
         logger.info(f"Creating chunks for {len(texts)} texts.")
@@ -98,40 +98,20 @@ async def batch_create_chunks(
         logger.error(f"Chunk creation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Chunk creation failed: {str(e)}")
 
-
-@app.post("/embed_chunk", response_model=EmbeddingResult)
-async def embed_chunk(
-    text: str,
-    cfg_path: Optional[str] = None,
-    model_name: Optional[str] = None,
-    collection_name: Optional[str] = None,
-    local_model: Optional[bool] = False,
-) -> EmbeddingResult:
-    """
-    Create embeddings for text.
-    """
-    try:
-        logger.info(f"Creating embeddings for text.")
-        response = embed_chunk(text, cfg_path, model_name, collection_name, local_model)
-        return response
-    except Exception as e:
-        logger.error(f"Chunk creation failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Chunk creation failed: {str(e)}")
-
-@app.post("/embed_chunks", response_model=List[EmbeddingResult])
-async def embed_chunks(
-    chunks: List[str],
-    cfg_path: Optional[str] = None,
-    model_name: Optional[str] = None,
-    collection_name: Optional[str] = None,
-    local_model: Optional[bool] = False,
-) -> List[EmbeddingResult]:
+@app.post("/embed_chunks", response_model=EmbeddingResult)
+async def embed_chunks(payload: EmbeddingPayload) -> EmbeddingResult:
     """
     Create embeddings for chunks.
     """
+    embed_params = {
+        "text": payload.text,
+        "cfg_path": payload.cfg_path,
+        "model_name": payload.model_name,
+        "collection_name": payload.collection_name
+    }
     try:
-        logger.info(f"Creating embeddings for {len(chunks)} chunks.")
-        response = embed_chunks(chunks, cfg_path, model_name, collection_name, local_model)
+        logger.info(f"Creating embeddings for {payload.text[:10]}...")
+        response = get_embedding_result(**embed_params)
         return response
     except Exception as e:
         logger.error(f"Chunk creation failed: {str(e)}")
