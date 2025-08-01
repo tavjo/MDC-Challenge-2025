@@ -304,8 +304,8 @@ class ChromaRetriever:
         logger.info("Retrieving top-%d chunks for %d queries", k, len(query_texts))
         
         # Step 1: Generate embeddings for queries
-        logger.info("Generating embeddings for queries")
         if query_embeddings is None:
+            logger.info("Generating embeddings for queries")
             query_embeddings = _embed_text(query_texts)
 
         # Step 2: Search ChromaDB for chunk IDs and metadata
@@ -340,6 +340,9 @@ class ChromaRetriever:
                 if doc_id_filter:
                     query_params["where"] = {"document_id": doc_id_filter}
                 results = self.collection.query(**query_params)
+                if len(results["distances"][0]) == 0:
+                    logger.warning("No chunks retrieved from ChromaDB for query %d", i+1)
+                    continue
                 
                 for dist, meta in zip(results["distances"][0], results["metadatas"][0]):
                     logger.info("Calculating score for chunk %s", meta["chunk_id"])
@@ -577,6 +580,7 @@ def batch_retrieve_top_chunks(
         logger.info("Retrieving top %d chunks for %d dataset IDs across %d documents", k, len(doc_id_map), len(set(doc_id_map.values())))
     
     # Phase 1: Generate embeddings for queries in bulk
+    logger.info("Generating embeddings for all queries")
     flat_queries = [q for qs in query_texts.values() for q in qs]
     # sanity check since number of flat queries should be the same as the length of the query_texts dictionary
     if len(flat_queries) != len(query_texts):

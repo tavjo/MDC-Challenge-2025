@@ -7,7 +7,7 @@ These queries will be constructed thusly:
 3. The query is constructed as follows:
     - The query is the concatenation of the chunk text and the text of its neighbors.
     - The query is then passed to the retriever.
-    - The retriever returns the top-k (default: 3) chunks.
+    - The retriever returns the top-k (default: 5) chunks.
 """
 import argparse
 import requests
@@ -96,7 +96,7 @@ def main():
         help="ChromaDB collection name for retrieval"
     )
     parser.add_argument(
-        "-k", type=int, default=3,
+        "-k", type=int, default=5,
         help="Number of chunks to retrieve per dataset citation"
     )
     args = parser.parse_args()
@@ -119,6 +119,8 @@ def main():
             continue
         query_texts[ce.data_citation] = [query_text]
         dataset_target_chunk_ids[ce.data_citation] = query_chunk_ids
+    
+    db_helper.close()
 
     if len(document_ids) != 95:
         logger.error(f"Expected 95 document IDs, got {len(document_ids)}")
