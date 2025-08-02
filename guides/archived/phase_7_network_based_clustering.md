@@ -11,7 +11,7 @@
 ## Phase 7: Network-Based Clustering
 
 ### 7.1 Create Clustering Module
-**Location**: `src/clustering.py`
+**Location**: `src/get_modules.py`
 
 **Core Functions:**
 ```python
@@ -75,6 +75,8 @@ def run_leiden_clustering(
     3. Filter out clusters smaller than min_cluster_size
     4. Return {dataset_id: cluster_label} mapping
     """
+
+# Update `Dataset` objects in DuckDB by adding value for cluster
 ```
 
 

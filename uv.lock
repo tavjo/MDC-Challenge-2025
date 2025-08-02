@@ -403,6 +403,28 @@ wheels = [
 ]
 
 [[package]]
+name = "igraph"
+version = "0.11.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "texttable" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fa/a2/ed3f1513b14e98f73ad29a2bbd2898aef7ceac739e9eff1b3b6a9126dfe6/igraph-0.11.9.tar.gz", hash = "sha256:c57ce44873abcfcfd1d61d7d261e416d352186958e7b5d299cf244efa6757816", size = 4587322, upload-time = "2025-06-11T09:27:49.958Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/84/bbcde5833e2685b722ce04ed2ec542cff49f12b4d6a3aa27d23c4febd4db/igraph-0.11.9-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:ef30a8eb6329a71211652223cad900dc42bc7fdb44d9e942e991181232906ac2", size = 1936209, upload-time = "2025-06-11T09:24:32.932Z" },
+    { url = "https://files.pythonhosted.org/packages/15/47/6e94649b7fe12f3a82e75ef0f35fb0a2d860b13aafcfcfcdf467d50e9208/igraph-0.11.9-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:4b3224b2b74e9dfac1271dc6f2e1061d13492f91198d05e1b8b696b994e5e269", size = 1752923, upload-time = "2025-06-11T09:24:36.256Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/21/8649eebbe101ecc704863a05814ccca90f578afcfd990038c739027211e9/igraph-0.11.9-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:adf7d7200c2e11a3b1122786f77cee96072c593fd62794aadb5ce546a24fa791", size = 4133376, upload-time = "2025-06-11T09:24:40.65Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/63/c4e561d5947d728dc1dd244bd86c1c2d01bd1e1b14ec04e6dc9bac1e601c/igraph-0.11.9-cp39-abi3-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:78a7f3a490f3f6a8aab99948e3e62ae81fc1e8a8aa07e326b09f4e570c042e79", size = 4285168, upload-time = "2025-06-11T09:24:46.84Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/79/a21fec50837ee429fd0cb675b93cd7db80f687a9eeab53f63ea02f0a5a99/igraph-0.11.9-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:773201c9eafef668be11d8966cf2d7114d34757cd9cfdbd8c190fefcd341220b", size = 4372306, upload-time = "2025-06-11T09:24:51.698Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/01/42bd858f01aa45f769f4edd0a643cf333f5a2b36efcca38f228af1cd02bc/igraph-0.11.9-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:9bc6fb4316bc79bd0d800dd0186921ef62da971be147861872be90242acbae7d", size = 5250489, upload-time = "2025-06-11T09:24:57.376Z" },
+    { url = "https://files.pythonhosted.org/packages/39/b5/44c6cd220baa6213a9edcc097aa9b2f4867d4f1f9b321369aa4820cb4790/igraph-0.11.9-cp39-abi3-musllinux_1_2_i686.whl", hash = "sha256:e45d03bfb931b73f323b531fc0d87235ac96c41a64363b243677034576cf411b", size = 5638683, upload-time = "2025-06-11T09:25:03.056Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/06/91761a416d52ba7049dffa8bfc6eb14b41c5c7f926c6d02a3532030f59d6/igraph-0.11.9-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:157b4a836628ca55c6422098bf34336006c1d517fc86fa0e89af3a233e3baa30", size = 5512189, upload-time = "2025-06-11T09:25:09Z" },
+    { url = "https://files.pythonhosted.org/packages/01/1b/b330e61dc2afb2f00bf152d1b570267741e2465a460a4f9a6e4c41057cbb/igraph-0.11.9-cp39-abi3-win32.whl", hash = "sha256:1fd67a0771b8ce70bef361557bdeb6ca7a1012f9fb8368eba86967deeb99a110", size = 2500729, upload-time = "2025-06-11T09:26:31.389Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/36/8de9605ba946f9ce82558e753ab08c4705124a92df561df83ac551c6e36a/igraph-0.11.9-cp39-abi3-win_amd64.whl", hash = "sha256:09c7d49c7759e058bf2526bbac54dd1f9e0725ff64352f01545db59c09de88cf", size = 2927497, upload-time = "2025-06-11T09:26:23.7Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/71/608f07217246858d5c73a68488bef60b819e502a3287e34a77743109011c/igraph-0.11.9-cp39-abi3-win_arm64.whl", hash = "sha256:8acca4f2463f4de572471cca2d46bb3ef5b3082bc125b9ec30e8032b177951df", size = 2568065, upload-time = "2025-06-11T09:26:27.491Z" },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -706,6 +728,26 @@ wheels = [
 ]
 
 [[package]]
+name = "leidenalg"
+version = "0.10.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "igraph" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/27/d8/ab411a39c8fe6b247e96a6c791c30dd91de53ce407f766d2c2f7ed2e3504/leidenalg-0.10.2.tar.gz", hash = "sha256:0f4147a92b59834a719bfce30d563ea107e570130a7be60adbc8b95757192e4c", size = 452590, upload-time = "2024-01-22T11:26:10.167Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5e/e0/0db1e6c235d883246f8dadb480d5b17140880099cc2c1c5aea5dc179262d/leidenalg-0.10.2-cp38-abi3-macosx_10_9_x86_64.whl", hash = "sha256:f1f5b441bf8baa4f18b434da2ddad70e5a9099bcfb787ebee6596b41140df8bb", size = 1693307, upload-time = "2024-01-22T11:25:23.186Z" },
+    { url = "https://files.pythonhosted.org/packages/82/90/0b9525098a7458939f5c2b956ffdc1fed460c0fe706f549087c3b0d12b81/leidenalg-0.10.2-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:05f4596164840005a3e91b83bba28ede202ebcbd939c4f9182738d3c199bb6c9", size = 1426209, upload-time = "2024-01-22T11:25:25.405Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/4e/4d31112151cfb49d8ae6a81a60f339ee4e35c50837103f5d5a475d7f16a9/leidenalg-0.10.2-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c8774bc9b7638b50ea69bcea0dfc55aa1ec88c3e57b0619c88462a6837f19d76", size = 1864248, upload-time = "2024-01-22T11:25:26.967Z" },
+    { url = "https://files.pythonhosted.org/packages/88/95/fefb3bd7a0841c6de10a7d2235d68b2eaa4219fb5b9785ee9327e249ac80/leidenalg-0.10.2-cp38-abi3-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:e8e64af280f88ccbc605a1fbe75fd7ab323f28526e4b1934867d0072ce03dbb2", size = 2047122, upload-time = "2024-01-22T11:25:28.885Z" },
+    { url = "https://files.pythonhosted.org/packages/48/bb/28343e7f26cbacf355c754ef6be2f1efa8d6233b56a5be89c5bc8caca1d1/leidenalg-0.10.2-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c3385462025acd6190ca5cb9df5b1dcf20995a048189a16a293dba2881f47cc0", size = 1967803, upload-time = "2024-01-22T11:25:30.455Z" },
+    { url = "https://files.pythonhosted.org/packages/53/09/0b3f6b017716627dab2c83bd685ad7bdf06d120d34e04dcd5a224ea3e0ed/leidenalg-0.10.2-cp38-abi3-musllinux_1_1_i686.whl", hash = "sha256:fda77a141a353ec3ef1de5578868c5ed336612fcf32685cdf3d67569ce9ade39", size = 2565393, upload-time = "2024-01-22T11:25:31.94Z" },
+    { url = "https://files.pythonhosted.org/packages/08/3b/7e6b6501e272443e08c4ee22673acdba6d9077dc01e3c4c6f85e906f1f05/leidenalg-0.10.2-cp38-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:ab11d9569d6bd76f27e00343deb5bd6d0efdbfa759ef612388162cef9d5ca949", size = 2527752, upload-time = "2024-01-22T11:25:34.044Z" },
+    { url = "https://files.pythonhosted.org/packages/89/53/fca3c0bbe545ea0180316f4e502cc6eae45754616f09fa87f7b1e457bf26/leidenalg-0.10.2-cp38-abi3-win32.whl", hash = "sha256:f6b4deb72c219d622bbcbf7a81151f680385d7f793f65c8e5a649580bedfcddd", size = 1268340, upload-time = "2024-01-22T11:25:36.214Z" },
+    { url = "https://files.pythonhosted.org/packages/29/2f/f315fca13523f6b7520b810cce942348e37e8e5ea4c39e4eaaeb3541fee0/leidenalg-0.10.2-cp38-abi3-win_amd64.whl", hash = "sha256:4ec2940665fc59e71175fb445e25d11ef0ab7e26f4076b932571eec2e9d05857", size = 1576010, upload-time = "2024-01-22T11:25:38.99Z" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -776,6 +818,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "ipykernel" },
     { name = "langchain" },
+    { name = "leidenalg" },
     { name = "matplotlib" },
     { name = "networkx" },
     { name = "nltk" },
@@ -786,6 +829,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pytest" },
     { name = "python-dotenv" },
+    { name = "python-igraph" },
     { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "regex" },
@@ -804,6 +848,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.116.1" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "langchain", specifier = ">=0.3.26" },
+    { name = "leidenalg", specifier = ">=0.10.2" },
     { name = "matplotlib", specifier = ">=3.10.3" },
     { name = "networkx", specifier = ">=3.5" },
     { name = "nltk", specifier = ">=3.9.1" },
@@ -814,6 +859,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "python-igraph", specifier = ">=0.11.9" },
     { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "regex", specifier = ">=2024.11.6" },
@@ -1280,6 +1326,18 @@ wheels = [
 ]
 
 [[package]]
+name = "python-igraph"
+version = "0.11.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "igraph" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/54/b6/c03609dd766c5c5ca17e3b42b42a92fbb2ab133256265128cfeb9b1f1733/python_igraph-0.11.9.tar.gz", hash = "sha256:51ad8bfba7777ff110cd4f47eb9efeaf092e4edf3167153b05156dbe55dbf90c", size = 9756, upload-time = "2025-06-11T09:28:44.9Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/64/0d58006ac4f03dc0b8055bbf6b4cdee361646dc7a8db9b233145e3b981d9/python_igraph-0.11.9-py3-none-any.whl", hash = "sha256:9154606132dac48071edf5bc27f5b54cb316db09686ad8cffce078943733de29", size = 9172, upload-time = "2025-06-11T09:28:41.99Z" },
+]
+
+[[package]]
 name = "python-multipart"
 version = "0.0.20"
 source = { registry = "https://pypi.org/simple" }
@@ -1595,6 +1653,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0a/d4/2b0cd0fe285e14b36db076e78c93766ff1d529d70408bd1d2a5a84f1d929/tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb", size = 48036, upload-time = "2025-04-02T08:25:09.966Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/30/643397144bfbfec6f6ef821f36f33e57d35946c44a2352d3c9f0ae847619/tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138", size = 28248, upload-time = "2025-04-02T08:25:07.678Z" },
+]
+
+[[package]]
+name = "texttable"
+version = "1.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/dc/0aff23d6036a4d3bf4f1d8c8204c5c79c4437e25e0ae94ffe4bbb55ee3c2/texttable-1.7.0.tar.gz", hash = "sha256:2d2068fb55115807d3ac77a4ca68fa48803e84ebb0ee2340f858107a36522638", size = 12831, upload-time = "2023-10-03T09:48:12.272Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/24/99/4772b8e00a136f3e01236de33b0efda31ee7077203ba5967fcc76da94d65/texttable-1.7.0-py2.py3-none-any.whl", hash = "sha256:72227d592c82b3d7f672731ae73e4d1f88cd8e2ef5b075a7a7f01a23a3743917", size = 10768, upload-time = "2023-10-03T09:48:10.434Z" },
 ]
 
 [[package]]
