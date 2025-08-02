@@ -80,7 +80,6 @@ async def create_chunks(
 async def batch_create_chunks(
     texts: List[str],
     cfg_path: Optional[str] = None,
-    model_name: Optional[str] = None,
     chunk_size: Optional[int] = 200,
     chunk_overlap: Optional[int] = 20
 ) -> Dict[str, List[str]]:
