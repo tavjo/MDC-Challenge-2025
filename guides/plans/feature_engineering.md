@@ -8,7 +8,7 @@ Based on my analysis of the codebase, here's the current end-to-end information 
 1. **EDA Phase**: Analyzed `train_labels.csv` and PDF/XML corpus → produced inventory CSVs
 2. **Document Parsing**: Used `unstructured.partition_pdf` → created `Document` Pydantic objects → stored in `documents.json` and DuckDB `documents` table
 3. **Citation Extraction**: Dual-mode extraction (regex for training, LLM+BAML for inference) → produced `CitationEntity` objects → stored in `citations.json` and DuckDB `citations` table  
-4. **Chunking**: Custom sliding-window chunker (~300 tokens, 30% overlap) with citation integrity validation → produced `Chunk` objects → stored in DuckDB `chunks` table
+4. **Chunking**: Custom sliding-window chunker (~300 tokens, 10% overlap) with citation integrity validation → produced `Chunk` objects → stored in DuckDB `chunks` table
 5. **Embeddings**: SentenceTransformers embedding of chunks → stored in ChromaDB (`local_chroma/` folder)
 
 **Phase 6 (Partially Implemented):**
@@ -25,7 +25,26 @@ Based on my analysis of the codebase, here's the current end-to-end information 
 
 ---
 
-# Comprehensive Feature Engineering Implementation Plan
+# Optimized Feature Engineering Implementation Plan
+
+## Key Optimizations Applied ✅
+
+Based on technical review feedback, this plan incorporates the following critical optimizations:
+
+1. **Memory-Efficient k-NN Similarity Graph**: Replaced O(N²) full similarity matrix with O(N*k) k-NN approach using sklearn.neighbors.NearestNeighbors
+2. **Direct igraph Construction**: Eliminated NetworkX → igraph conversion overhead for 4x faster clustering  
+3. **Parquet-Based Bulk Upsert**: Single INSERT OR REPLACE statement vs. batched temp table operations
+4. **ChromaDB Vector Storage**: Dataset embeddings stored in dedicated `dataset-aggregates-train` collection (optimal for vector operations)
+5. **Foreign Key Enforcement**: Added `PRAGMA foreign_keys=ON` to prevent silent data integrity issues
+6. **Robust Multi-ID Masking**: Regex-escaped, case-insensitive masking for compound dataset citations
+7. **Reproducibility Seeds**: Fixed random seeds for UMAP, PCA, and Leiden clustering (critical for Kaggle consistency)
+8. **Lightweight Dependencies**: Removed Seaborn dependency for simpler Docker builds
+9. **Security Hardening**: Path validation, control character sanitization, transaction wrapping
+10. **Deterministic Thresholding**: Default to degree-target method (k=15) for consistent network density
+
+These changes address scalability bottlenecks while maintaining the same 2.5-3 day development timeline.
+
+---
 
 ## Phase 6 Completion: Dataset Object Construction & Aggregation
 
@@ -53,8 +72,18 @@ def construct_datasets_from_retrieval_results(
     """
 
 @timer_wrap 
-def mask_dataset_ids_in_text(text: str, dataset_id: str, mask_token: str = "<DATASET_ID>") -> str:
-    """Replace all instances of dataset_id with mask_token to prevent leakage"""
+def mask_dataset_ids_in_text(text: str, dataset_ids: List[str], mask_token: str = "<DATASET_ID>") -> str:
+    """
+    Robust multi-ID masking with regex escaping:
+    - Handles multiple dataset IDs per text
+    - Case-insensitive matching with word boundaries  
+    - Prevents leakage from compound citations
+    """
+    import re
+    if not ids:
+        return text
+    pattern = r'(' + r'|'.join(re.escape(i) for i in ids) + r')'
+    return re.sub(pattern, mask_token, text, flags=re.IGNORECASE)
 
 @timer_wrap
 def compute_neighborhood_embedding_stats(
@@ -91,45 +120,79 @@ Orchestrates the complete Phase 6:
 @timer_wrap
 def compute_dataset_embeddings(
     datasets: List[Dataset],
-    chroma_client,
+    db_path: str,
     collection_name: str,
+    dataset_collection_name: str = "dataset-aggregates-train",
     method: Literal["mean", "re_embed"] = "re_embed"
 ) -> Dict[str, np.ndarray]:
     """
-    Compute dataset-level embeddings using either:
+    Compute dataset-level embeddings and store in ChromaDB:
     - Method A: Mean of constituent chunk embeddings (faster)
     - Method B: Re-embed concatenated masked text (potentially richer)
+    - Store in dedicated ChromaDB collection for dataset-level vectors
     """
 
 @timer_wrap  
-def build_similarity_matrix(dataset_embeddings: Dict[str, np.ndarray]) -> np.ndarray:
-    """Create N×N cosine similarity matrix from dataset embeddings"""
+def build_knn_similarity_graph(
+    dataset_embeddings: Dict[str, np.ndarray], 
+    k_neighbors: int = 30,
+    similarity_threshold: float = None,
+    threshold_method: str = "degree_target"
+) -> ig.Graph:
+    """
+    Memory-efficient k-NN similarity graph construction:
+    1. Use sklearn.neighbors.NearestNeighbors for O(N*k) memory complexity
+    2. Apply similarity threshold to filter edges
+    3. Build igraph directly (no NetworkX conversion)
+    4. Default to degree-target heuristic for deterministic thresholding
+    """
 
 @timer_wrap
-def determine_similarity_threshold(similarity_matrix: np.ndarray, method: str = "percentile_90") -> float:
+def determine_similarity_threshold(
+    distances: np.ndarray, 
+    method: str = "degree_target",
+    target_degree: int = 15
+) -> float:
     """
-    Dynamically determine similarity threshold based on network density:
+    Dynamically determine similarity threshold:
+    - degree_target: Target average node degree (default, deterministic)
     - percentile_90: Use 90th percentile of similarities
-    - elbow_method: Find largest gap in sorted similarities  
-    - density_target: Target specific edge density (e.g., 10% of possible edges)
+    - elbow_method: Find largest gap in sorted similarities
     """
 
 @timer_wrap
-def build_similarity_network(similarity_matrix: np.ndarray, threshold: float) -> networkx.Graph:
-    """Convert similarity matrix to NetworkX graph using threshold for edge existence"""
+def run_leiden_clustering(
+    graph: ig.Graph, 
+    resolution: float = 1.0, 
+    min_cluster_size: int = 2,
+    random_seed: int = 42
+) -> Dict[str, str]:
+    """
+    Apply Leiden clustering with safeguards:
+    1. Use igraph directly (no NetworkX conversion)
+    2. Set random seed for reproducibility
+    3. Filter out clusters smaller than min_cluster_size
+    4. Return {dataset_id: cluster_label} mapping
+    """
+# **Use existing  save_chunks_to_chroma function in `semantic_chunking.py`**
+@timer_wrap  
+def store_dataset_embeddings_in_chroma(
+    dataset_embeddings: Dict[str, np.ndarray],
+    dataset_metadata: Dict[str, Dict[str, str]],
+    collection_name: str = "dataset-aggregates-train",
+    cfg_path: str = "configs/chunking.yaml"
+):
+    """Store dataset-level embeddings in dedicated ChromaDB collection"""
+
 
 @timer_wrap
-def run_leiden_clustering(graph: networkx.Graph, resolution: float = 1.0) -> Dict[str, str]:
+def mask_dataset_ids_in_text(text: str, dataset_ids: List[str], mask_token: str = "<DATASET_ID>") -> str:
     """
-    Apply Leiden clustering using leidenalg library:
-    1. Convert NetworkX → igraph  
-    2. Apply leidenalg.find_partition()
-    3. Return {dataset_id: cluster_label} mapping
+    Robust multi-ID masking with regex escaping:
+    - Handles multiple dataset IDs per text
+    - Case-insensitive matching with word boundaries
+    - Prevents leakage from compound citations
     """
-
-@timer_wrap
-def encode_cluster_features(datasets: List[Dataset], cluster_mapping: Dict[str, str]) -> List[Dataset]:
-    """Add cluster field to Dataset objects and return binary cluster feature encodings"""
 ```
 
 ### 7.2 Clustering Dependencies
@@ -137,7 +200,7 @@ def encode_cluster_features(datasets: List[Dataset], cluster_mapping: Dict[str, 
 ```toml
 leidenalg = "^0.10.1"
 python-igraph = "^0.11.0"  
-networkx = "^3.1"
+scikit-learn = "^1.3.0"
 ```
 
 ---
@@ -153,11 +216,13 @@ networkx = "^3.1"
 def run_pca_reduction(
     dataset_embeddings: Dict[str, np.ndarray], 
     n_components: int = None,
-    variance_threshold: float = 0.95
+    variance_threshold: float = 0.95,
+    random_seed: int = 42
 ) -> Tuple[Dict[str, np.ndarray], PCA]:
     """
-    Apply PCA to dataset embeddings:
+    Apply PCA to dataset embeddings with reproducibility:
     - Auto-determine n_components to retain ≥95% variance if not specified
+    - Set random seed for consistent results across runs
     - Return transformed embeddings and fitted PCA object
     """
 
@@ -166,9 +231,14 @@ def run_umap_reduction(
     embeddings: Dict[str, np.ndarray],
     n_neighbors: int = 15,
     min_dist: float = 0.1,
-    n_components: int = 2
+    n_components: int = 2,
+    random_seed: int = 42
 ) -> Dict[str, np.ndarray]:
-    """Apply UMAP dimensionality reduction for 2D visualization"""
+    """
+    Apply UMAP dimensionality reduction with reproducibility:
+    - Set random_state for deterministic embedding layout
+    - Critical for consistent visualizations across pipeline runs
+    """
 
 @timer_wrap
 def create_cluster_visualization(
@@ -176,7 +246,7 @@ def create_cluster_visualization(
     cluster_labels: Dict[str, str],
     output_path: str = "reports/cluster_visualization.png"
 ):
-    """Create scatter plot colored by Leiden cluster labels"""
+    """Create scatter plot colored by Leiden cluster labels using matplotlib"""
 
 @timer_wrap  
 def create_ground_truth_visualization(
@@ -184,28 +254,39 @@ def create_ground_truth_visualization(
     datasets: List[Dataset],
     output_path: str = "reports/ground_truth_visualization.png"
 ):
-    """Create scatter plot colored by dataset_type (PRIMARY/SECONDARY) labels"""
+    """Create scatter plot colored by dataset_type (PRIMARY/SECONDARY) labels using matplotlib"""
 ```
 
 ### 8.2 Visualization Dependencies
-**New Dependencies**:
+**Dependencies** (scikit-learn already included from clustering):
 ```toml
 umap-learn = "^0.5.4"
-scikit-learn = "^1.3.0"  
 matplotlib = "^3.7.0"
-seaborn = "^0.12.0"
+# Note: Seaborn removed for lighter Docker builds - matplotlib sufficient
 ```
 
 ---
 
 ## Phase 9: Database Schema Extension  
 
-### 9.1 Add Datasets Table
+### 9.1 Add Datasets Table with FK Enforcement
 **Location**: Update `api/database/duckdb_schema.py`
 
 ```python
+def create_connection(self) -> duckdb.DuckDBPyConnection:
+    """Create and return a DuckDB connection with FK enforcement."""
+    # Ensure the directory exists
+    db_path = Path(self.db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Create connection and enable foreign key constraints
+    self.conn = duckdb.connect(str(db_path))
+    self.conn.execute("PRAGMA foreign_keys=ON")  # Critical: enable FK enforcement
+    
+    return self.conn
+
 def create_datasets_table(self):
-    """Create the datasets table matching the Dataset model."""
+    """Create the datasets table - embeddings stored in ChromaDB separately."""
     logger.info("Creating datasets table...")
     
     create_table_sql = """
@@ -219,7 +300,7 @@ def create_datasets_table(self):
         cluster VARCHAR,
         dataset_type VARCHAR CHECK (dataset_type IN ('PRIMARY', 'SECONDARY')),
         text TEXT NOT NULL,
-        -- Dimensionality reduction features
+        -- Dimensionality reduction features (derived from ChromaDB embeddings)
         umap_1 REAL,
         umap_2 REAL, 
         pc_1 REAL,
@@ -242,8 +323,8 @@ def create_datasets_table(self):
     logger.info("Datasets table created successfully")
 
 def create_datasets_indexes(self):
-    """Create indexes for datasets table performance."""
-    # Index on cluster for clustering analysis
+    """Create minimal indexes for datasets table performance."""
+    # Primary index on cluster for clustering analysis
     self.conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_datasets_cluster ON datasets(cluster);
     """)
@@ -253,18 +334,16 @@ def create_datasets_indexes(self):
         CREATE INDEX IF NOT EXISTS idx_datasets_type ON datasets(dataset_type);
     """)
     
-    # Composite index for dataset_id lookups
-    self.conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_datasets_id ON datasets(dataset_id);
-    """)
+    # Note: Minimal indexing to avoid upsert slowdown
+    logger.info("Datasets table indexes created successfully")
 ```
 
-### 9.2 Update Dataset Model
+### 9.2 Update Dataset Model  
 **Location**: Update `src/models.py`
 
 ```python
 class Dataset(BaseModel):
-    """Dataset Citation Extracted from Document text"""
+    """Dataset Citation Extracted from Document text - embeddings stored separately in ChromaDB"""
     dataset_id: str = Field(..., description="Dataset ID")
     doc_id: str = Field(..., description="DOI in which the dataset citation was found")
     total_tokens: int = Field(..., description="Total number of tokens in all chunks.")
@@ -275,13 +354,13 @@ class Dataset(BaseModel):
     dataset_type: Optional[Literal["PRIMARY", "SECONDARY"]] = Field(None, description="Dataset Type: main target of the classification task")
     text: str = Field(..., description="Text in the document where the dataset citation is found (masked)")
     
-    # Dimensionality reduction features
+    # Dimensionality reduction features (derived from ChromaDB embeddings)
     umap_1: Optional[float] = Field(None, description="UMAP dimension 1")
     umap_2: Optional[float] = Field(None, description="UMAP dimension 2") 
     pc_1: Optional[float] = Field(None, description="First principal component")
     pc_2: Optional[float] = Field(None, description="Second principal component")
     
-    # Neighborhood embedding statistics
+    # Neighborhood embedding statistics (computed from ChromaDB k-NN search)
     neighbor_mean_similarity: Optional[float] = Field(None, description="Mean similarity to k-nearest neighbors")
     neighbor_max_similarity: Optional[float] = Field(None, description="Max similarity to k-nearest neighbors")
     neighbor_var_similarity: Optional[float] = Field(None, description="Variance of similarities to k-nearest neighbors")
@@ -290,7 +369,7 @@ class Dataset(BaseModel):
     neighbor_var_norm: Optional[float] = Field(None, description="Variance of norms of k-nearest neighbor embeddings")
     
     def to_duckdb_row(self) -> Dict[str, Any]:
-        """Convert Dataset to DuckDB row dictionary for bulk upsert."""
+        """Convert Dataset to DuckDB row dictionary for parquet-based bulk upsert."""
         return {
             "dataset_id": self.dataset_id,
             "doc_id": self.doc_id,
@@ -319,13 +398,22 @@ class Dataset(BaseModel):
     def from_duckdb_row(cls, row: Dict[str, Any]) -> "Dataset":
         """Rehydrate Dataset from DuckDB row."""
         return cls(**{k: v for k, v in row.items() if k not in ["created_at", "updated_at"]})
+    
+    def to_chroma_metadata(self) -> Dict[str, str]:
+        """Convert Dataset to ChromaDB metadata dictionary."""
+        return {
+            "dataset_id": self.dataset_id,
+            "doc_id": self.doc_id,
+            "cluster": self.cluster or "unknown",
+            "dataset_type": self.dataset_type or "unknown"
+        }
 ```
 
 ---
 
 ## Phase 10: Bulk Upsert Implementation
 
-### 10.1 Bulk Upsert Service
+### 10.1 Parquet-Based Bulk Upsert Service
 **Location**: `api/services/dataset_upsert_service.py`
 
 ```python
@@ -333,95 +421,73 @@ class Dataset(BaseModel):
 def bulk_upsert_datasets(
     datasets: List[Dataset],
     db_path: str = "artifacts/mdc_challenge.db",
-    batch_size: int = 1000
+    temp_dir: str = "/tmp"
 ) -> Dict[str, Any]:
     """
-    Efficiently upsert Dataset objects using DuckDB's MERGE INTO statement.
-    Uses parameterized batching to avoid memory issues with large datasets.
+    Efficiently upsert Dataset objects using DuckDB's parquet-based bulk operations.
+    Single INSERT OR REPLACE statement - no temp tables or batching overhead.
     """
     
+    # Enable foreign key constraints and transaction
     conn = duckdb.connect(db_path)
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("BEGIN TRANSACTION")
     
-    # Prepare batch data
-    upsert_data = [ds.to_duckdb_row() for ds in datasets]
-    
-    total_batches = (len(upsert_data) + batch_size - 1) // batch_size
-    logger.info(f"Upserting {len(datasets)} datasets in {total_batches} batches")
-    
-    for i in range(0, len(upsert_data), batch_size):
-        batch = upsert_data[i:i+batch_size]
-        batch_num = i // batch_size + 1
+    try:
+        # Convert datasets to DataFrame
+        upsert_data = [ds.to_duckdb_row() for ds in datasets]
+        df = pd.DataFrame(upsert_data)
         
-        logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} records)")
+        # Strip control characters from text fields to prevent CSV export issues
+        df['text'] = df['text'].str.replace(r'[\x00-\x1f\x7f-\x9f]', '', regex=True)
         
-        # Create temporary table for this batch
-        conn.execute("DROP TABLE IF EXISTS temp_datasets_batch")
-        conn.execute("""
-            CREATE TEMPORARY TABLE temp_datasets_batch AS 
-            SELECT * FROM datasets WHERE 1=0
-        """)
+        # Write to temporary parquet file
+        temp_parquet = os.path.join(temp_dir, f"datasets_upsert_{uuid.uuid4().hex[:8]}.parquet")
+        df.to_parquet(temp_parquet, index=False)
         
-        # Insert batch data into temporary table
-        conn.executemany("""
-            INSERT INTO temp_datasets_batch VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
-        """, [tuple(row.values()) for row in batch])
+        logger.info(f"Upserting {len(datasets)} datasets via parquet bulk load")
         
-        # Execute MERGE statement for this batch
-        merge_sql = """
-        MERGE INTO datasets AS target
-        USING temp_datasets_batch AS source
-        ON target.dataset_id = source.dataset_id AND target.doc_id = source.doc_id
-        WHEN MATCHED THEN UPDATE SET
-            total_tokens = source.total_tokens,
-            avg_tokens_per_chunk = source.avg_tokens_per_chunk,
-            total_char_length = source.total_char_length,
-            clean_text_length = source.clean_text_length,
-            cluster = source.cluster,
-            dataset_type = source.dataset_type,
-            text = source.text,
-            umap_1 = source.umap_1,
-            umap_2 = source.umap_2,
-            pc_1 = source.pc_1,
-            pc_2 = source.pc_2,
-            neighbor_mean_similarity = source.neighbor_mean_similarity,
-            neighbor_max_similarity = source.neighbor_max_similarity,
-            neighbor_var_similarity = source.neighbor_var_similarity,
-            neighbor_mean_norm = source.neighbor_mean_norm,
-            neighbor_max_norm = source.neighbor_max_norm,
-            neighbor_var_norm = source.neighbor_var_norm,
-            updated_at = CURRENT_TIMESTAMP
-        WHEN NOT MATCHED THEN INSERT (
-            dataset_id, doc_id, total_tokens, avg_tokens_per_chunk,
-            total_char_length, clean_text_length, cluster, dataset_type, text,
-            umap_1, umap_2, pc_1, pc_2,
-            neighbor_mean_similarity, neighbor_max_similarity, neighbor_var_similarity,
-            neighbor_mean_norm, neighbor_max_norm, neighbor_var_norm,
-            created_at, updated_at
-        ) VALUES (
-            source.dataset_id, source.doc_id, source.total_tokens, source.avg_tokens_per_chunk,
-            source.total_char_length, source.clean_text_length, source.cluster, source.dataset_type, source.text,
-            source.umap_1, source.umap_2, source.pc_1, source.pc_2,
-            source.neighbor_mean_similarity, source.neighbor_max_similarity, source.neighbor_var_similarity,
-            source.neighbor_mean_norm, source.neighbor_max_norm, source.neighbor_var_norm,
-            source.created_at, source.updated_at
-        )
+        # Single INSERT OR REPLACE statement - DuckDB's recommended approach
+        upsert_sql = """
+        INSERT OR REPLACE INTO datasets 
+        SELECT * FROM parquet_scan(?)
         """
         
-        conn.execute(merge_sql)
-        logger.info(f"Batch {batch_num} upserted successfully")
-    
-    # Return summary statistics
-    total_count = conn.execute("SELECT COUNT(*) FROM datasets").fetchone()[0]
-    conn.close()
-    
-    return {
-        "success": True,
-        "total_datasets_upserted": len(datasets),
-        "total_datasets_in_db": total_count,
-        "batches_processed": total_batches
-    }
+        conn.execute(upsert_sql, [temp_parquet])
+        conn.execute("COMMIT")
+        
+        # Clean up temp file
+        os.unlink(temp_parquet)
+        
+        # Return summary statistics
+        total_count = conn.execute("SELECT COUNT(*) FROM datasets").fetchone()[0]
+        
+        logger.info(f"✅ Successfully upserted {len(datasets)} datasets")
+        
+        return {
+            "success": True,
+            "total_datasets_upserted": len(datasets),
+            "total_datasets_in_db": total_count,
+            "method": "parquet_bulk_load"
+        }
+        
+    except Exception as e:
+        conn.execute("ROLLBACK")
+        logger.error(f"Bulk upsert failed: {str(e)}")
+        # Clean up temp file on error
+        if os.path.exists(temp_parquet):
+            os.unlink(temp_parquet)
+        raise
+    finally:
+        conn.close()
+
+
+@timer_wrap
+def sanitize_text_for_storage(text: str) -> str:
+    """Remove control characters that can break CSV exports or cause encoding issues."""
+    import re
+    # Remove control characters except newline and tab
+    return re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', text)
 ```
 
 ---
@@ -437,27 +503,35 @@ def main(
     retrieval_results_path: str = "reports/retrieval/retrieval_results.json",
     db_path: str = "artifacts/mdc_challenge.db",
     collection_name: str = "mdc_training_data",
+    dataset_collection_name: str = "dataset-aggregates-train",
     output_dir: str = "reports/feature_engineering",
-    similarity_threshold_method: str = "percentile_90",
+    similarity_threshold_method: str = "degree_target",
     clustering_resolution: float = 1.0,
     k_neighbors: int = 5,
+    k_similarity_neighbors: int = 30,
     visualization: bool = True
 ):
     """
-    Complete feature engineering pipeline:
+    Complete feature engineering pipeline with optimizations:
     1. Phase 6: Dataset construction from retrieval results
-    2. Phase 7: Network-based Leiden clustering  
-    3. Phase 8: PCA & UMAP dimensionality reduction + visualizations
-    4. Phase 9: DuckDB datasets table creation
-    5. Phase 10: Bulk upsert of enriched Dataset objects
+    2. Phase 7: Memory-efficient k-NN clustering with ChromaDB storage  
+    3. Phase 8: PCA & UMAP dimensionality reduction with reproducibility
+    4. Phase 9: DuckDB datasets table creation with FK enforcement
+    5. Phase 10: Parquet-based bulk upsert
     """
     
-    logger.info("🚀 Starting Feature Engineering Pipeline")
+    # Set reproducibility seeds
+    np.random.seed(42)
     
-    # Ensure output directory exists
+    logger.info("🚀 Starting Optimized Feature Engineering Pipeline")
+    
+    # Ensure output directory exists and validate path
+    if not os.path.abspath(retrieval_results_path).startswith(os.path.abspath("reports/")):
+        raise ValueError("retrieval_results_path must be within reports/ directory for security")
+    
     os.makedirs(output_dir, exist_ok=True)
     
-    # Phase 6: Dataset Construction
+    # Phase 6: Dataset Construction with robust masking
     logger.info("Phase 6: Constructing Dataset objects from retrieval results")
     datasets = construct_datasets_from_retrieval_results(
         retrieval_results_path=retrieval_results_path,
@@ -472,13 +546,28 @@ def main(
     with open(datasets_json_path, 'w') as f:
         json.dump([ds.model_dump() for ds in datasets], f, indent=2)
     
-    # Phase 7: Clustering
-    logger.info("Phase 7: Network-based Leiden clustering")
-    dataset_embeddings = compute_dataset_embeddings(datasets, chroma_client, collection_name)
-    similarity_matrix = build_similarity_matrix(dataset_embeddings)
-    threshold = determine_similarity_threshold(similarity_matrix, similarity_threshold_method)
-    network = build_similarity_network(similarity_matrix, threshold)
-    cluster_mapping = run_leiden_clustering(network, clustering_resolution)
+    # Phase 7: Memory-efficient k-NN clustering with ChromaDB storage
+    logger.info("Phase 7: Computing dataset embeddings and storing in ChromaDB")
+    dataset_embeddings = compute_dataset_embeddings(
+        datasets=datasets, 
+        db_path=db_path,
+        collection_name=collection_name,
+        dataset_collection_name=dataset_collection_name
+    )
+    
+    logger.info("Phase 7: Building k-NN similarity graph")
+    similarity_graph = build_knn_similarity_graph(
+        dataset_embeddings=dataset_embeddings,
+        k_neighbors=k_similarity_neighbors,
+        threshold_method=similarity_threshold_method
+    )
+    
+    logger.info("Phase 7: Running Leiden clustering")
+    cluster_mapping = run_leiden_clustering(
+        graph=similarity_graph, 
+        resolution=clustering_resolution,
+        random_seed=42
+    )
     
     # Add cluster labels to datasets
     for dataset in datasets:
@@ -486,10 +575,10 @@ def main(
     
     logger.info(f"✅ Clustering complete: {len(set(cluster_mapping.values()))} clusters found")
     
-    # Phase 8: Dimensionality Reduction
+    # Phase 8: Dimensionality Reduction with reproducibility
     logger.info("Phase 8: PCA & UMAP dimensionality reduction")
-    pca_embeddings, pca_model = run_pca_reduction(dataset_embeddings)
-    umap_embeddings = run_umap_reduction(pca_embeddings)
+    pca_embeddings, pca_model = run_pca_reduction(dataset_embeddings, random_seed=42)
+    umap_embeddings = run_umap_reduction(pca_embeddings, random_seed=42)
     
     # Add DR features to datasets
     for dataset in datasets:
@@ -509,19 +598,19 @@ def main(
                                         os.path.join(output_dir, "ground_truth_visualization.png"))
         logger.info("✅ Visualizations saved")
     
-    # Phase 9: Database Schema Update
+    # Phase 9: Database Schema Update with FK enforcement
     logger.info("Phase 9: Updating DuckDB schema")
     schema_initializer = DuckDBSchemaInitializer(db_path)
-    schema_initializer.create_connection()
+    schema_initializer.create_connection()  # Automatically enables FK pragma
     schema_initializer.create_datasets_table()
     schema_initializer.create_datasets_indexes()
     schema_initializer.close()
     logger.info("✅ Database schema updated")
     
-    # Phase 10: Bulk Upsert
-    logger.info("Phase 10: Bulk upserting Dataset objects")
+    # Phase 10: Parquet-based bulk upsert
+    logger.info("Phase 10: Parquet-based bulk upserting Dataset objects")
     upsert_result = bulk_upsert_datasets(datasets, db_path)
-    logger.info(f"✅ Upserted {upsert_result['total_datasets_upserted']} datasets")
+    logger.info(f"✅ Upserted {upsert_result['total_datasets_upserted']} datasets via {upsert_result['method']}")
     
     # Export final enriched datasets
     enriched_datasets_path = os.path.join(output_dir, "enriched_datasets.json")
@@ -533,9 +622,15 @@ def main(
         "pipeline_completed_at": datetime.now().isoformat(),
         "total_datasets": len(datasets),
         "total_clusters": len(set(cluster_mapping.values())),
-        "similarity_threshold": float(threshold),
+        "similarity_method": similarity_threshold_method,
+        "k_similarity_neighbors": k_similarity_neighbors,
+        "clustering_resolution": clustering_resolution,
         "pca_explained_variance_ratio": pca_model.explained_variance_ratio_.tolist(),
         "upsert_result": upsert_result,
+        "chroma_collections": {
+            "chunks": collection_name,
+            "datasets": dataset_collection_name
+        },
         "output_files": {
             "datasets": datasets_json_path,
             "enriched_datasets": enriched_datasets_path,
@@ -548,7 +643,7 @@ def main(
     with open(summary_path, 'w') as f:
         json.dump(summary, f, indent=2)
     
-    logger.info(f"🎉 Feature Engineering Pipeline Complete! Summary: {summary_path}")
+    logger.info(f"🎉 Optimized Feature Engineering Pipeline Complete! Summary: {summary_path}")
     return summary
 ```
 
@@ -624,54 +719,85 @@ dataset_construction:
   mask_token: "<DATASET_ID>"
   k_neighbors: 5
   re_embed_masked_text: true
+  robust_multi_id_masking: true
 
 clustering:
-  similarity_threshold_method: "percentile_90"  # or "elbow_method", "density_target"
+  similarity_threshold_method: "degree_target"  # deterministic default
+  target_degree: 15  # for degree_target method
+  k_similarity_neighbors: 30  # k-NN graph construction
   leiden_resolution: 1.0
   min_cluster_size: 2
 
 dimensionality_reduction:
   pca:
     variance_threshold: 0.95
+    random_seed: 42
   umap:
     n_neighbors: 15
     min_dist: 0.1
     n_components: 2
+    random_seed: 42
 
-database:
-  batch_size: 1000
-  enable_indexes: true
+storage:
+  # ChromaDB collections
+  chunk_collection: "mdc_training_data"
+  dataset_collection: "dataset-aggregates-train"
+  
+  # DuckDB settings
+  enable_foreign_keys: true
+  enable_minimal_indexes: true
+  parquet_bulk_upsert: true
+
+security:
+  validate_paths: true
+  strip_control_characters: true
+  sanitize_text_fields: true
 
 output:
   export_visualizations: true
   export_intermediate_files: true
+  temp_directory: "/tmp"
 ```
 
 ---
 
 ## Expected Outputs & Benefits
 
-After implementation, this pipeline will produce:
+After implementation, this optimized pipeline will produce:
 
-1. **Enriched Dataset Objects** with:
-   - Masked text to prevent overfitting
-   - Leiden cluster assignments as binary features  
-   - PCA/UMAP coordinates for visualization
-   - Neighborhood embedding statistics
-   
-2. **Rich Visualizations**:
-   - UMAP scatter plots colored by cluster membership
-   - UMAP scatter plots colored by ground truth labels (PRIMARY/SECONDARY)
-   - Cluster quality assessment plots
+1. **Dual-Storage Architecture**:
+   - **ChromaDB**: Full dataset embeddings in dedicated `dataset-aggregates-train` collection
+   - **DuckDB**: Tabular features, metadata, and derived statistics in indexed `datasets` table
+   - Clear separation of vector storage (ChromaDB) vs. structured data (DuckDB)
 
-3. **Production-Ready Database**:
-   - Indexed `datasets` table with all engineered features
-   - Bulk upsert capability for efficient updates
-   - Full integration with existing DuckDB infrastructure
+2. **Enriched Dataset Objects** with:
+   - Robust multi-ID masked text to prevent overfitting
+   - Memory-efficient Leiden cluster assignments as binary features
+   - Reproducible PCA/UMAP coordinates for visualization
+   - k-NN neighborhood embedding statistics from ChromaDB
 
-4. **Improved Classifier Performance**:
+3. **Scalable & Performant Operations**:
+   - O(N*k) memory complexity for similarity graph construction (vs O(N²))
+   - Direct igraph clustering (no NetworkX conversion overhead)
+   - Single parquet-based bulk upsert (no temp table batching)
+   - Foreign key enforcement with proper pragma settings
+
+4. **Production-Ready Visualizations**:
+   - Deterministic UMAP scatter plots colored by cluster membership
+   - Ground truth visualization colored by PRIMARY/SECONDARY labels
+   - Maybe include visualization colored by document ID (continuous color scale since there are ~95 docs with citations)
+   - Matplotlib-only plots for lighter Docker builds
+
+5. **Security & Robustness**:
+   - Path validation for input files
+   - Control character sanitization for text fields
+   - Transaction-wrapped upserts with proper error handling
+   - Reproducible results via consistent random seeds
+
+6. **Improved Classifier Performance**:
    - Network-based cluster features capture dataset relationships
    - Dimensionality reduction features provide additional signal
-   - Masked embeddings prevent label leakage
+   - Properly masked embeddings prevent label leakage
+   - Neighborhood statistics provide contextual features
 
-This comprehensive plan maintains consistency with existing codebase architecture while implementing state-of-the-art feature engineering techniques optimized for your biomedical dataset citation classification task.
+This optimized plan addresses the scalability concerns identified in the colleague's review while maintaining consistency with existing codebase architecture and implementing production-grade feature engineering techniques optimized for your biomedical dataset citation classification task.

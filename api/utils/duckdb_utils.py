@@ -5,22 +5,24 @@ This module provides helper functions for database operations, following the
 specification from chunk_and_embedding_api.md.
 """
 
-import sys
+import sys, os
 from pathlib import Path
-from typing import List, Iterable, Union, Tuple
+from typing import List, Iterable, Union, Tuple, Dict, Any, Optional
 
 import duckdb
 import pandas as pd  # for bulk DataFrame-based upserts
+import datetime
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from src.models import Document, CitationEntity, Chunk
+from src.models import Document, CitationEntity, Chunk, Dataset, EngineeredFeatures
 from src.helpers import initialize_logging
 
 # Initialize logging
-logger = initialize_logging("duckdb_utils")
+filename = os.path.basename(__file__)
+logger = initialize_logging(filename)
 
 class DuckDBHelper:
     """
@@ -483,6 +485,210 @@ class DuckDBHelper:
             )
             raise ValueError(str(exc)) from exc
     
+
+    def bulk_upsert_datasets(
+        datasets: List[Dataset],
+        db_path: str = "artifacts/mdc_challenge.db"
+    ) -> Dict[str, Any]:
+        """
+        Batch-upsert Dataset objects using a DataFrame buffer — identical pattern
+        to `store_chunks_batch`, avoiding parquet/temp-file overhead.
+        """
+        if not datasets:
+            logger.warning("No datasets supplied for upsert.")
+            return {"success": True, "total_datasets_upserted": 0}
+
+        # 1️⃣  Open connection, enforce FKs, start TX
+        con = duckdb.connect(db_path)
+        con.execute("PRAGMA foreign_keys=ON")
+        con.execute("BEGIN TRANSACTION")
+
+        try:
+            # 2️⃣  Convert to DataFrame
+            records = [ds.to_duckdb_row() for ds in datasets]
+            df = pd.DataFrame.from_records(records)
+
+            # 3️⃣  Sanitize text fields (optional but safer)
+            # if "text" in df.columns:
+            #     df["text"] = _sanitize_series(df["text"])
+
+            # 4️⃣  Register buffer table & bulk upsert
+            con.register("datasets_buffer", df)
+            con.execute("""
+                INSERT OR REPLACE INTO datasets
+                (dataset_id, doc_id, total_tokens, avg_tokens_per_chunk,
+                total_char_length, clean_text_length, cluster,
+                dataset_type, text)
+                SELECT dataset_id, doc_id, total_tokens, avg_tokens_per_chunk,
+                    total_char_length, clean_text_length, cluster,
+                    dataset_type, text
+                FROM datasets_buffer
+            """)
+            con.unregister("datasets_buffer")
+
+            con.execute("COMMIT")
+
+            total_in_db = con.execute("SELECT COUNT(*) FROM datasets").fetchone()[0]
+            logger.info(f"✅ Upserted {len(datasets)} datasets (total now {total_in_db}).")
+
+            return {
+                "success": True,
+                "total_datasets_upserted": len(datasets),
+                "total_datasets_in_db": total_in_db,
+                "method": "dataframe_buffer"
+            }
+
+        except Exception as e:
+            con.execute("ROLLBACK")
+            logger.error(f"Bulk upsert failed: {e}")
+            raise
+        finally:
+            con.close()
+    
+    def get_all_datasets(self) -> List[Dataset]:
+        """Get all datasets from the database."""
+        try:
+            result = self.engine.execute("SELECT * FROM datasets")
+            rows = result.fetchall()
+            return [Dataset.from_duckdb_row(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Failed to get all datasets: {str(e)}")
+            raise
+    
+
+    def upsert_engineered_features_batch(
+        self,
+        features: List[EngineeredFeatures],
+    ) -> bool:
+        """
+        Batch-insert (or replace) rows into the `engineered_feature_values` table.
+        Each `EngineeredFeatures` object is converted to its EAV rows
+        via the model's `to_eav_rows()` helper.
+
+        Returns
+        -------
+        bool
+            True on success, False on error (see log).
+        """
+        if not features:
+            logger.warning("No EngineeredFeatures supplied for upsert.")
+            return True
+
+        try:
+            # 1️⃣  Flatten → list[dict]  (many rows per model!)
+            eav_rows: List[Dict[str, Any]] = []
+            for feat in features:
+                # ensure fresh timestamps so OR REPLACE updates `updated_at`
+                now_iso = datetime.now().isoformat()
+                for row in feat.to_eav_rows():
+                    row["created_at"] = now_iso
+                    row["updated_at"] = now_iso
+                    eav_rows.append(row)
+
+            # 2️⃣  Register DataFrame buffer (no copy → Arrow zero-copy)
+            df = pd.DataFrame.from_records(eav_rows)
+            self.engine.register("feat_buffer", df)
+
+            # 3️⃣  One SQL statement = ✨ fast ✨
+            self.engine.execute(
+                """
+                INSERT OR REPLACE INTO engineered_feature_values
+                (dataset_id, document_id, feature_name, feature_value,
+                created_at, updated_at)
+                SELECT dataset_id, document_id, feature_name, feature_value,
+                    created_at, updated_at
+                FROM feat_buffer
+                """
+            )
+            self.engine.unregister("feat_buffer")
+
+            logger.info(f"✅ Upserted {len(eav_rows)} feature rows.")
+            return True
+
+        except Exception as exc:
+            logger.error(f"Feature upsert failed: {exc}")
+            return False
+    
+    def get_full_dataset_dataframe(
+        self,
+        dataset_ids: Optional[List[str]] = None,
+        feature_filter: Optional[List[str]] = None,
+        fill_na: bool = True,
+    ) -> pd.DataFrame:
+        """
+        Return a wide DataFrame that merges fixed columns from `datasets`
+        with *pivoted* engineered features.
+
+        Parameters
+        ----------
+        dataset_ids : list[str] | None
+            If provided, restrict to these dataset_id values.
+        feature_filter : list[str] | None
+            If provided, keep only these engineered feature names.
+        fill_na : bool
+            If True, fill missing feature columns with NaN; otherwise keep NaNs.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per dataset (plus `doc_id`) with extra feature columns.
+        """
+
+        # 1️⃣  Load base datasets -------------------------------
+        if dataset_ids:
+            placeholders = ", ".join("?" * len(dataset_ids))
+            ds_sql = f"SELECT * FROM datasets WHERE dataset_id IN ({placeholders})"
+            df_ds = self.engine.execute(ds_sql, dataset_ids).df()
+        else:
+            df_ds = self.engine.execute("SELECT * FROM datasets").df()
+
+        # 2️⃣  Load engineered features -------------------------
+        if feature_filter:
+            ph = ", ".join("?" * len(feature_filter))
+            feat_sql = (
+                "SELECT * FROM engineered_feature_values "
+                f"WHERE feature_name IN ({ph})"
+            )
+            df_feat = self.engine.execute(feat_sql, feature_filter).df()
+        else:
+            df_feat = self.engine.execute(
+                "SELECT * FROM engineered_feature_values"
+            ).df()
+
+        if df_feat.empty:
+            logger.warning("No engineered features found; returning datasets only.")
+            return df_ds
+
+        # 3️⃣  Pivot long → wide  (Pandas = simpler than SQL PIVOT for unknown cols) --
+        df_wide = (
+            df_feat.pivot_table(
+                index=["dataset_id", "document_id"],
+                columns="feature_name",
+                values="feature_value",
+                aggfunc="first",
+            )
+            .reset_index()
+        )  # same semantics as DuckDB PIVOT_WIDER:contentReference[oaicite:2]{index=2}
+
+        if fill_na:
+            df_wide = df_wide.fillna(pd.NA)
+
+        # 4️⃣  Merge with datasets ------------------------------
+        df_full = (
+            df_ds.merge(
+                df_wide,
+                how="left",
+                left_on=["dataset_id", "doc_id"],
+                right_on=["dataset_id", "document_id"],
+                suffixes=("", "_drop"),
+            )
+            .drop(columns=[c for c in df_ds.columns if c.endswith("_drop")], errors="ignore")
+        )
+
+        logger.info(f"🔄 Built dataframe with shape {df_full.shape}.")
+        return df_full
+            
+    
     def get_database_stats(self) -> dict:
         """Get basic statistics about the database."""
         try:
@@ -499,12 +705,16 @@ class DuckDBHelper:
             docs_with_citations = self.engine.execute(
                 "SELECT COUNT(*) FROM documents WHERE has_dataset_citation = true"
             ).fetchone()[0]
+
+            # get datasets
+            dataset_count = self.engine.execute("SELECT COUNT(*) FROM datasets").fetchone()[0]
             
             return {
                 "total_documents": doc_count,
                 "total_citations": citation_count,
                 "total_chunks": chunk_count,
-                "documents_with_citations": docs_with_citations
+                "documents_with_citations": docs_with_citations,
+                "total_datasets": dataset_count
             }
             
         except Exception as e:

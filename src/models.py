@@ -241,38 +241,111 @@ class DocumentChunkingResult(BaseModel):
 class Dataset(BaseModel):
     """Dataset Citation Extracted from Document text"""
     dataset_id: str = Field(..., description="Dataset ID")
-    doc_id: str = Field(..., description="DOI in which the dataset citation was found")
+    document_id: str = Field(..., description="DOI in which the dataset citation was found")
     total_tokens: int = Field(..., description="Total number of tokens in all chunks.")
     avg_tokens_per_chunk: float = Field(..., description="Average number of tokens per chunk.")
     total_char_length: int = Field(..., description="Total number of characters")
     clean_text_length: int = Field(..., description="Total number of characters after cleaning")
     cluster: Optional[str] = Field(None, description="Cluster of the dataset citation")
     dataset_type: Optional[Literal["PRIMARY", "SECONDARY"]] = Field(None, description="Dataset Type: main target of the classification task")
-    text: str = Field(..., description= "Text in the document where the dataset citation is found") 
+    text: str = Field(..., description= "Text in the document where the dataset citation is found")
 
-class FirstClassifierInput(BaseModel):
-    """Input for classifier to determine if a document has a dataset citation"""
-    doc: Document = Field(..., description="Document to be classified")
-    embeddings: List[float] = Field(..., description="Embeddings of the text within the document potentially containing dataset citations")
-    UMAP_1: Optional[float] = Field(None, description="UMAP 1 dimension")
-    UMAP_2: Optional[float] = Field(None, description="UMAP 2 dimension")
-    PC_1: Optional[float] = Field(None, description="PC 1 dimension")
-    PC_2: Optional[float] = Field(None, description="PC 2 dimension")
-    has_data_citation: bool = Field(..., description="Whether the document has a dataset citation: first classifer target variable")
+    # save to DuckDB
+    def to_duckdb_row(self) -> Dict[str, Any]:
+        """
+        Convert the dataset into a dictionary that can be inserted into DuckDB.
+        """
+        return {
+            "dataset_id": self.dataset_id,
+            "document_id": self.document_id,
+            "total_tokens": self.total_tokens,
+            "avg_tokens_per_chunk": self.avg_tokens_per_chunk,
+            "total_char_length": self.total_char_length,
+            "clean_text_length": self.clean_text_length,
+            "cluster": self.cluster,
+            "dataset_type": self.dataset_type,
+            "text": self.text,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+    
+    @classmethod
+    def from_duckdb_row(cls, row: Dict[str, Any]) -> "Dataset":
+        """
+        Rehydrate the dataset from a DuckDB row.
+        """
+        return cls(
+            dataset_id=row["dataset_id"],
+            document_id=row["document_id"],
+            total_tokens=row["total_tokens"],
+            avg_tokens_per_chunk=row["avg_tokens_per_chunk"],
+            total_char_length=row["total_char_length"],
+            clean_text_length=row["clean_text_length"],
+            cluster=row["cluster"],
+            dataset_type=row["dataset_type"],
+            text=row["text"]
+        )
 
-class SecondClassifierInput(BaseModel):
+class EngineeredFeatures(BaseModel):
+    """Engineered features for the dataset citation classification task"""
+    dataset_id: str = Field(..., description="Dataset ID")
+    document_id: str = Field(..., description="DOI of document in which the dataset citation was found")
+    UMAP_1: float = Field(..., description="UMAP 1 dimension")
+    UMAP_2: float = Field(..., description="UMAP 2 dimension")
+    LEIDEN_1: float = Field(..., description="LEIDEN 1 PC1 loadings")
+    # Allow arbitrary additional fields based on the number leiden clusters
+    model_config = {"extra": "allow"}  # capture any other feature_*
+    
+    def to_eav_rows(self) -> List[Dict[str, Any]]:
+        """Return a list[dict] ready for bulk INSERT into engineered_feature_values."""
+        base = self.model_dump()            
+        now = datetime.now().isoformat()
+        return [
+            {
+                "dataset_id":  base["dataset_id"],
+                "document_id": base["document_id"],
+                "feature_name": k,
+                "feature_value": v,
+                "created_at": now,
+                "updated_at": now,
+            }
+            for k, v in base.items()
+            if k not in {"dataset_id", "document_id"}
+        ]
+
+    @classmethod
+    def from_eav_rows(cls, rows: List[Dict[str, Any]]) -> "EngineeredFeatures":
+        """Hydrate a model from SELECT * WHERE dataset_id=… AND document_id=…"""
+        merged: Dict[str, Any] = {}
+        for r in rows:
+            merged.setdefault("dataset_id", r["dataset_id"])
+            merged.setdefault("document_id", r["document_id"])
+            merged[r["feature_name"]] = r["feature_value"]
+        return cls.model_validate(merged)
+
+
+
+# class FirstClassifierInput(BaseModel):
+#     """Input for classifier to determine if a document has a dataset citation"""
+#     doc: Document = Field(..., description="Document to be classified")
+#     embeddings: List[float] = Field(..., description="Embeddings of the text within the document potentially containing dataset citations")
+#     UMAP_1: Optional[float] = Field(None, description="UMAP 1 dimension")
+#     UMAP_2: Optional[float] = Field(None, description="UMAP 2 dimension")
+#     PC_1: Optional[float] = Field(None, description="PC 1 dimension")
+#     PC_2: Optional[float] = Field(None, description="PC 2 dimension")
+#     has_data_citation: bool = Field(..., description="Whether the document has a dataset citation: first classifer target variable")
+
+class ClassifierInput(BaseModel):
     """Input for classifer that predicts the type of dataset citation"""
     dataset: Dataset = Field(..., description="Dataset to be classified")
-    embeddings: List[float] = Field(..., description="Embeddings of the text containing the dataset citation")
-    UMAP_1: float = Field(None, description="UMAP 1 dimension")
-    UMAP_2: float = Field(None, description="UMAP 2 dimension")
-    PC_1: float = Field(None, description="PC 1 dimension")
-    PC_2: Optional[float] = Field(None, description="PC 2 dimension")
-    Cluster: Optional[str] = Field(None, description="Cluster of the dataset citation")
-    is_primary: bool = Field(..., description="Whether the dataset citation is a primary dataset citation. Since there are only 2 classes at this stage, anything else is a secondary dataset citation.")
-    # Allow arbitrary additional fields per nf-core samplesheet flexibility
-    class Config:
-        extra = "allow"
+    document_id: str = Field(..., description="DOI of document in which the dataset citation was found")
+    embeddings: Optional[float] = Field(None, description="Mean of embeddings of the dataset-specific text")
+    UMAP_1: float = Field(..., description="UMAP 1 dimension")
+    UMAP_2: float = Field(..., description="UMAP 2 dimension")
+    LEIDEN_1: float = Field(..., description="LEIDEN 1 PC1 loadings")
+    is_primary: Optional[bool] = Field(None, description="Whether the dataset citation is a primary dataset citation. Since there are only 2 classes at this stage, anything else is a secondary dataset citation.")
+    # Allow arbitrary additional fields
+    model_config = {"extra": "allow"}  # capture any other feature_*
 
 class PreprocessingReport(BaseModel):
     """Report of the preprocessing pipeline"""
