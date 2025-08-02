@@ -107,7 +107,8 @@ async def embed_chunks(payload: EmbeddingPayload) -> EmbeddingResult:
         "text": payload.text,
         "cfg_path": payload.cfg_path,
         "model_name": payload.model_name,
-        "collection_name": payload.collection_name
+        "collection_name": payload.collection_name,
+        "save_to_chroma": payload.save_to_chroma
     }
     try:
         logger.info(f"Creating embeddings for {payload.text[:10]}...")

@@ -373,6 +373,7 @@ class EmbeddingPayload(BaseModel):
     local_model: Optional[bool] = Field(False, description="Whether to use the local model")
     cfg_path: Optional[str] = Field(None, description="Path to the configuration file")
     model_name: Optional[str] = Field(None, description="Name of the model used for embedding. If not provided, will be inferred from default local_model selection")
+    save_to_chroma: Optional[bool] = Field(False, description="Whether to save the embeddings to ChromaDB")
 
 class EmbeddingResult(BaseModel):
     """Result of the embedding step"""

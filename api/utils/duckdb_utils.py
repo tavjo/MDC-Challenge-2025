@@ -487,8 +487,8 @@ class DuckDBHelper:
     
 
     def bulk_upsert_datasets(
-        datasets: List[Dataset],
-        db_path: str = "artifacts/mdc_challenge.db"
+        self,
+        datasets: List[Dataset]
     ) -> Dict[str, Any]:
         """
         Batch-upsert Dataset objects using a DataFrame buffer — identical pattern
@@ -498,10 +498,9 @@ class DuckDBHelper:
             logger.warning("No datasets supplied for upsert.")
             return {"success": True, "total_datasets_upserted": 0}
 
-        # 1️⃣  Open connection, enforce FKs, start TX
-        con = duckdb.connect(db_path)
-        con.execute("PRAGMA foreign_keys=ON")
-        con.execute("BEGIN TRANSACTION")
+        # 1️⃣  Use existing connection, enforce FKs, start TX
+        self.engine.execute("PRAGMA foreign_keys=ON")
+        self.engine.execute("BEGIN TRANSACTION")
 
         try:
             # 2️⃣  Convert to DataFrame
@@ -513,22 +512,22 @@ class DuckDBHelper:
             #     df["text"] = _sanitize_series(df["text"])
 
             # 4️⃣  Register buffer table & bulk upsert
-            con.register("datasets_buffer", df)
-            con.execute("""
+            self.engine.register("datasets_buffer", df)
+            self.engine.execute("""
                 INSERT OR REPLACE INTO datasets
                 (dataset_id, doc_id, total_tokens, avg_tokens_per_chunk,
                 total_char_length, clean_text_length, cluster,
-                dataset_type, text)
-                SELECT dataset_id, doc_id, total_tokens, avg_tokens_per_chunk,
+                dataset_type, text, created_at, updated_at)
+                SELECT dataset_id, document_id, total_tokens, avg_tokens_per_chunk,
                     total_char_length, clean_text_length, cluster,
-                    dataset_type, text
+                    dataset_type, text, created_at, updated_at
                 FROM datasets_buffer
             """)
-            con.unregister("datasets_buffer")
+            self.engine.unregister("datasets_buffer")
 
-            con.execute("COMMIT")
+            self.engine.execute("COMMIT")
 
-            total_in_db = con.execute("SELECT COUNT(*) FROM datasets").fetchone()[0]
+            total_in_db = self.engine.execute("SELECT COUNT(*) FROM datasets").fetchone()[0]
             logger.info(f"✅ Upserted {len(datasets)} datasets (total now {total_in_db}).")
 
             return {
@@ -539,11 +538,9 @@ class DuckDBHelper:
             }
 
         except Exception as e:
-            con.execute("ROLLBACK")
+            self.engine.execute("ROLLBACK")
             logger.error(f"Bulk upsert failed: {e}")
             raise
-        finally:
-            con.close()
     
     def get_all_datasets(self) -> List[Dataset]:
         """Get all datasets from the database."""
