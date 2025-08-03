@@ -98,7 +98,7 @@ class DuckDBSchemaInitializer:
             """
             CREATE TABLE IF NOT EXISTS datasets (
                 dataset_id      VARCHAR PRIMARY KEY,
-                doc_id          VARCHAR NOT NULL,
+                document_id     VARCHAR NOT NULL,
                 total_tokens    INTEGER,
                 avg_tokens_per_chunk REAL,
                 total_char_length   INTEGER,
@@ -108,7 +108,7 @@ class DuckDBSchemaInitializer:
                 text            TEXT NOT NULL,
                 created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (doc_id) REFERENCES documents(doi)
+                FOREIGN KEY (document_id) REFERENCES documents(doi)
             );
             """
         )
@@ -158,8 +158,8 @@ class DuckDBSchemaInitializer:
 
         # datasets
         self.conn.execute(
-            """CREATE INDEX IF NOT EXISTS idx_datasets_doc_id
-               ON datasets(doc_id);"""
+            """CREATE INDEX IF NOT EXISTS idx_datasets_document_id
+               ON datasets(document_id);"""
         )
         self.conn.execute(
             """CREATE INDEX IF NOT EXISTS idx_datasets_cluster

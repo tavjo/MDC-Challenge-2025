@@ -19,6 +19,7 @@ sys.path.append(str(project_root))
 
 from src.models import Document, CitationEntity, Chunk, Dataset, EngineeredFeatures
 from src.helpers import initialize_logging
+from api.database.duckdb_schema import DuckDBSchemaInitializer
 
 # Initialize logging
 filename = os.path.basename(__file__)
@@ -53,75 +54,14 @@ class DuckDBHelper:
     
     def _initialize_schema(self):
         """Initialize database schema if it doesn't exist."""
-        # Create documents table
-        self.engine.execute("""
-            CREATE TABLE IF NOT EXISTS documents (
-                doi VARCHAR PRIMARY KEY,
-                has_dataset_citation BOOLEAN,
-                full_text VARCHAR[],
-                total_char_length INTEGER,
-                parsed_timestamp TIMESTAMP,
-                total_chunks INTEGER,
-                total_tokens INTEGER,
-                avg_tokens_per_chunk REAL,
-                file_hash VARCHAR,
-                file_path VARCHAR,
-                citation_entities VARCHAR[],
-                n_pages INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # Create citation_entities table
-        self.engine.execute("""
-            CREATE TABLE IF NOT EXISTS citations (
-                data_citation VARCHAR NOT NULL,
-                document_id VARCHAR NOT NULL,
-                pages INTEGER[],
-                evidence VARCHAR[],
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (data_citation, document_id),
-                FOREIGN KEY (document_id) REFERENCES documents(doi)
-            )
-        """)
-        
-        # Create chunks table
-        self.engine.execute("""
-            CREATE TABLE IF NOT EXISTS chunks (
-                chunk_id VARCHAR PRIMARY KEY,
-                document_id VARCHAR NOT NULL,
-                chunk_text TEXT NOT NULL,
-                score REAL,
-                chunk_metadata STRUCT(
-                    created_at TIMESTAMP,
-                    previous_chunk_id VARCHAR,
-                    next_chunk_id VARCHAR,
-                    token_count INTEGER,
-                    citation_entities VARCHAR[]
-                ),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (document_id) REFERENCES documents(doi)
-            )
-        """)
-        
-        # Create indexes for better performance
-        self.engine.execute("""
-            CREATE INDEX IF NOT EXISTS idx_chunks_document_id 
-            ON chunks(document_id)
-        """)
-        
-        self.engine.execute("""
-            CREATE INDEX IF NOT EXISTS idx_citations_data_citation 
-            ON citations(data_citation)
-        """)
-        
-        self.engine.execute("""
-            CREATE INDEX IF NOT EXISTS idx_citations_document_id 
-            ON citations(document_id)
-        """)
-        
-        logger.info("Database schema initialized successfully")
+        schema = DuckDBSchemaInitializer()
+        try:
+            schema.create_schema()
+            schema.validate_schema()
+            logger.info("DuckDB schema initialization completed successfully")
+        finally:
+            schema.close()
+
     
     def get_all_documents(self) -> List[Document]:
         """Get all documents from the database."""
@@ -499,7 +439,7 @@ class DuckDBHelper:
             return {"success": True, "total_datasets_upserted": 0}
 
         # 1️⃣  Use existing connection, enforce FKs, start TX
-        self.engine.execute("PRAGMA foreign_keys=ON")
+        # self.engine.execute("PRAGMA foreign_keys=ON")
         self.engine.execute("BEGIN TRANSACTION")
 
         try:
@@ -515,7 +455,7 @@ class DuckDBHelper:
             self.engine.register("datasets_buffer", df)
             self.engine.execute("""
                 INSERT OR REPLACE INTO datasets
-                (dataset_id, doc_id, total_tokens, avg_tokens_per_chunk,
+                (dataset_id, document_id, total_tokens, avg_tokens_per_chunk,
                 total_char_length, clean_text_length, cluster,
                 dataset_type, text, created_at, updated_at)
                 SELECT dataset_id, document_id, total_tokens, avg_tokens_per_chunk,
@@ -628,7 +568,7 @@ class DuckDBHelper:
         Returns
         -------
         pd.DataFrame
-            One row per dataset (plus `doc_id`) with extra feature columns.
+            One row per dataset (plus `document_id`) with extra feature columns.
         """
 
         # 1️⃣  Load base datasets -------------------------------
@@ -675,7 +615,7 @@ class DuckDBHelper:
             df_ds.merge(
                 df_wide,
                 how="left",
-                left_on=["dataset_id", "doc_id"],
+                left_on=["dataset_id", "document_id"],
                 right_on=["dataset_id", "document_id"],
                 suffixes=("", "_drop"),
             )

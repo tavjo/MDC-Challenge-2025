@@ -368,12 +368,14 @@ class ChunkingPipelinePayload(BaseModel):
 
 class EmbeddingPayload(BaseModel):
     """Payload for the embedding API"""
-    text: str = Field(..., description="Text to be embedded")
+    text: List[str] = Field(..., description="Text to be embedded")
     collection_name: str = Field(..., description="Name of the collection in ChromaDB")
     local_model: Optional[bool] = Field(False, description="Whether to use the local model")
     cfg_path: Optional[str] = Field(None, description="Path to the configuration file")
     model_name: Optional[str] = Field(None, description="Name of the model used for embedding. If not provided, will be inferred from default local_model selection")
     save_to_chroma: Optional[bool] = Field(False, description="Whether to save the embeddings to ChromaDB")
+    ids: Optional[List[str]] = Field(None, description="List of IDs to associate with the embeddings")
+    metadata: Optional[List[dict]] = Field(None, description="List of metadata to associate with the embeddings")
 
 class EmbeddingResult(BaseModel):
     """Result of the embedding step"""
@@ -382,7 +384,7 @@ class EmbeddingResult(BaseModel):
     embeddings: Optional[List[float]] = Field(None, description="Embeddings of the text")
     model_name: Optional[str] = Field(None, description="Name of the model used for embedding")
     collection_name: Optional[str] = Field(None, description="Name of the collection in ChromaDB")
-    id: str = Field(..., description="ID of the embedding in ChromaDB if not associated with a chunk")
+    ids: Optional[List[str]] = Field(None, description="IDs of the embeddings in ChromaDB if not associated with a chunk")
 
 class RetrievalPayload(BaseModel):
     """Payload for the retrieval API"""
@@ -421,3 +423,15 @@ class BatchRetrievalResult(BaseModel):
     avg_retrieval_time: Optional[float] = Field(None, description="Time taken to retrieve the chunks")
     max_retrieval_time: Optional[float] = Field(None, description="Maximum time taken to retrieve the chunks")
     total_failed_queries: Optional[int] = Field(None, description="Total number of failed queries")
+
+class DatasetConstructionPayload(BaseModel):
+    """Payload for the dataset construction API"""
+    retrieval_results_path: str = Field(..., description="Path to the retrieval results file")
+    db_path: str = Field(..., description="Path to the DuckDB database")
+    mask_token: str = Field("<DATASET_ID>", description="Token to mask in the text")
+
+class DatasetConstructionResult(BaseModel):
+    """Result of the dataset construction API"""
+    success: bool = Field(..., description="Whether the dataset construction pipeline completed successfully.")
+    error: Optional[str] = Field(None, description="Error message if pipeline failed.") 
+    failed_dataset_ids: Optional[List[str]] = Field(None, description="List of failed dataset IDs")

@@ -65,6 +65,7 @@ services:
       - ./api:/app/api
       - ./logs:/app/logs
       - ./local_chroma:/app/local_chroma
+      - ./reports:/app/reports
     ports:
       - "8000:8000"
     restart: unless-stopped

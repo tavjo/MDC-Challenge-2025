@@ -58,14 +58,30 @@ def embed_text(texts: List[str], model_name: Optional[str] = None, batch_size: i
     return embeddings
 
 @timer_wrap
-def get_embedding_result(text: str, collection_name: str = None, model_name: Optional[str] = None, save_to_chroma: bool = False) -> EmbeddingResult:
+def get_embedding_result(texts: List[str], collection_name: str = None, model_name: Optional[str] = None, save_to_chroma: bool = False, ids: Optional[List[str]] = None, metadata: Optional[List[dict]] = None, cfg_path: Optional[os.PathLike] = None) -> EmbeddingResult:
+    if cfg_path is None:
+        cfg_path = DEFAULT_CHROMA_CONFIG
     if save_to_chroma:
-        res = save_chunks_to_chroma([text], collection_name, model_name)
+        res = save_chunks_to_chroma(
+            chunks=texts,
+            cfg_path=cfg_path,
+            collection_name=collection_name,
+            metadata=metadata,
+            model_name=model_name,
+            ids=ids
+        )
         if res:
+            # Extract data from list of dictionaries
+            all_embeddings = []
+            all_ids = []
+            for item in res:
+                all_embeddings.extend(item["embeddings"])
+                all_ids.append(item["id"])
+                
             return EmbeddingResult(
                 success=True,
-                embeddings=res.embeddings,
-                id=res.id,
+                embeddings=all_embeddings,
+                ids=all_ids,
                 model_name=model_name,
                 collection_name=collection_name,
                 error=None
@@ -77,10 +93,10 @@ def get_embedding_result(text: str, collection_name: str = None, model_name: Opt
                 model_name=model_name,
                 collection_name=collection_name,
                 embeddings=None,
-                id=None
+                ids=None
             )
     try:
-        embeddings = embed_text([text])
+        embeddings = embed_text(texts)
     except Exception as e:
         logger.error("Error embedding text: %s", e)
         return EmbeddingResult(
@@ -88,17 +104,19 @@ def get_embedding_result(text: str, collection_name: str = None, model_name: Opt
             error=str(e),
             model_name=model_name,
             collection_name=collection_name,
-            id=None
+            ids=None
         )
     return EmbeddingResult(
         success=True,
         embeddings=embeddings,
         model_name=model_name,
         collection_name=collection_name,
-        id=None
+        ids=None
     )
 
-def embed_chunks_from_duckdb(db_path: str = DEFAULT_DUCKDB_PATH, collection_name: str = "mdc_training_data", cfg_path: str = DEFAULT_CHROMA_CONFIG):
+def embed_chunks_from_duckdb(db_path: str = DEFAULT_DUCKDB_PATH, collection_name: str = "mdc_training_data", cfg_path: Optional[os.PathLike] = None):
+    if cfg_path is None:
+        cfg_path = DEFAULT_CHROMA_CONFIG
     db_helper = get_duckdb_helper(db_path)
     chunks = db_helper.get_chunks_by_chunk_ids()
     db_helper.close()

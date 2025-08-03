@@ -778,7 +778,8 @@ def save_chunks_to_chroma(
     cfg_path: Optional[os.PathLike] | None = None,
     collection_name: str = "chunks",
     metadata: Optional[List[dict]] = None,
-    model_name: str = "BAAI/bge-small-en-v1.5"
+    model_name: str = "BAAI/bge-small-en-v1.5",
+    ids: Optional[List[str]] = None,
 ):
     """Embed raw *chunks* and upsert them into a ChromaDB collection."""
     if not chunks:
@@ -807,7 +808,8 @@ def save_chunks_to_chroma(
         raise ValueError("length of metadata list must match chunks list")
 
     client, collection = _get_chroma_collection(cfg, collection_name)
-    ids = [str(uuid.uuid4()) for _ in chunks]
+    if ids is None or len(ids) != len(chunks):
+        ids = [str(uuid.uuid4()) for _ in chunks]
 
     logger.info(
         "▸ Upserting %d items into collection '%s' (path=%s)",

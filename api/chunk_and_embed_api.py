@@ -18,16 +18,20 @@ import duckdb
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from src.models import Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload, RetrievalPayload, BatchRetrievalResult, EmbeddingPayload
+from src.models import (
+    Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload, RetrievalPayload, BatchRetrievalResult, EmbeddingPayload, DatasetConstructionResult, DatasetConstructionPayload
+    )
 from api.services.chunking_and_embedding_services import run_semantic_chunking_pipeline
 from api.services.retriever_services import batch_retrieve_top_chunks
 from src.helpers import initialize_logging
 from src.semantic_chunking import sliding_window_chunk_text
 # from api.utils.duckdb_utils import get_duckdb_helper
-from api.services.embeddings_services import get_embedding_result, embed_chunks_from_duckdb
+from api.services.embeddings_services import get_embedding_result
+from api.services.dataset_construction_service import construct_datasets_from_retrieval_results
 
 # Initialize logging
-logger = initialize_logging("chunk_and_embed_api")
+filename = os.path.basename(__file__)
+logger = initialize_logging(filename)
 
 # Create FastAPI app
 app = FastAPI(
@@ -50,6 +54,23 @@ DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 # Remove module-level helper instantiation to defer until requests
 # DUCKDB_HELPER = get_duckdb_helper(DEFAULT_DUCKDB_PATH)
 DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
+
+@app.post("/construct_datasets", response_model=DatasetConstructionResult)
+async def construct_datasets(payload: DatasetConstructionPayload) -> DatasetConstructionResult:
+    """
+    Construct datasets from retrieval results.
+    """
+    params = {
+        "retrieval_results_path": payload.retrieval_results_path,
+        "db_path": payload.db_path or DEFAULT_DUCKDB_PATH,
+        "mask_token": payload.mask_token
+    }
+    try:
+        logger.info(f"Constructing datasets from retrieval results.")
+        return construct_datasets_from_retrieval_results(**params)
+    except Exception as e:
+        logger.error(f"Dataset construction failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Dataset construction failed: {str(e)}")
 
 @app.post("/create_chunks", response_model=List[str])
 async def create_chunks(
@@ -103,19 +124,21 @@ async def embed_chunks(payload: EmbeddingPayload) -> EmbeddingResult:
     Create embeddings for chunks.
     """
     embed_params = {
-        "text": payload.text,
-        "cfg_path": payload.cfg_path,
+        "texts": payload.text,
+        "cfg_path": payload.cfg_path or DEFAULT_CHROMA_CONFIG,
         "model_name": payload.model_name,
         "collection_name": payload.collection_name,
-        "save_to_chroma": payload.save_to_chroma
+        "save_to_chroma": payload.save_to_chroma,
+        "ids": payload.ids,
+        "metadata": payload.metadata
     }
     try:
         logger.info(f"Creating embeddings for {payload.text[:10]}...")
         response = get_embedding_result(**embed_params)
         return response
     except Exception as e:
-        logger.error(f"Chunk creation failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Chunk creation failed: {str(e)}")
+        logger.error(f"Embeddings failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Embeddings failed: {str(e)}")
 
 # New Batch Retrieval endpoint
 @app.post("/batch_retrieve", response_model=BatchRetrievalResult)
