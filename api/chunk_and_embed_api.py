@@ -13,21 +13,24 @@ from typing import List, Optional, Dict
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import duckdb
+import numpy as np
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 from src.models import (
-    Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload, RetrievalPayload, BatchRetrievalResult, EmbeddingPayload, DatasetConstructionResult, DatasetConstructionPayload
+    Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload, RetrievalPayload, BatchRetrievalResult, EmbeddingPayload, DatasetConstructionResult, DatasetConstructionPayload, NeighborhoodStatsPayload,
+    LoadChromaDataPayload, LoadChromaDataResult
     )
 from api.services.chunking_and_embedding_services import run_semantic_chunking_pipeline
-from api.services.retriever_services import batch_retrieve_top_chunks
+from api.services.retriever_services import batch_retrieve_top_chunks, load_embeddings
 from src.helpers import initialize_logging
 from src.semantic_chunking import sliding_window_chunk_text
 # from api.utils.duckdb_utils import get_duckdb_helper
 from api.services.embeddings_services import get_embedding_result
 from api.services.dataset_construction_service import construct_datasets_from_retrieval_results
+from api.services.neighborhood_stats import run_neighborhood_stats_pipeline
 
 # Initialize logging
 filename = os.path.basename(__file__)
@@ -54,6 +57,42 @@ DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 # Remove module-level helper instantiation to defer until requests
 # DUCKDB_HELPER = get_duckdb_helper(DEFAULT_DUCKDB_PATH)
 DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
+
+@app.post("/load_embeddings", response_model=Dict[str, np.ndarray])
+async def load_chroma_data(payload: LoadChromaDataPayload) -> LoadChromaDataResult:
+    """
+    Load embeddings with associated metadata and text from ChromaDB
+    """
+    try:
+        params = {
+            "collection_name": payload.collection_name,
+            "cfg_path": payload.cfg_path or DEFAULT_CHROMA_CONFIG,
+            "include": payload.include or ["embeddings"]
+        }
+        return load_embeddings(**params)
+    except Exception as e:
+        logger.error(f"Load embeddings failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Load embeddings failed: {str(e)}")
+
+@app.post("/run_neighborhood_stats_pipeline", response_model=bool)
+async def run_neighborhood_stats_pipeline(payload: NeighborhoodStatsPayload) -> bool:
+    """
+    Run the neighborhood stats pipeline.
+    """
+    logger.info("Running neighborhood stats pipeline")
+    pipeline_params = {
+        "db_path": payload.db_path or DEFAULT_DUCKDB_PATH,
+        "collection_name": payload.collection_name or "dataset-aggregates-train",
+        "k": payload.k,
+        "cfg_path": payload.cfg_path or DEFAULT_CHROMA_CONFIG,
+        "max_workers": payload.max_workers or 1
+    }
+    try:
+        return run_neighborhood_stats_pipeline(**pipeline_params)
+    except Exception as e:
+        logger.error(f"Neighborhood stats pipeline failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Neighborhood stats pipeline failed: {str(e)}")
+
 
 @app.post("/construct_datasets", response_model=DatasetConstructionResult)
 async def construct_datasets(payload: DatasetConstructionPayload) -> DatasetConstructionResult:

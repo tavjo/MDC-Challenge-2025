@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Literal, Any, Union
 from datetime import datetime
 import pandas as pd
+import numpy as np
 
 class Section(BaseModel):
     page_start: Optional[int] = None
@@ -435,3 +436,26 @@ class DatasetConstructionResult(BaseModel):
     success: bool = Field(..., description="Whether the dataset construction pipeline completed successfully.")
     error: Optional[str] = Field(None, description="Error message if pipeline failed.") 
     failed_dataset_ids: Optional[List[str]] = Field(None, description="List of failed dataset IDs")
+
+class NeighborhoodStatsPayload(BaseModel):
+    """Payload for the neighborhood stats API"""
+    db_path: str = Field(..., description="Path to the DuckDB database")
+    collection_name: str = Field(..., description="Name of the collection in ChromaDB")
+    k: int = Field(3, description="Number of nearest neighbors to find")
+    cfg_path: Optional[str] = Field(None, description="Path to the configuration file")
+    max_workers: Optional[int] = Field(1, description="Number of parallel worker threads")
+
+class LoadChromaDataPayload(BaseModel):
+    """Payload for the load embeddings API"""
+    collection_name: str = Field(..., description="Name of the collection in ChromaDB")
+    cfg_path: Optional[str] = Field(None, description="Path to the configuration file")
+    include: Optional[List[Literal["embeddings", "documents", "metadatas"]]] = Field(["embeddings"], description="List of fields to include in the embeddings")
+
+class LoadChromaDataResult(BaseModel):
+    """Result of the load embeddings API"""
+    success: bool = Field(..., description="Whether the load embeddings pipeline completed successfully.")
+    error: Optional[str] = Field(None, description="Error message if pipeline failed.")
+    embeddings: Optional[List[Dict[str, np.ndarray]]] = Field(None, description="Embeddings of the data")
+    documents: Optional[List[Dict[str, str]]] = Field(None, description="text")
+    metadatas: Optional[List[Dict[str, Dict[str, Any]]]] = Field(None, description="Metadata associated with embeddings")
+    all: Optional[List[Dict[str, Any]]] = Field(None, description="All data from the collection")

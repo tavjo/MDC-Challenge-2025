@@ -59,7 +59,7 @@ except ImportError:
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(project_root)
 
-from src.models import Chunk
+from src.models import Chunk, LoadChromaDataResult
 from src.helpers import initialize_logging, timer_wrap, preprocess_text
 from api.utils.duckdb_utils import get_duckdb_helper
 import threading
@@ -155,6 +155,28 @@ def _embed_text(texts: List[str], model_name: Optional[str] = None, batch_size: 
         return []
     return embeddings
 
+@timer_wrap
+def load_embeddings(collection_name: str, cfg_path: str, include: List[str] = ["embeddings"]) -> LoadChromaDataResult:
+    """Load embeddings from ChromaDB collection"""
+    try:
+        collection = _get_chroma_collection(cfg_path, collection_name)
+        dat = collection.get(include=include)
+        if "embeddings" in include:
+            id_embeddings = {id: embeddings for id, embeddings in zip(dat["ids"], dat["embeddings"])}
+            return LoadChromaDataResult(success=True, embeddings=id_embeddings)
+
+        if "documents" in include:
+            id_documents = {id: document for id, document in zip(dat["ids"], dat["documents"])}
+            return LoadChromaDataResult(success=True, documents=id_documents)
+        if "metadatas" in include:
+            id_metadatas = {id: metadata for id, metadata in zip(dat["ids"], dat["metadatas"])}
+            return LoadChromaDataResult(success=True, metadatas=id_metadatas)
+        if "all" in include:
+            id_all = {id: {**document, **metadata} for id, document, metadata in zip(dat["ids"], dat["documents"], dat["metadatas"])}
+            return LoadChromaDataResult(success=True, all=id_all)
+    except Exception as e:
+        logger.error(f"Error loading embeddings from ChromaDB: {str(e)}")
+        return LoadChromaDataResult(success=False, error=str(e))
 
 # ---------------------------------------------------------------------------
 # Data Citation Entity Detection

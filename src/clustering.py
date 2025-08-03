@@ -4,10 +4,9 @@ src/clustering.py
 Network-based clustering using k-NN similarity graphs and Leiden algorithm.
 
 This module provides functions for:
-1. Computing neighborhood embedding statistics from ChromaDB
-2. Building k-NN similarity graphs with memory efficiency
-3. Applying Leiden clustering algorithm
-4. Updating dataset records and engineered features in DuckDB
+1. Building k-NN similarity graphs with memory efficiency
+2. Applying Leiden clustering algorithm
+3. Updating dataset records in DuckDB with cluster assignments
 """
 
 import os
@@ -21,82 +20,21 @@ import numpy as np
 import pandas as pd
 import igraph as ig
 from sklearn.neighbors import NearestNeighbors
-# from sklearn.metrics.pairwise import cosine_similarity
 import leidenalg
-import chromadb
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 from src.helpers import initialize_logging, timer_wrap
-from src.models import EngineeredFeatures, Dataset
+from src.models import Dataset
 from api.utils.duckdb_utils import DuckDBHelper
 
 # Initialize logging
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
 
-
-@timer_wrap
-def compute_neighborhood_embedding_stats(
-    dataset_embedding: np.ndarray,
-    chroma_client,
-    collection_name: str,
-    k: int = 5
-) -> Dict[str, float]:
-    """
-    Find k-nearest neighbors to dataset embedding and compute:
-    - mean, max, variance of neighbor similarities
-    - mean, max, variance of neighbor embedding norms
-    
-    Args:
-        dataset_embedding: The embedding vector for the dataset
-        chroma_client: ChromaDB client instance
-        collection_name: Name of the ChromaDB collection
-        k: Number of nearest neighbors to find
-        
-    Returns:
-        Dictionary with neighborhood statistics
-    """
-    try:
-        collection = chroma_client.get_collection(collection_name)
-        
-        # Query for k nearest neighbors
-        results = collection.query(
-            query_embeddings=[dataset_embedding.tolist()],
-            n_results=k,
-            include=["embeddings", "distances"]
-        )
-        
-        if not results["embeddings"] or not results["embeddings"][0]:
-            logger.warning("No neighbors found for dataset embedding")
-            return {}
-        
-        neighbor_embeddings = np.array(results["embeddings"][0])
-        distances = np.array(results["distances"][0])
-        
-        # Convert distances to similarities (assuming cosine distance)
-        similarities = 1 - distances
-        
-        # Compute neighbor embedding norms
-        neighbor_norms = np.linalg.norm(neighbor_embeddings, axis=1)
-        
-        stats = {
-            "neighbor_similarity_mean": float(np.mean(similarities)),
-            "neighbor_similarity_max": float(np.max(similarities)),
-            "neighbor_similarity_var": float(np.var(similarities)),
-            "neighbor_norm_mean": float(np.mean(neighbor_norms)),
-            "neighbor_norm_max": float(np.max(neighbor_norms)),
-            "neighbor_norm_var": float(np.var(neighbor_norms))
-        }
-        
-        logger.info(f"Computed neighborhood stats for {k} neighbors")
-        return stats
-        
-    except Exception as e:
-        logger.error(f"Error computing neighborhood embedding stats: {e}")
-        return {}
+DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 
 
 @timer_wrap
@@ -359,62 +297,8 @@ def update_dataset_clusters_in_duckdb(
 
 
 @timer_wrap
-def add_neighborhood_features_to_duckdb(
-    dataset_neighborhood_stats: Dict[str, Dict[str, float]],
-    db_helper: DuckDBHelper
-) -> bool:
-    """
-    Add new feature values from neighborhood embeddings stats to 
-    engineered_feature_values table in DuckDB.
-    
-    Args:
-        dataset_neighborhood_stats: Dict mapping dataset_id to neighborhood stats
-        db_helper: DuckDBHelper instance
-        
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        logger.info(f"Adding neighborhood features for {len(dataset_neighborhood_stats)} datasets")
-        
-        # Get all datasets to map dataset_id to document_id
-        datasets = db_helper.get_all_datasets()
-        dataset_to_doc = {ds.dataset_id: ds.document_id for ds in datasets}
-        
-        # Create EngineeredFeatures objects
-        features_list = []
-        
-        for dataset_id, stats in dataset_neighborhood_stats.items():
-            if dataset_id in dataset_to_doc:
-                # Create EngineeredFeatures object with neighborhood stats
-                features = EngineeredFeatures(
-                    dataset_id=dataset_id,
-                    document_id=dataset_to_doc[dataset_id],
-                    **stats  # Unpack all the neighborhood statistics
-                )
-                features_list.append(features)
-        
-        if features_list:
-            success = db_helper.upsert_engineered_features_batch(features_list)
-            if success:
-                logger.info(f"Successfully added neighborhood features for {len(features_list)} datasets")
-                return True
-            else:
-                logger.error("Failed to add neighborhood features")
-                return False
-        else:
-            logger.warning("No datasets found to add neighborhood features")
-            return True
-            
-    except Exception as e:
-        logger.error(f"Error adding neighborhood features: {e}")
-        return False
-
-
-@timer_wrap
 def export_clustering_report(
     cluster_assignments: Dict[str, str],
-    dataset_neighborhood_stats: Dict[str, Dict[str, float]],
     graph_stats: Dict[str, Any],
     output_dir: str = "reports/clustering"
 ) -> bool:
@@ -457,13 +341,6 @@ def export_clustering_report(
             "graph_stats": graph_stats,
             "cluster_sizes": cluster_sizes,
             "cluster_assignments": cluster_assignments,
-            "neighborhood_stats_summary": {
-                "datasets_with_stats": len(dataset_neighborhood_stats),
-                "avg_neighbor_similarity_mean": np.mean([
-                    stats.get("neighbor_similarity_mean", 0) 
-                    for stats in dataset_neighborhood_stats.values()
-                ]) if dataset_neighborhood_stats else 0
-            }
         }
         
         # Write report to file
@@ -477,6 +354,36 @@ def export_clustering_report(
         logger.error(f"Error exporting clustering report: {e}")
         return False
 
+@timer_wrap
+def run_clustering_pipeline(
+    dataset_embeddings: Dict[str, np.ndarray],
+    k_neighbors: int = 30,
+    similarity_threshold: float = None,
+    threshold_method: str = "degree_target",
+    resolution: float = 1.0,
+    min_cluster_size: int = 2,
+    random_seed: int = 42,
+    db_path: str = DEFAULT_DUCKDB_PATH,
+    output_dir: str = "reports/clustering"
+) -> bool:
+    """
+    Run the complete clustering pipeline.
+    """
+    logger.info("Running clustering pipeline")
+    db_helper = DuckDBHelper(db_path)
+    try:
+        graph = build_knn_similarity_graph(dataset_embeddings, k_neighbors, similarity_threshold, threshold_method)
+        graph_stats = {
+            "vertices": graph.vcount(),
+            "edges": graph.ecount(),
+            "avg_degree": 2*graph.ecount()/graph.vcount()
+        }
+        cluster_assignments = run_leiden_clustering(graph, resolution, min_cluster_size, random_seed)
+        update_dataset_clusters_in_duckdb(cluster_assignments, db_helper)
+        return export_clustering_report(cluster_assignments, graph_stats, output_dir)
+    except Exception as e:
+        logger.error(f"Error running clustering pipeline: {e}")
+        return False
 
 def main():
     """
