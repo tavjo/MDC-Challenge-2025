@@ -1,17 +1,19 @@
 ## Checklist
 
-- [ ] Add dependencies to `pyproject.toml`: `leidenalg`, `python-igraph`, and `scikit-learn`. **Don't forget to activate virtual environment first!** Then use command `uv add leidenalg python-igraph scikit-learn`
+- [ ] Read relevant files thoroughly (`duckdb_schema.py`, `duckdb_utils.py`, `semantic_chunking.py`, `pyproject.toml`, `Dockerfile.api`, `docker-compose.yaml`)
+- [ ] Add dependencies to `pyproject.toml` if needed: `leidenalg`, `python-igraph`, and `scikit-learn`. **Don't forget to activate virtual environment first!** Then use command `uv add leidenalg python-igraph scikit-learn`
 - [ ] Create `src/clustering.py`.
 - [ ] Implement `build_knn_similarity_graph`.
 - [ ] Implement `determine_similarity_threshold`.
 - [ ] Implement `run_leiden_clustering`.
-- [ ] Update dataset-level chunk records in DuckDB with cluster membership
+- [ ] Update dataset records in DuckDB with cluster membership
+- [ ] Add new feature values (aside from clusters) from neighborhood embeddings stats to `engineered_feature_values` table in DuckDB using functions that already exist in `duckdb_utils.py`.
 - [ ] Export summary report in json to `reports/clustering`
 
 ## Phase 7: Network-Based Clustering
 
 ### 7.1 Create Clustering Module
-**Location**: `src/get_modules.py`
+**Location**: `src/clustering.py`
 
 **Core Functions:**
 ```python
@@ -77,6 +79,7 @@ def run_leiden_clustering(
     """
 
 # Update `Dataset` objects in DuckDB by adding value for cluster
+# **Add new features to DuckDB `engineered_feature_values` table** 
 ```
 
 

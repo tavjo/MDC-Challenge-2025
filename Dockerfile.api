@@ -28,15 +28,6 @@ nltk.download("punkt")
 nltk.download("wordnet")
 nltk.download("words")
 PY
-# -------- download BGE once --------
-# RUN . .venv/bin/activate \
-#  && python - <<'PY'
-# from huggingface_hub import snapshot_download
-# snapshot_download(
-#     repo_id="BAAI/bge-small-en-v1.5",
-#     cache_dir="/app/offline_models"
-# )
-# PY
 
 # copy code after deps to leverage Docker layer cache
 COPY src/ /app/src/
