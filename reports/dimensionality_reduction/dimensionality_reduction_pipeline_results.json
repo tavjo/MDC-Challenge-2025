@@ -1,0 +1,9 @@
+{
+  "load_embeddings": {
+    "success": true
+  },
+  "dimensionality_reduction": {
+    "success": true
+  },
+  "overall_success": true
+}

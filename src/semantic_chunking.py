@@ -34,10 +34,10 @@ import chromadb
 # from llama_index.embeddings.openai import OpenAIEmbedding
 # from src.helpers import get_embedding, CustomOpenAIEmbedding
 # from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core.node_parser import (
-    # SentenceSplitter,
-    SemanticSplitterNodeParser
-)
+# from llama_index.core.node_parser import (
+#     # SentenceSplitter,
+#     SemanticSplitterNodeParser
+# )
 # from llama_index.core.base.embeddings.base import BaseEmbedding
 # from llama_index.core.schema import Document
 # from llama_index.core.schema import BaseNode, Document , ObjectType , TextNode
@@ -494,15 +494,15 @@ def _embed_text(texts: List[str], model_name: Optional[str] = None, batch_size: 
 #     return _build_embedder(model_name, cfg)
 
 
-def _build_splitter(cfg: dict, embedder) -> SemanticSplitterNodeParser:
-    """Instantiate SemanticSplitterNodeParser with config-driven hyper-params."""
-    return SemanticSplitterNodeParser(
-        embed_model=embedder,
-        similarity_threshold=cfg.get("similarity_threshold", 0.75),
-        chunk_overlap=cfg.get("overlap_sentences", 2),
-        chunk_size=cfg.get("max_tokens", 300),
-        min_chunk_size=cfg.get("min_tokens", 80),
-    )
+# def _build_splitter(cfg: dict, embedder) -> SemanticSplitterNodeParser:
+#     """Instantiate SemanticSplitterNodeParser with config-driven hyper-params."""
+#     return SemanticSplitterNodeParser(
+#         embed_model=embedder,
+#         similarity_threshold=cfg.get("similarity_threshold", 0.75),
+#         chunk_overlap=cfg.get("overlap_sentences", 2),
+#         chunk_size=cfg.get("max_tokens", 300),
+#         min_chunk_size=cfg.get("min_tokens", 80),
+#     )
 
 
 def _get_chroma_collection(cfg: dict, collection_name: str):

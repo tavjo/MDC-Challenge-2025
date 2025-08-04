@@ -485,9 +485,9 @@ class DuckDBHelper:
     def get_all_datasets(self) -> List[Dataset]:
         """Get all datasets from the database."""
         try:
-            result = self.engine.execute("SELECT * FROM datasets")
-            rows = result.fetchall()
-            return [Dataset.from_duckdb_row(row) for row in rows]
+            result = self.engine.execute("SELECT * FROM datasets").df()
+            # rows = result.fetchall()
+            return [Dataset.from_duckdb_row(row.to_dict()) for _, row in result.iterrows()]
         except Exception as e:
             logger.error(f"Failed to get all datasets: {str(e)}")
             raise
