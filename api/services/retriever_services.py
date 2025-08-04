@@ -159,24 +159,15 @@ def _embed_text(texts: List[str], model_name: Optional[str] = None, batch_size: 
 def load_embeddings(collection_name: str, cfg_path: str, include: List[str] = ["embeddings"]) -> LoadChromaDataResult:
     """Load embeddings from ChromaDB collection"""
     try:
-        collection = _get_chroma_collection(cfg_path, collection_name)
+        cfg = _load_cfg(cfg_path)
+        collection = _get_chroma_collection(cfg, collection_name)
         dat = collection.get(include=include)
-        if "embeddings" in include:
-            id_embeddings = {id: embeddings for id, embeddings in zip(dat["ids"], dat["embeddings"])}
-            return LoadChromaDataResult(success=True, embeddings=id_embeddings)
-
-        if "documents" in include:
-            id_documents = {id: document for id, document in zip(dat["ids"], dat["documents"])}
-            return LoadChromaDataResult(success=True, documents=id_documents)
-        if "metadatas" in include:
-            id_metadatas = {id: metadata for id, metadata in zip(dat["ids"], dat["metadatas"])}
-            return LoadChromaDataResult(success=True, metadatas=id_metadatas)
-        if "all" in include:
-            id_all = {id: {**document, **metadata} for id, document, metadata in zip(dat["ids"], dat["documents"], dat["metadatas"])}
-            return LoadChromaDataResult(success=True, all=id_all)
+        # remove any keys with None values
+        dat = {k: v for k, v in dat.items() if v is not None}
+        return LoadChromaDataResult(success=True, results=dat)
     except Exception as e:
         logger.error(f"Error loading embeddings from ChromaDB: {str(e)}")
-        return LoadChromaDataResult(success=False, error=str(e))
+        return LoadChromaDataResult(success=False, error=str(e), results={})
 
 # ---------------------------------------------------------------------------
 # Data Citation Entity Detection

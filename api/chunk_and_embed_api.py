@@ -30,7 +30,7 @@ from src.semantic_chunking import sliding_window_chunk_text
 # from api.utils.duckdb_utils import get_duckdb_helper
 from api.services.embeddings_services import get_embedding_result
 from api.services.dataset_construction_service import construct_datasets_from_retrieval_results
-from api.services.neighborhood_stats import run_neighborhood_stats_pipeline
+from api.services.neighborhood_stats import run_neighborhood_stats_pipeline as run_neighborhood_stats_pipeline_service
 
 # Initialize logging
 filename = os.path.basename(__file__)
@@ -58,7 +58,7 @@ DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 # DUCKDB_HELPER = get_duckdb_helper(DEFAULT_DUCKDB_PATH)
 DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
 
-@app.post("/load_embeddings", response_model=Dict[str, np.ndarray])
+@app.post("/load_embeddings", response_model=LoadChromaDataResult, response_model_exclude_none=True)
 async def load_chroma_data(payload: LoadChromaDataPayload) -> LoadChromaDataResult:
     """
     Load embeddings with associated metadata and text from ChromaDB
@@ -88,7 +88,7 @@ async def run_neighborhood_stats_pipeline(payload: NeighborhoodStatsPayload) -> 
         "max_workers": payload.max_workers or 1
     }
     try:
-        return run_neighborhood_stats_pipeline(**pipeline_params)
+        return run_neighborhood_stats_pipeline_service(**pipeline_params)
     except Exception as e:
         logger.error(f"Neighborhood stats pipeline failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Neighborhood stats pipeline failed: {str(e)}")

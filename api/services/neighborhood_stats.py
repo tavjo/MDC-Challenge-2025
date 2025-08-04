@@ -114,11 +114,12 @@ def compute_neighborhood_embedding_stats(
             include=["embeddings", "distances"]
         )
         
-        if not results["embeddings"] or not results["embeddings"][0]:
+        arr = np.array(results.get("embeddings", [[]]))  # shape: [1 or more][dim]
+        # if the first batch has zero length, bail
+        if arr.size == 0 or arr.shape[0] == 0:
             logger.warning("No neighbors found for dataset embedding")
             return {}
-        
-        neighbor_embeddings = np.array(results["embeddings"][0])
+        neighbor_embeddings = arr[0]
         distances = np.array(results["distances"][0])
         
         # Convert distances to similarities (assuming cosine distance)

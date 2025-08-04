@@ -89,16 +89,12 @@ class ClusteringPipeline:
             response = requests.post(full_url, json=payload.model_dump(exclude_none=True))
             if response.status_code == 200:
                 result = LoadChromaDataResult.model_validate(response.json())
-                if result.success and result.embeddings:
-                    logger.info(f"✅ Successfully loaded {len(result.embeddings)} embeddings")
+                if result.success and result.results:
+                    logger.info(f"✅ Successfully loaded {len(result.results)} embeddings")
                     
                     # Convert embeddings to numpy arrays if they aren't already
-                    dataset_embeddings = {}
-                    for dataset_id, embedding in result.embeddings.items():
-                        if isinstance(embedding, list):
-                            dataset_embeddings[dataset_id] = np.array(embedding)
-                        else:
-                            dataset_embeddings[dataset_id] = embedding
+                    dat = result.results
+                    dataset_embeddings = {id: embeddings for id, embeddings in zip(dat["ids"], dat["embeddings"])}
                     
                     return dataset_embeddings
                 else:

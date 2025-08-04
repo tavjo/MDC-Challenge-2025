@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Dict, Literal, Any, Union
 from datetime import datetime
 import pandas as pd
@@ -453,9 +453,20 @@ class LoadChromaDataPayload(BaseModel):
 
 class LoadChromaDataResult(BaseModel):
     """Result of the load embeddings API"""
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "json_encoders": {np.ndarray: lambda v: v.tolist()}
+        }
     success: bool = Field(..., description="Whether the load embeddings pipeline completed successfully.")
     error: Optional[str] = Field(None, description="Error message if pipeline failed.")
-    embeddings: Optional[List[Dict[str, np.ndarray]]] = Field(None, description="Embeddings of the data")
-    documents: Optional[List[Dict[str, str]]] = Field(None, description="text")
-    metadatas: Optional[List[Dict[str, Dict[str, Any]]]] = Field(None, description="Metadata associated with embeddings")
-    all: Optional[List[Dict[str, Any]]] = Field(None, description="All data from the collection")
+    results: Dict[str, Union[List[Any], np.ndarray]] = Field(..., description="Results of the load embeddings API")
+
+    @model_validator(mode="before")
+    def _cast_lists_to_ndarray(cls, values):
+        # Only touch the HTTP‐decoded dict; internal returns still work
+        res = values.get("results", {})
+        for k, v in list(res.items()):
+            if k == "embeddings" and isinstance(v, list):
+                res[k] = np.array(v)
+        values["results"] = res
+        return values

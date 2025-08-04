@@ -118,6 +118,7 @@ def main():
     logger.info("Initializing neighborhood stats pipeline...")
     
     pipeline = NeighborhoodStatsPipeline(
+        base_api_url=API_ENDPOINTS["base_api_url"],
         db_path=DEFAULT_DUCKDB_PATH,
         collection_name=DEFAULT_COLLECTION_NAME,
         k=DEFAULT_K,

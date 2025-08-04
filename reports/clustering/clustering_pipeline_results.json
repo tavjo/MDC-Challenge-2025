@@ -1,0 +1,9 @@
+{
+  "load_embeddings": {
+    "success": true
+  },
+  "clustering": {
+    "success": true
+  },
+  "overall_success": true
+}
