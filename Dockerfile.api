@@ -16,7 +16,7 @@ COPY pyproject.toml uv.lock ./
 # create venv & install deps (one layer)
 RUN python -m venv .venv && . .venv/bin/activate \
  && uv pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
- && uv pip install --no-cache-dir umap-learn chromadb sentence-transformers accelerate \
+ && uv pip install --no-cache-dir chromadb sentence-transformers accelerate \
  && uv sync --locked --inexact
 
 # Install NLTK corpora needed by SentenceSplitter

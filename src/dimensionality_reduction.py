@@ -10,7 +10,7 @@ import os
 import sys
 from typing import Optional, Dict, List
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Add project root to path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -22,11 +22,13 @@ from src.helpers import initialize_logging, timer_wrap
 from api.utils.duckdb_utils import DuckDBHelper
 import requests
 
-try:
-    import umap
-    UMAP_AVAILABLE = True
-except ImportError:
-    UMAP_AVAILABLE = False
+# try:
+#     import umap as umap_lib
+#     UMAP_AVAILABLE = True
+# except ImportError:
+#     umap_lib = None
+#     UMAP_AVAILABLE = False
+import umap
     
 try:
     import matplotlib.pyplot as plt
@@ -73,7 +75,7 @@ class Reducer:
     def __init__(self,
                  base_api_url: str = API_ENDPOINTS["base_api_url"],
                  collection_name: str = DEFAULT_COLLECTION_NAME,
-                 cfg_path: Optional[str] = None,
+                 cfg_path: Optional[str] = DEFAULT_CHROMA_CONFIG,
                  db_path: str = DEFAULT_DUCKDB_PATH,
                  n_neighbors: int = DEFAULT_N_NEIGHBORS,
                  min_dist: float = DEFAULT_MIN_DIST,
@@ -138,6 +140,7 @@ class Reducer:
             logger.info("Loading datasets from DuckDB...")
             datasets = self.db_helper.get_all_datasets()
             logger.info(f"✅ Successfully loaded {len(datasets)} datasets from DuckDB")
+            self.db_helper.close()
             self.datasets = datasets
             return datasets
         except Exception as e:
@@ -158,7 +161,7 @@ class Reducer:
         - Set random_state for deterministic embedding layout
         - Save UMAP_1, UMAP_2 features to DuckDB via upsert_engineered_features_batch
         """
-        # if not UMAP_AVAILABLE:
+        # if not UMAP_AVAILABLE or umap_lib is None:
         #     logger.error("❌ UMAP is not available. Please install umap-learn")
         #     return None
             
@@ -486,7 +489,7 @@ class Reducer:
             clustered_datasets = {k: v for k, v in dataset_to_cluster.items() if v is not None}
             if not clustered_datasets:
                 logger.warning("No datasets with cluster assignments found. Skipping per-cluster PCA.")
-                return True  # Graceful failure
+                return False  # Graceful failure
             
             logger.info(f"Found {len(clustered_datasets)} datasets with cluster assignments")
             
@@ -669,7 +672,7 @@ class Reducer:
         results["overall_success"] = all([
             results["load_embeddings"]["success"],
             results["load_datasets"]["success"],
-            results["umap_reduction"]["success"] if UMAP_AVAILABLE else True,
+            results["umap_reduction"]["success"],
             results["per_cluster_pca"]["success"]
         ])
         
@@ -689,8 +692,8 @@ def main():
     
     # Check dependencies
     missing_deps = []
-    if not UMAP_AVAILABLE:
-        missing_deps.append("umap-learn")
+    # if not UMAP_AVAILABLE or umap_lib is None:
+    #     missing_deps.append("umap-learn")
     if not MATPLOTLIB_AVAILABLE:
         missing_deps.append("matplotlib")
     if not SKLEARN_AVAILABLE:
@@ -720,7 +723,7 @@ def main():
     output_file = os.path.join(output_dir, "dimensionality_reduction_results.json")
     
     # Add timestamp to results
-    results["timestamp"] = datetime.now().isoformat()
+    results["timestamp"] = datetime.now(timezone.utc).isoformat()
     results["parameters"] = {
         "n_neighbors": pipeline.n_neighbors,
         "min_dist": pipeline.min_dist,

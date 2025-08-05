@@ -30,17 +30,20 @@ API_ENDPOINTS = {
 }
 
 # Default paths and configurations
-DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
+DEFAULT_DUCKDB_PATH = os.path.join(project_root, "artifacts", "mdc_challenge.db")
 DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
 DEFAULT_COLLECTION_NAME = "dataset-aggregates-train"
 
 # Clustering parameters
-DEFAULT_K_NEIGHBORS = 30
+DEFAULT_K_NEIGHBORS = 12
 DEFAULT_SIMILARITY_THRESHOLD = None
 DEFAULT_THRESHOLD_METHOD = "degree_target"
-DEFAULT_RESOLUTION = 1.0
-DEFAULT_MIN_CLUSTER_SIZE = 2
+DEFAULT_RESOLUTION = 4
+DEFAULT_MIN_CLUSTER_SIZE = 6
+DEFAULT_MAX_CLUSTER_SIZE = 50
+DEFAULT_SPLIT_FACTOR = 1.3
 DEFAULT_RANDOM_SEED = 42
+
 
 
 class ClusteringPipeline:
@@ -54,6 +57,8 @@ class ClusteringPipeline:
                  threshold_method: str = DEFAULT_THRESHOLD_METHOD,
                  resolution: float = DEFAULT_RESOLUTION,
                  min_cluster_size: int = DEFAULT_MIN_CLUSTER_SIZE,
+                 max_cluster_size: int = DEFAULT_MAX_CLUSTER_SIZE,
+                 split_factor: float = DEFAULT_SPLIT_FACTOR,
                  random_seed: int = DEFAULT_RANDOM_SEED):
         self.base_api_url = base_api_url
         self.collection_name = collection_name
@@ -64,6 +69,8 @@ class ClusteringPipeline:
         self.threshold_method = threshold_method
         self.resolution = resolution
         self.min_cluster_size = min_cluster_size
+        self.max_cluster_size = max_cluster_size
+        self.split_factor = split_factor
         self.random_seed = random_seed
         self.endpoints = API_ENDPOINTS
 
@@ -127,6 +134,8 @@ class ClusteringPipeline:
                 threshold_method=self.threshold_method,
                 resolution=self.resolution,
                 min_cluster_size=self.min_cluster_size,
+                max_cluster_size=self.max_cluster_size,
+                split_factor=self.split_factor,
                 random_seed=self.random_seed,
                 db_path=self.db_path,
                 output_dir="reports/clustering"
@@ -194,6 +203,8 @@ def main():
         threshold_method=DEFAULT_THRESHOLD_METHOD,
         resolution=DEFAULT_RESOLUTION,
         min_cluster_size=DEFAULT_MIN_CLUSTER_SIZE,
+        max_cluster_size=DEFAULT_MAX_CLUSTER_SIZE,
+        split_factor=DEFAULT_SPLIT_FACTOR,
         random_seed=DEFAULT_RANDOM_SEED
     )
     

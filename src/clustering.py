@@ -40,7 +40,7 @@ DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 @timer_wrap
 def build_knn_similarity_graph(
     dataset_embeddings: Dict[str, np.ndarray], 
-    k_neighbors: int = 30,
+    k_neighbors: int = 12,
     similarity_threshold: float = None,
     threshold_method: str = "degree_target"
 ) -> ig.Graph:
@@ -170,81 +170,188 @@ def determine_similarity_threshold(
 
 
 @timer_wrap
+# def run_leiden_clustering(
+#     graph: ig.Graph, 
+#     resolution: float = 1.0, 
+#     min_cluster_size: int = 8,
+#     random_seed: int = 42
+# ) -> Dict[str, str]:
+#     """
+#     Apply Leiden clustering with safeguards:
+#     1. Use igraph directly (no NetworkX conversion)
+#     2. Set random seed for reproducibility
+#     3. Filter out clusters smaller than min_cluster_size
+#     4. Return {dataset_id: cluster_label} mapping
+    
+#     Args:
+#         graph: igraph.Graph object with similarity edges
+#         resolution: Resolution parameter for Leiden algorithm
+#         min_cluster_size: Minimum size for valid clusters
+#         random_seed: Random seed for reproducibility
+        
+#     Returns:
+#         Dictionary mapping dataset_id to cluster_label
+#     """
+#     logger.info(f"Running Leiden clustering with resolution={resolution}")
+    
+#     if graph.ecount() == 0:
+#         logger.warning("Graph has no edges, assigning all nodes to singleton clusters")
+#         return {graph.vs[i]['dataset_id']: f"cluster_{i}" 
+#                 for i in range(graph.vcount())}
+    
+#     # Set random seed for reproducibility
+#     np.random.seed(random_seed)
+    
+#     # Run Leiden clustering
+#     partition = leidenalg.find_partition(
+#         graph, 
+#         leidenalg.RBConfigurationVertexPartition,
+#         resolution_parameter=resolution,
+#         seed=random_seed
+#     )
+    
+#     logger.info(f"Initial clustering: {len(partition)} clusters, "
+#                 f"modularity: {partition.modularity:.4f}")
+    
+#     # Create cluster assignments
+#     cluster_assignments = {}
+#     cluster_sizes = {}
+    
+#     for i, cluster_id in enumerate(partition.membership):
+#         dataset_id = graph.vs[i]['dataset_id']
+#         cluster_label = f"cluster_{cluster_id}"
+#         cluster_assignments[dataset_id] = cluster_label
+#         cluster_sizes[cluster_label] = cluster_sizes.get(cluster_label, 0) + 1
+    
+#     # Filter small clusters (reassign to largest cluster or mark as noise)
+#     large_clusters = {k: v for k, v in cluster_sizes.items() if v >= min_cluster_size}
+    
+#     if large_clusters:
+#         largest_cluster = max(large_clusters.keys(), key=lambda x: large_clusters[x])
+        
+#         # Reassign small clusters to largest cluster
+#         for dataset_id, cluster_label in cluster_assignments.items():
+#             if cluster_label not in large_clusters:
+#                 cluster_assignments[dataset_id] = largest_cluster
+#                 logger.debug(f"Reassigned {dataset_id} from {cluster_label} to {largest_cluster}")
+    
+#     # Final cluster stats
+#     final_cluster_sizes = {}
+#     for cluster_label in cluster_assignments.values():
+#         final_cluster_sizes[cluster_label] = final_cluster_sizes.get(cluster_label, 0) + 1
+    
+#     logger.info(f"Final clustering: {len(final_cluster_sizes)} clusters")
+#     for cluster_label, size in sorted(final_cluster_sizes.items()):
+#         logger.info(f"  {cluster_label}: {size} datasets")
+    
+#     return cluster_assignments
+@timer_wrap
 def run_leiden_clustering(
-    graph: ig.Graph, 
-    resolution: float = 1.0, 
-    min_cluster_size: int = 2,
+    graph: ig.Graph,
+    resolution: float = 1.5,
+    min_cluster_size: int = 6,
+    max_cluster_size: int = 75,
+    split_factor: float = 1.3,
     random_seed: int = 42
 ) -> Dict[str, str]:
     """
-    Apply Leiden clustering with safeguards:
-    1. Use igraph directly (no NetworkX conversion)
-    2. Set random seed for reproducibility
-    3. Filter out clusters smaller than min_cluster_size
-    4. Return {dataset_id: cluster_label} mapping
-    
-    Args:
-        graph: igraph.Graph object with similarity edges
-        resolution: Resolution parameter for Leiden algorithm
-        min_cluster_size: Minimum size for valid clusters
-        random_seed: Random seed for reproducibility
-        
-    Returns:
-        Dictionary mapping dataset_id to cluster_label
+    Balanced Leiden clustering with recursive split / merge.
+
+    Parameters
+    ----------
+    graph : ig.Graph
+        Pre-built similarity graph with 'dataset_id' on vertices.
+    resolution : float, default 1.5
+        Base resolution for the first Leiden pass.  Higher ⇒ more clusters.
+    min_cluster_size : int, default 6
+        Clusters smaller than this will be merged into a neighbour.
+    max_cluster_size : int, default 75
+        Clusters larger than this will be recursively re-clustered
+        with a higher resolution (resolution*split_factor).
+    split_factor : float, default 1.3
+        Multiplier applied to `resolution` when re-clustering
+        an oversized community.
+    random_seed : int, default 42
+        Seed for reproducibility.
+
+    Returns
+    -------
+    Dict[str, str]
+        Mapping {dataset_id: "cluster_<int>"} after balancing.
     """
-    logger.info(f"Running Leiden clustering with resolution={resolution}")
-    
     if graph.ecount() == 0:
-        logger.warning("Graph has no edges, assigning all nodes to singleton clusters")
-        return {graph.vs[i]['dataset_id']: f"cluster_{i}" 
-                for i in range(graph.vcount())}
-    
-    # Set random seed for reproducibility
+        logger.warning("Graph has no edges; returning singletons")
+        return {v["dataset_id"]: f"cluster_{i}"
+                for i, v in enumerate(graph.vs)}
+
     np.random.seed(random_seed)
-    
-    # Run Leiden clustering
-    partition = leidenalg.find_partition(
-        graph, 
-        leidenalg.RBConfigurationVertexPartition,
-        resolution_parameter=resolution,
-        seed=random_seed
-    )
-    
-    logger.info(f"Initial clustering: {len(partition)} clusters, "
-                f"modularity: {partition.modularity:.4f}")
-    
-    # Create cluster assignments
-    cluster_assignments = {}
-    cluster_sizes = {}
-    
-    for i, cluster_id in enumerate(partition.membership):
-        dataset_id = graph.vs[i]['dataset_id']
-        cluster_label = f"cluster_{cluster_id}"
-        cluster_assignments[dataset_id] = cluster_label
-        cluster_sizes[cluster_label] = cluster_sizes.get(cluster_label, 0) + 1
-    
-    # Filter small clusters (reassign to largest cluster or mark as noise)
-    large_clusters = {k: v for k, v in cluster_sizes.items() if v >= min_cluster_size}
-    
-    if large_clusters:
-        largest_cluster = max(large_clusters.keys(), key=lambda x: large_clusters[x])
-        
-        # Reassign small clusters to largest cluster
-        for dataset_id, cluster_label in cluster_assignments.items():
-            if cluster_label not in large_clusters:
-                cluster_assignments[dataset_id] = largest_cluster
-                logger.debug(f"Reassigned {dataset_id} from {cluster_label} to {largest_cluster}")
-    
-    # Final cluster stats
-    final_cluster_sizes = {}
-    for cluster_label in cluster_assignments.values():
-        final_cluster_sizes[cluster_label] = final_cluster_sizes.get(cluster_label, 0) + 1
-    
-    logger.info(f"Final clustering: {len(final_cluster_sizes)} clusters")
-    for cluster_label, size in sorted(final_cluster_sizes.items()):
-        logger.info(f"  {cluster_label}: {size} datasets")
-    
+
+    # --- helper -----------------------------------------------------------
+    def _leiden(g, res):
+        return leidenalg.find_partition(
+            g,
+            leidenalg.RBConfigurationVertexPartition,
+            resolution_parameter=res,
+            seed=random_seed
+        )
+    # ----------------------------------------------------------------------
+
+    # 1️⃣  initial pass
+    part = _leiden(graph, resolution)
+    logger.info(f"First pass: {len(part)} clusters; modularity={part.modularity:.4f}")
+
+    # 2️⃣  recursive split / merge loop
+    changed = True
+    while changed:
+        changed = False
+        sizes = np.bincount(part.membership)
+
+        # ---- split big clusters -----------------------------------------
+        for cid, size in enumerate(sizes):
+            if size > max_cluster_size:
+                idx_big = [v.index for v in graph.vs if part.membership[v.index] == cid]
+                sub = graph.subgraph(idx_big)
+                sub_part = _leiden(sub, resolution * split_factor)
+                if len(sub_part) > 1:
+                    # re-label: offset with current max label
+                    offset = max(part.membership) + 1
+                    for sub_v, new_c in zip(sub.vs, sub_part.membership):
+                        part.membership[idx_big[sub_v.index]] = offset + new_c
+                    changed = True
+
+        # recompute sizes after potential splits
+        sizes = np.bincount(part.membership)
+
+        # ---- merge small clusters ---------------------------------------
+        for cid, size in enumerate(sizes):
+            if size < min_cluster_size:
+                small_vs = [v.index for v in graph.vs if part.membership[v.index] == cid]
+                # pick neighbour cluster with most edges to the small cluster
+                neighbour_counts = {}
+                for vid in small_vs:
+                    for nb in graph.vs[vid].neighbors():
+                        nb_cid = part.membership[nb.index]
+                        if nb_cid != cid:
+                            neighbour_counts[nb_cid] = neighbour_counts.get(nb_cid, 0) + 1
+                if neighbour_counts:
+                    target_cid = max(neighbour_counts, key=neighbour_counts.get)
+                    for vid in small_vs:
+                        part.membership[vid] = target_cid
+                    changed = True
+
+    # 3️⃣  build final mapping
+    cluster_assignments: Dict[str, str] = {}
+    for v in graph.vs:
+        cluster_assignments[v["dataset_id"]] = f"cluster_{part.membership[v.index]}"
+
+    # log stats
+    final_sizes = np.bincount(list(part.membership))
+    logger.info(f"Balanced clustering: {len(final_sizes)} clusters "
+                f"(min={final_sizes.min()}, median={np.median(final_sizes)}, "
+                f"max={final_sizes.max()})")
+
     return cluster_assignments
+
 
 
 @timer_wrap
@@ -280,7 +387,7 @@ def update_dataset_clusters_in_duckdb(
                 updated_count += 1
         
         if updated_datasets:
-            success = db_helper.bulk_upsert_datasets(updated_datasets)
+            success = db_helper.update_datasets(updated_datasets)
             if success:
                 logger.info(f"Successfully updated {updated_count} dataset cluster assignments")
                 return True
@@ -289,7 +396,7 @@ def update_dataset_clusters_in_duckdb(
                 return False
         else:
             logger.warning("No datasets found to update with cluster assignments")
-            return True
+            return False
             
     except Exception as e:
         logger.error(f"Error updating dataset clusters: {e}")
@@ -340,7 +447,7 @@ def export_clustering_report(
             },
             "graph_stats": graph_stats,
             "cluster_sizes": cluster_sizes,
-            "cluster_assignments": cluster_assignments,
+            # "cluster_assignments": cluster_assignments,
         }
         
         # Write report to file
@@ -360,8 +467,10 @@ def run_clustering_pipeline(
     k_neighbors: int = 30,
     similarity_threshold: float = None,
     threshold_method: str = "degree_target",
-    resolution: float = 1.0,
-    min_cluster_size: int = 2,
+    resolution: float = 1.5,
+    min_cluster_size: int = 6,
+    max_cluster_size: int = 75,
+    split_factor: float = 1.3,
     random_seed: int = 42,
     db_path: str = DEFAULT_DUCKDB_PATH,
     output_dir: str = "reports/clustering"
@@ -378,7 +487,7 @@ def run_clustering_pipeline(
             "edges": graph.ecount(),
             "avg_degree": 2*graph.ecount()/graph.vcount()
         }
-        cluster_assignments = run_leiden_clustering(graph, resolution, min_cluster_size, random_seed)
+        cluster_assignments = run_leiden_clustering(graph, resolution, min_cluster_size,max_cluster_size, split_factor, random_seed)
         update_dataset_clusters_in_duckdb(cluster_assignments, db_helper)
         return export_clustering_report(cluster_assignments, graph_stats, output_dir)
     except Exception as e:

@@ -11,7 +11,7 @@ from typing import List, Iterable, Union, Tuple, Dict, Any, Optional
 
 import duckdb
 import pandas as pd  # for bulk DataFrame-based upserts
-import datetime
+from datetime import datetime, timezone
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -482,15 +482,88 @@ class DuckDBHelper:
             logger.error(f"Bulk upsert failed: {e}")
             raise
     
+    def update_datasets(self, datasets: List[Dataset]) -> Dict[str, Any]:
+        """
+        Upsert datasets into the DuckDB 'datasets' table using INSERT ON CONFLICT.
+        Updates existing rows (matched by dataset_id) or inserts new ones.
+        Returns summary of operation.
+        """
+        if not datasets:
+            logger.warning("No datasets supplied for upsert.")
+            return {"success": True, "total_upserted": 0}
+
+        # Convert Dataset instances to DuckDB-ready rows
+        records = [ds.to_duckdb_row() for ds in datasets]
+        df = pd.DataFrame.from_records(records)
+
+        # Register in-memory buffer table
+        self.engine.register("datasets_buffer", df)
+
+        # Execute upsert via DuckDB ON CONFLICT clause
+        self.engine.execute("""
+            INSERT INTO datasets (
+                dataset_id, document_id, total_tokens, avg_tokens_per_chunk,
+                total_char_length, clean_text_length, cluster,
+                dataset_type, text, created_at, updated_at
+            )
+            SELECT
+                dataset_id, document_id, total_tokens, avg_tokens_per_chunk,
+                total_char_length, clean_text_length, cluster,
+                dataset_type, text, created_at, updated_at
+            FROM datasets_buffer
+            ON CONFLICT (dataset_id) DO UPDATE
+            SET
+                document_id = EXCLUDED.document_id,
+                total_tokens = EXCLUDED.total_tokens,
+                avg_tokens_per_chunk = EXCLUDED.avg_tokens_per_chunk,
+                total_char_length = EXCLUDED.total_char_length,
+                clean_text_length = EXCLUDED.clean_text_length,
+                cluster = EXCLUDED.cluster,
+                dataset_type = EXCLUDED.dataset_type,
+                text = EXCLUDED.text,
+                updated_at = EXCLUDED.updated_at;
+        """)
+
+        # Unregister buffer
+        self.engine.unregister("datasets_buffer")
+
+        # Fetch total rows count after upsert
+        total_rows = self.engine.execute("SELECT COUNT(*) FROM datasets").fetchone()[0]
+        logger.info(f"✅ Upserted {len(datasets)} dataset rows (total in DB now: {total_rows})")
+
+        return {
+            "success": True,
+            "total_upserted": len(datasets),
+            "total_in_db": total_rows
+        }
+    
+    # def get_all_datasets(self) -> List[Dataset]:
+    #     """Get all datasets from the database."""
+    #     try:
+    #         result = self.engine.execute("SELECT * FROM datasets")
+    #         rows = result.fetchall()
+    #         return [Dataset.from_duckdb_row(row) for row in rows]
+    #     except Exception as e:
+    #         logger.error(f"Failed to get all datasets: {str(e)}")
+    #         raise
+
     def get_all_datasets(self) -> List[Dataset]:
         """Get all datasets from the database."""
         try:
-            result = self.engine.execute("SELECT * FROM datasets").df()
-            # rows = result.fetchall()
-            return [Dataset.from_duckdb_row(row.to_dict()) for _, row in result.iterrows()]
+            result = self.engine.execute("SELECT * FROM datasets")
+            rows = result.fetchall()
+            datasets = []
+            
+            for row in rows:
+                row_dict = dict(zip([desc[0] for desc in result.description], row))
+                datasets.append(Dataset.from_duckdb_row(row_dict))
+            
+            logger.info(f"Retrieved {len(datasets)} datasets from database")
+            return datasets
+            
         except Exception as e:
-            logger.error(f"Failed to get all datasets: {str(e)}")
-            raise
+            logger.error(f"Failed to retrieve datasets: {str(e)}")
+            raise ValueError(f"Database query failed: {str(e)}")
     
 
     def upsert_engineered_features_batch(
@@ -516,7 +589,7 @@ class DuckDBHelper:
             eav_rows: List[Dict[str, Any]] = []
             for feat in features:
                 # ensure fresh timestamps so OR REPLACE updates `updated_at`
-                now_iso = datetime.now().isoformat()
+                now_iso = datetime.now(timezone.utc).isoformat()
                 for row in feat.to_eav_rows():
                     row["created_at"] = now_iso
                     row["updated_at"] = now_iso

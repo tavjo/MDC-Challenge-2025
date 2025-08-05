@@ -14,7 +14,7 @@ dependencies = [
     "matplotlib>=3.10.3",
     "networkx>=3.5",
     "nltk>=3.9.1",
-    "numpy>=2.3.1",
+    "numpy>=1.24.0,<2.3.0",
     "openai>=1.96.0",
     "pandas>=2.3.0",
     "psutil>=7.0.0",
@@ -31,4 +31,5 @@ dependencies = [
     "tiktoken>=0.8.0", # exact GPT-token counts
     "tqdm>=4.67.1",
     "uvicorn>=0.35.0",
+    "umap-learn>=0.5.4",
 ]
