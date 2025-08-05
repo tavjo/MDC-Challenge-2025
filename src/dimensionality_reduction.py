@@ -29,6 +29,7 @@ import requests
 #     umap_lib = None
 #     UMAP_AVAILABLE = False
 import umap
+EPS = 1e-8          # threshold for “effectively zero variance”
     
 try:
     import matplotlib.pyplot as plt
@@ -434,19 +435,38 @@ class Reducer:
             cluster_embeddings = np.array([dataset_embeddings[ds_id] for ds_id in dataset_ids])
             
             # Standardize the features
-            scaler = StandardScaler()
-            scaled_embeddings = scaler.fit_transform(cluster_embeddings)
+            # scaler = StandardScaler() # ignore scaling for now
+            # scaler = StandardScaler(with_mean=True, with_std=False)   # centre only if scaling
+            # cluster_embeddings = scaler.fit_transform(cluster_embeddings)
             
             # Run PCA (keep first component only)
-            pca = PCA(n_components=1, random_state=random_seed)
-            pca_result = pca.fit_transform(scaled_embeddings)
+            pca = PCA(n_components=1, random_state=random_seed, svd_solver="full")
+            # pca_result = pca.fit_transform(cluster_embeddings)
+            pc_proj = pca.fit_transform(cluster_embeddings).ravel()   # shape (n_samples,)
+            ratio = pca.explained_variance_ratio_[0]
+            if np.isnan(ratio) or ratio < EPS:
+            # ---------- 3) fallback --------------------------------------
+                logger.info(
+                    f"Cluster {cluster_id}: PC1 variance too small "
+                    "(ratio={ratio}); using distance-to-centroid fallback"
+                )
+                centroid = cluster_embeddings.mean(axis=0)
+                diff     = cluster_embeddings - centroid
+                # Euclidean distance; use cosine if that aligns with the rest of
+                # your pipeline.
+                pc_proj  = 1 - (cluster_embeddings @ centroid) / (np.linalg.norm(cluster_embeddings, axis=1) * np.linalg.norm(centroid) + EPS)
+            else:
+                logger.info(
+                    f"Cluster {cluster_id}: PC1 explained variance = {ratio:.5f}"
+                )
             
             # Store PC1 values for each dataset in this cluster
-            cluster_pca_features = {}
-            for i, dataset_id in enumerate(dataset_ids):
-                cluster_pca_features[dataset_id] = float(pca_result[i, 0])
+            # cluster_pca_features = {}
+            # for i, dataset_id in enumerate(dataset_ids):
+            #     cluster_pca_features[dataset_id] = float(pc_proj[i])
+            cluster_pca_features = {ds_id: float(val) for ds_id, val in zip(dataset_ids, pc_proj)}
             
-            logger.info(f"Cluster {cluster_id}: PC1 explained variance = {pca.explained_variance_ratio_[0]:.3f}")
+            # logger.info(f"Cluster {cluster_id}: PC1 explained variance = {ratio:.3f}")
             return cluster_pca_features
             
         except Exception as e:

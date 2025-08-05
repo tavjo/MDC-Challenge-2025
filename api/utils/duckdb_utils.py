@@ -619,6 +619,51 @@ class DuckDBHelper:
             logger.error(f"Feature upsert failed: {exc}")
             return False
     
+    def delete_pca_features(self) -> bool:
+        """
+        Delete all PCA-related features from the engineered_feature_values table.
+        This removes features with names starting with 'LEIDEN_' (PCA features).
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            logger.info("Deleting existing PCA features from engineered_feature_values table...")
+            
+            # Count existing PCA features before deletion
+            pca_count_before = self.engine.execute("""
+                SELECT COUNT(*) FROM engineered_feature_values 
+                WHERE feature_name LIKE 'LEIDEN_%'
+            """).fetchone()[0]
+            
+            logger.info(f"Found {pca_count_before} PCA feature records to delete")
+            
+            # Delete all features that start with 'LEIDEN_' (PCA features)
+            self.engine.execute("""
+                DELETE FROM engineered_feature_values 
+                WHERE feature_name LIKE 'LEIDEN_%'
+            """)
+            
+            # Verify deletion
+            pca_count_after = self.engine.execute("""
+                SELECT COUNT(*) FROM engineered_feature_values 
+                WHERE feature_name LIKE 'LEIDEN_%'
+            """).fetchone()[0]
+            
+            # Get count of remaining rows for verification
+            remaining_count = self.engine.execute(
+                "SELECT COUNT(*) FROM engineered_feature_values"
+            ).fetchone()[0]
+            
+            logger.info(f"✅ Successfully deleted {pca_count_before - pca_count_after} PCA feature records")
+            logger.info(f"   {remaining_count} total feature rows remain in database")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to delete PCA features: {str(e)}")
+            return False
+    
     def get_full_dataset_dataframe(
         self,
         dataset_ids: Optional[List[str]] = None,

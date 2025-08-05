@@ -35,15 +35,16 @@ DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
 DEFAULT_COLLECTION_NAME = "dataset-aggregates-train"
 
 # Clustering parameters
-DEFAULT_K_NEIGHBORS = 12
+DEFAULT_K_NEIGHBORS = 5
 DEFAULT_SIMILARITY_THRESHOLD = None
 DEFAULT_THRESHOLD_METHOD = "degree_target"
-DEFAULT_RESOLUTION = 4
-DEFAULT_MIN_CLUSTER_SIZE = 6
-DEFAULT_MAX_CLUSTER_SIZE = 50
+DEFAULT_RESOLUTION = 2.5
+DEFAULT_MIN_CLUSTER_SIZE = 3
+DEFAULT_MAX_CLUSTER_SIZE = 9999
 DEFAULT_SPLIT_FACTOR = 1.3
 DEFAULT_RANDOM_SEED = 42
-
+DEFAULT_TARGET_N = 60
+DEFAULT_TOL = 2
 
 
 class ClusteringPipeline:
@@ -59,7 +60,9 @@ class ClusteringPipeline:
                  min_cluster_size: int = DEFAULT_MIN_CLUSTER_SIZE,
                  max_cluster_size: int = DEFAULT_MAX_CLUSTER_SIZE,
                  split_factor: float = DEFAULT_SPLIT_FACTOR,
-                 random_seed: int = DEFAULT_RANDOM_SEED):
+                 random_seed: int = DEFAULT_RANDOM_SEED,
+                 target_n: int = DEFAULT_TARGET_N,
+                 tol: int = DEFAULT_TOL):
         self.base_api_url = base_api_url
         self.collection_name = collection_name
         self.cfg_path = cfg_path
@@ -72,6 +75,8 @@ class ClusteringPipeline:
         self.max_cluster_size = max_cluster_size
         self.split_factor = split_factor
         self.random_seed = random_seed
+        self.target_n = target_n
+        self.tol = tol
         self.endpoints = API_ENDPOINTS
 
     def _get_api_url(self, endpoint: str) -> str:
@@ -137,6 +142,8 @@ class ClusteringPipeline:
                 max_cluster_size=self.max_cluster_size,
                 split_factor=self.split_factor,
                 random_seed=self.random_seed,
+                target_n=self.target_n,
+                tol=self.tol,
                 db_path=self.db_path,
                 output_dir="reports/clustering"
             )

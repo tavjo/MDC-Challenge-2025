@@ -13,7 +13,7 @@ import os
 import sys
 import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 import numpy as np
@@ -252,106 +252,166 @@ def run_leiden_clustering(
     min_cluster_size: int = 6,
     max_cluster_size: int = 75,
     split_factor: float = 1.3,
-    random_seed: int = 42
+    random_seed: int = 42,
+    max_iter: int = 20,           # ❶ hard ceiling on passes
+    stagnation_patience: int = 3  # ❷ stop if no net change for N passes
 ) -> Dict[str, str]:
     """
-    Balanced Leiden clustering with recursive split / merge.
+    Size-balanced Leiden clustering with explicit stop criteria.
+
+    *   **Split big → re-cluster** with higher resolution (`resolution*split_factor`).
+    *   **Merge small → nearest neighbour** by strongest connectivity.
+    *   Break when:  
+        – no changes for `stagnation_patience` passes or  
+        – `max_iter` reached or  
+        – membership pattern repeats (cycle detection).
+
+    Returns
+    -------
+    {dataset_id: "cluster_<int>"}
+    """
+    if graph.ecount() == 0:
+        logger.warning("Graph is edgeless; returning singletons")
+        return {v["dataset_id"]: f"cluster_{i}" for i, v in enumerate(graph.vs)}
+
+    np.random.seed(random_seed)
+    optimiser = leidenalg.Optimiser()
+
+    def _leiden(g, res):
+        part = leidenalg.RBConfigurationVertexPartition(g, resolution_parameter=res)
+        optimiser.optimise_partition(part, n_iterations=-1)
+        return part
+
+    # ---------- first pass -------------------------------------------------
+    part = _leiden(graph, resolution)
+    logger.info(f"Initial Leiden: {len(part)} clusters; modularity={part.modularity:.4f}")
+
+    previous_memberships = set()
+    stagnation = 0
+
+    for iteration in range(1, max_iter + 1):
+        changed = False
+        sizes = np.bincount(part.membership)
+
+        # ---- 1) split oversize clusters -----------------------------------
+        for cid, size in enumerate(sizes):
+            if size > max_cluster_size:
+                idx = [v.index for v in graph.vs if part.membership[v.index] == cid]
+                sub = graph.subgraph(idx)
+                sub_part = _leiden(sub, resolution * split_factor)
+
+                if len(sub_part) > 1:
+                    offset = max(part.membership) + 1
+                    for sub_v, new_c in zip(sub.vs, sub_part.membership):
+                        part.membership[idx[sub_v.index]] = offset + new_c
+                    changed = True
+
+        # recompute after splits
+        sizes = np.bincount(part.membership)
+
+        # ---- 2) merge undersize clusters ----------------------------------
+        for cid, size in enumerate(sizes):
+            if size < min_cluster_size:
+                small_idx = [v.index for v in graph.vs if part.membership[v.index] == cid]
+                nbr_counts = {}
+                for vid in small_idx:
+                    for nb in graph.vs[vid].neighbors():
+                        tgt = part.membership[nb.index]
+                        if tgt != cid:
+                            nbr_counts[tgt] = nbr_counts.get(tgt, 0) + 1
+                if nbr_counts:
+                    target = max(nbr_counts, key=nbr_counts.get)
+                    for vid in small_idx:
+                        part.membership[vid] = target
+                    changed = True
+
+        # ---------- stopping logic -----------------------------------------
+        mem_tuple = tuple(part.membership)
+        if mem_tuple in previous_memberships:
+            logger.info("Cycle detected; stopping at iteration %d", iteration)
+            break
+        previous_memberships.add(mem_tuple)
+
+        if not changed:
+            stagnation += 1
+            if stagnation >= stagnation_patience:
+                logger.info("No changes for %d passes; converged", stagnation_patience)
+                break
+        else:
+            stagnation = 0
+
+    else:
+        logger.warning("Reached max_iter=%d without full convergence", max_iter)
+
+    # ---------- build mapping ---------------------------------------------
+    assignments = {v["dataset_id"]: f"cluster_{part.membership[v.index]}" for v in graph.vs}
+    final_sizes = np.bincount(part.membership)
+    logger.info("Final: %d clusters (min=%d │ median=%d │ max=%d)",
+                len(final_sizes), final_sizes.min(), int(np.median(final_sizes)),
+                final_sizes.max())
+    return assignments
+
+@timer_wrap
+def find_resolution_for_target(
+    graph: ig.Graph,
+    target_n: int,
+    tol: int = 2,               # acceptable ± window
+    min_cluster_size: int = 3,  # still guard against singletons
+    res_low: float = 0.5,
+    res_high: float = 8.0,
+    max_steps: int = 10,
+    **kwargs
+):
+    """
+    Binary-search the Leiden resolution_parameter so that the
+    number of clusters is within `target_n ± tol`.
 
     Parameters
     ----------
     graph : ig.Graph
-        Pre-built similarity graph with 'dataset_id' on vertices.
-    resolution : float, default 1.5
-        Base resolution for the first Leiden pass.  Higher ⇒ more clusters.
-    min_cluster_size : int, default 6
-        Clusters smaller than this will be merged into a neighbour.
-    max_cluster_size : int, default 75
-        Clusters larger than this will be recursively re-clustered
-        with a higher resolution (resolution*split_factor).
-    split_factor : float, default 1.3
-        Multiplier applied to `resolution` when re-clustering
-        an oversized community.
-    random_seed : int, default 42
-        Seed for reproducibility.
+    target_n : int
+        Desired cluster count (e.g. 48).
+    tol : int
+        Acceptable deviation (e.g. 2 ⇒ 46–50).
+    res_low, res_high : float
+        Bracketing resolution values.
+    max_steps : int
+        Safety cap on iterations.
+    kwargs :
+        Extra args forwarded to `run_leiden_clustering`
+        (min/max size, split_factor, etc.).
 
     Returns
     -------
-    Dict[str, str]
-        Mapping {dataset_id: "cluster_<int>"} after balancing.
+    (assignments, resolution) : (Dict[str,str], float)
     """
-    if graph.ecount() == 0:
-        logger.warning("Graph has no edges; returning singletons")
-        return {v["dataset_id"]: f"cluster_{i}"
-                for i, v in enumerate(graph.vs)}
-
-    np.random.seed(random_seed)
-
-    # --- helper -----------------------------------------------------------
-    def _leiden(g, res):
-        return leidenalg.find_partition(
-            g,
-            leidenalg.RBConfigurationVertexPartition,
-            resolution_parameter=res,
-            seed=random_seed
+    for step in range(max_steps):
+        res_mid = (res_low + res_high) / 2
+        assignments = run_leiden_clustering(
+            graph,
+            resolution=res_mid,
+            min_cluster_size=min_cluster_size,
+            **kwargs
         )
-    # ----------------------------------------------------------------------
+        n = len(set(assignments.values()))
+        logger.info(
+            f"[res search] step {step:02d}  γ={res_mid:.3f} → {n} clusters"
+        )
 
-    # 1️⃣  initial pass
-    part = _leiden(graph, resolution)
-    logger.info(f"First pass: {len(part)} clusters; modularity={part.modularity:.4f}")
+        if abs(n - target_n) <= tol:
+            return assignments, res_mid
 
-    # 2️⃣  recursive split / merge loop
-    changed = True
-    while changed:
-        changed = False
-        sizes = np.bincount(part.membership)
+        if n < target_n:
+            # too few clusters → raise γ
+            res_low = res_mid
+        else:
+            # too many clusters → lower γ
+            res_high = res_mid
 
-        # ---- split big clusters -----------------------------------------
-        for cid, size in enumerate(sizes):
-            if size > max_cluster_size:
-                idx_big = [v.index for v in graph.vs if part.membership[v.index] == cid]
-                sub = graph.subgraph(idx_big)
-                sub_part = _leiden(sub, resolution * split_factor)
-                if len(sub_part) > 1:
-                    # re-label: offset with current max label
-                    offset = max(part.membership) + 1
-                    for sub_v, new_c in zip(sub.vs, sub_part.membership):
-                        part.membership[idx_big[sub_v.index]] = offset + new_c
-                    changed = True
-
-        # recompute sizes after potential splits
-        sizes = np.bincount(part.membership)
-
-        # ---- merge small clusters ---------------------------------------
-        for cid, size in enumerate(sizes):
-            if size < min_cluster_size:
-                small_vs = [v.index for v in graph.vs if part.membership[v.index] == cid]
-                # pick neighbour cluster with most edges to the small cluster
-                neighbour_counts = {}
-                for vid in small_vs:
-                    for nb in graph.vs[vid].neighbors():
-                        nb_cid = part.membership[nb.index]
-                        if nb_cid != cid:
-                            neighbour_counts[nb_cid] = neighbour_counts.get(nb_cid, 0) + 1
-                if neighbour_counts:
-                    target_cid = max(neighbour_counts, key=neighbour_counts.get)
-                    for vid in small_vs:
-                        part.membership[vid] = target_cid
-                    changed = True
-
-    # 3️⃣  build final mapping
-    cluster_assignments: Dict[str, str] = {}
-    for v in graph.vs:
-        cluster_assignments[v["dataset_id"]] = f"cluster_{part.membership[v.index]}"
-
-    # log stats
-    final_sizes = np.bincount(list(part.membership))
-    logger.info(f"Balanced clustering: {len(final_sizes)} clusters "
-                f"(min={final_sizes.min()}, median={np.median(final_sizes)}, "
-                f"max={final_sizes.max()})")
-
-    return cluster_assignments
-
+    logger.warning(
+        "Resolution search hit max_steps=%d; returning best effort", max_steps
+    )
+    return assignments, res_mid
 
 
 @timer_wrap
@@ -469,9 +529,11 @@ def run_clustering_pipeline(
     threshold_method: str = "degree_target",
     resolution: float = 1.5,
     min_cluster_size: int = 6,
-    max_cluster_size: int = 75,
+    max_cluster_size: Optional[int] = None,
     split_factor: float = 1.3,
     random_seed: int = 42,
+    target_n: int = 48,
+    tol: int = 2,
     db_path: str = DEFAULT_DUCKDB_PATH,
     output_dir: str = "reports/clustering"
 ) -> bool:
@@ -487,7 +549,17 @@ def run_clustering_pipeline(
             "edges": graph.ecount(),
             "avg_degree": 2*graph.ecount()/graph.vcount()
         }
-        cluster_assignments = run_leiden_clustering(graph, resolution, min_cluster_size,max_cluster_size, split_factor, random_seed)
+        # cluster_assignments = run_leiden_clustering(graph, resolution, min_cluster_size,max_cluster_size, split_factor, random_seed)
+        cluster_assignments, gamma = find_resolution_for_target(
+        graph,
+        target_n=target_n,            # aim for ~48 clusters
+        tol=tol,
+        min_cluster_size=min_cluster_size,
+        max_cluster_size=max_cluster_size,  # effectively disable the upper bound
+        split_factor=split_factor,
+        random_seed=random_seed)
+        logger.info("Final γ = %.3f yielded %d clusters", gamma,
+                len(set(cluster_assignments.values())))
         update_dataset_clusters_in_duckdb(cluster_assignments, db_helper)
         return export_clustering_report(cluster_assignments, graph_stats, output_dir)
     except Exception as e:
