@@ -1,0 +1,31 @@
+2025-08-06 10:22:20,867 — INFO — Logger initialized. Log file: artifacts/models/train_log.txt
+2025-08-06 10:22:20,867 — INFO — ✅ Phase 09 training started
+2025-08-06 10:22:20,868 — INFO — Input CSV: Data/train/train_data.csv
+2025-08-06 10:22:20,868 — INFO — Output directory: artifacts/models
+2025-08-06 10:22:20,868 — INFO — Random seed: 42
+2025-08-06 10:22:20,903 — INFO — Data loaded successfully: 487 samples, 55 features, target distribution: {0: 387, 1: 100}
+2025-08-06 10:22:20,905 — INFO — Class distribution: {0: 0.7946611909650924, 1: 0.2053388090349076}
+2025-08-06 10:22:20,906 — INFO — Computed balanced class weights: {np.int64(0): np.float64(0.6291989664082688), np.int64(1): np.float64(2.435)}
+2025-08-06 10:22:20,906 — INFO — Using StratifiedKFold
+2025-08-06 10:22:20,906 — INFO — Using standard RandomForestClassifier with balanced class weights
+2025-08-06 10:22:20,906 — INFO — Pipeline created successfully with steps: ['imputer', 'rf']
+2025-08-06 10:22:20,907 — INFO — Starting hyperparameter optimization with 100 iterations
+2025-08-06 10:25:22,867 — INFO — Best parameters: {'rf__max_depth': None, 'rf__max_features': 'sqrt', 'rf__max_samples': 0.8, 'rf__min_samples_leaf': 4, 'rf__n_estimators': 258}
+2025-08-06 10:25:22,867 — INFO — Best CV F1: 0.7997
+2025-08-06 10:25:22,868 — INFO — Computing cross-validation metrics...
+2025-08-06 10:25:23,817 — INFO — Saved cv_results.csv
+2025-08-06 10:25:23,818 — INFO — test_f1: 0.7997 ± 0.0724
+2025-08-06 10:25:23,818 — INFO — test_precision: 0.8264 ± 0.0850
+2025-08-06 10:25:23,819 — INFO — test_recall: 0.7800 ± 0.0908
+2025-08-06 10:25:23,819 — INFO — test_accuracy: 0.9198 ± 0.0307
+2025-08-06 10:25:23,819 — INFO — Computing permutation importances (30 repeats)…
+2025-08-06 10:25:49,345 — INFO — Saved feature_importance_permutation.csv
+2025-08-06 10:25:49,346 — INFO — Top feature: LEIDEN_cluster_2 (importance: 0.0111 ± 0.0041)
+2025-08-06 10:25:49,347 — INFO — Top feature: LEIDEN_cluster_1 (importance: 0.0076 ± 0.0068)
+2025-08-06 10:25:49,347 — INFO — Top feature: LEIDEN_cluster_31 (importance: 0.0044 ± 0.0033)
+2025-08-06 10:25:49,348 — INFO — Top feature: LEIDEN_cluster_11 (importance: 0.0041 ± 0.0044)
+2025-08-06 10:25:49,348 — INFO — Top feature: LEIDEN_cluster_30 (importance: 0.0040 ± 0.0116)
+2025-08-06 10:25:49,483 — INFO — Model and artefacts persisted to artifacts/models
+2025-08-06 10:25:49,483 — INFO — Model file size: 0.31 MB
+2025-08-06 10:25:50,432 — INFO — Model metadata registered in DuckDB (artifacts/mdc-challenge.db).
+2025-08-06 10:25:50,432 — INFO — 🏁 Training complete. Artefacts available in artifacts/models
