@@ -292,6 +292,90 @@ make clean
 make clean-all
 ```
 
+## 🤖 Machine Learning Training
+
+The project includes a comprehensive Random Forest training pipeline with enhanced error handling and documentation.
+
+### Training Scripts
+
+Two bash scripts are provided for running the Random Forest training:
+
+#### Quick Training Script
+For basic training with default parameters:
+
+```bash
+# Simple training with defaults
+./quick_train.sh
+```
+
+This script:
+- Uses `Data/train/train_data.csv` as input
+- Outputs models to `artifacts/models/`
+- Uses default parameters (seed=42, 100 iterations)
+- Provides basic status updates
+
+#### Full Training Script
+For advanced training with custom parameters:
+
+```bash
+# Basic usage
+./run_training.sh
+
+# Custom parameters
+./run_training.sh --input my_data.csv --output my_models --seed 123 --n-iter 200
+
+# With balanced Random Forest
+./run_training.sh --balanced
+
+# With grouping column for StratifiedGroupKFold
+./run_training.sh --group article_id
+
+# Show help
+./run_training.sh --help
+```
+
+**Available Options:**
+- `-i, --input`: Input CSV file (default: Data/train/train_data.csv)
+- `-o, --output`: Output directory (default: artifacts/models)
+- `-d, --duckdb`: DuckDB database path (default: artifacts/mdc-challenge.db)
+- `-t, --target`: Target column name (default: target)
+- `-g, --group`: Optional group column for StratifiedGroupKFold
+- `-s, --seed`: Random seed (default: 42)
+- `-n, --n-iter`: Number of RandomizedSearch iterations (default: 100)
+- `-b, --balanced`: Use BalancedRandomForestClassifier from imblearn
+- `-h, --help`: Show help message
+
+### Training Features
+
+The training pipeline includes:
+
+- **Comprehensive Error Handling**: Validates data, handles missing files, and provides clear error messages
+- **Dependency Checking**: Automatically verifies required Python packages
+- **Data Validation**: Checks data dimensions, target column existence, and data quality
+- **Progress Monitoring**: Detailed logging throughout the training process
+- **Model Artifacts**: Saves trained model, feature importance, cross-validation results, and metadata
+- **Database Integration**: Optional DuckDB storage for model metadata
+- **Flexible Configuration**: Support for various Random Forest configurations
+
+### Training Output
+
+The training process generates several artifacts in the output directory:
+
+- `rf_model.pkl`: Trained Random Forest model
+- `best_params.json`: Optimal hyperparameters found during search
+- `feature_names.json`: List of feature names used in training
+- `cv_results.csv`: Cross-validation performance metrics
+- `feature_importance_permutation.csv`: Feature importance rankings
+- `train_log.txt`: Detailed training log
+
+### Requirements
+
+For training, ensure you have:
+- Python 3.8+
+- Required packages: pandas, scikit-learn, numpy, joblib, scipy
+- Optional: imbalanced-learn (for balanced Random Forest)
+- Optional: duckdb (for metadata storage)
+
 ## 🧪 Testing
 
 The project includes comprehensive testing:
@@ -302,6 +386,9 @@ python -m pytest tests/
 
 # Test API health
 make test
+
+# Test training pipeline
+./quick_train.sh
 
 # Manual API testing via documentation
 open http://localhost:3000/docs

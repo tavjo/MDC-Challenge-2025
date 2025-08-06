@@ -1,5 +1,0 @@
-# Your curated pattern overrides - start with a few key ones
-GEO: "GSE\\d{3,6}"
-SRA_Run: "SRR\\d{5,}"
-ENA_Run: "ERR\\d{6,}"
-DDBJ_Run: "DRR\\d{6,}" 
