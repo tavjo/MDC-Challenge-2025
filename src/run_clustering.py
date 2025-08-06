@@ -38,12 +38,12 @@ DEFAULT_COLLECTION_NAME = "dataset-aggregates-train"
 DEFAULT_K_NEIGHBORS = 5
 DEFAULT_SIMILARITY_THRESHOLD = None
 DEFAULT_THRESHOLD_METHOD = "degree_target"
-DEFAULT_RESOLUTION = 2.5
+DEFAULT_RESOLUTION = 1
 DEFAULT_MIN_CLUSTER_SIZE = 3
 DEFAULT_MAX_CLUSTER_SIZE = 9999
 DEFAULT_SPLIT_FACTOR = 1.3
 DEFAULT_RANDOM_SEED = 42
-DEFAULT_TARGET_N = 60
+DEFAULT_TARGET_N = 50
 DEFAULT_TOL = 2
 
 
@@ -106,7 +106,8 @@ class ClusteringPipeline:
                     
                     # Convert embeddings to numpy arrays if they aren't already
                     dat = result.results
-                    dataset_embeddings = {id: embeddings for id, embeddings in zip(dat["ids"], dat["embeddings"])}
+                    dataset_embeddings = np.array(dat["embeddings"])
+                    logger.info(f"✅ Embeddings shape: {dataset_embeddings.shape}")
                     
                     return dataset_embeddings
                 else:
@@ -120,7 +121,7 @@ class ClusteringPipeline:
             logger.error(f"Load embeddings request failed: {str(e)}")
             return None
 
-    def run_clustering(self, dataset_embeddings: Dict[str, np.ndarray]) -> bool:
+    def run_clustering(self, dataset_embeddings: np.ndarray) -> bool:
         """Run the clustering pipeline on the loaded embeddings."""
         logger.info("🔄 Starting clustering pipeline...")
         logger.info(f"Clustering {len(dataset_embeddings)} datasets with parameters:")
@@ -137,14 +138,14 @@ class ClusteringPipeline:
                 k_neighbors=self.k_neighbors,
                 similarity_threshold=self.similarity_threshold,
                 threshold_method=self.threshold_method,
-                resolution=self.resolution,
+                # resolution=self.resolution,
                 min_cluster_size=self.min_cluster_size,
                 max_cluster_size=self.max_cluster_size,
                 split_factor=self.split_factor,
                 random_seed=self.random_seed,
                 target_n=self.target_n,
                 tol=self.tol,
-                db_path=self.db_path,
+                # db_path=self.db_path,
                 output_dir="reports/clustering"
             )
             

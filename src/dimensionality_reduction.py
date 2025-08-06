@@ -11,6 +11,7 @@ import sys
 from typing import Optional, Dict, List
 import numpy as np
 from datetime import datetime, timezone
+from collections import defaultdict
 
 # Add project root to path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -58,6 +59,7 @@ API_ENDPOINTS = {
 DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
 DEFAULT_COLLECTION_NAME = "dataset-aggregates-train"
+DEFAULT_FEATURE_CLUSTERS_PATH = "reports/clustering/feature_clusters.json"
 
 # UMAP parameters
 DEFAULT_N_NEIGHBORS = 15
@@ -148,6 +150,18 @@ class Reducer:
             logger.error(f"Failed to load datasets from DuckDB: {str(e)}")
             return None
 
+    def load_feature_clusters(self, feature_clusters_path: str = DEFAULT_FEATURE_CLUSTERS_PATH) -> Optional[Dict[str, str]]:
+        """Load feature cluster mapping from JSON file."""
+        try:
+            logger.info(f"Loading feature clusters from {feature_clusters_path}...")
+            with open(feature_clusters_path, 'r') as f:
+                feature_cluster_map = json.load(f)
+            logger.info(f"✅ Successfully loaded {len(feature_cluster_map)} feature cluster mappings")
+            return feature_cluster_map
+        except Exception as e:
+            logger.error(f"Failed to load feature clusters: {str(e)}")
+            return None
+
     @timer_wrap  
     def run_umap_reduction(
         self,
@@ -180,6 +194,7 @@ class Reducer:
             # Prepare embeddings matrix
             dataset_ids = list(embeddings.keys())
             embedding_matrix = np.array([embeddings[dataset_id] for dataset_id in dataset_ids])
+            # embedding_matrix = embedding_matrix.T
             
             logger.info(f"Embedding matrix shape: {embedding_matrix.shape}")
             
@@ -408,79 +423,62 @@ class Reducer:
     def _run_pca_on_cluster(
         self,
         cluster_id: str,
-        dataset_ids: List[str],
-        dataset_embeddings: Dict[str, np.ndarray],
-        random_seed: int
-    ) -> Dict[str, float]:
+        feature_idx: List[int],
+        dataset_embeddings: np.ndarray,
+        random_seed: int,
+    ) -> np.ndarray:
         """
-        Run PCA on a single cluster and return the PC1 values for each dataset.
-        
-        Args:
-            cluster_id: ID of the cluster
-            dataset_ids: List of dataset IDs in this cluster
-            dataset_embeddings: Dictionary mapping dataset_id to embeddings
-            random_seed: Random seed for PCA
-            
-        Returns:
-            Dictionary mapping dataset_id to PC1 value for this cluster
+        Run PCA on a *feature* cluster; return the PC1 projection for every sample.
+
+        Parameters
+        ----------
+        cluster_id   : cluster label (e.g. "cluster_7")
+        feature_idx  : column indices belonging to this cluster
+       dataset_embeddings            : full design matrix, shape (n_samples, n_features)
+        random_seed  : reproducibility
+
+        Returns
+        -------
+        np.ndarray   : PC1 scores, shape (n_samples,)
         """
         try:
-            if len(dataset_ids) < 2:
-                logger.warning(f"Cluster {cluster_id} has only {len(dataset_ids)} datasets, skipping PCA")
-                return {}
-            
-            logger.info(f"Running PCA on cluster {cluster_id} with {len(dataset_ids)} datasets")
-            
-            # Extract embeddings for this cluster
-            cluster_embeddings = np.array([dataset_embeddings[ds_id] for ds_id in dataset_ids])
-            
-            # Standardize the features
-            # scaler = StandardScaler() # ignore scaling for now
-            # scaler = StandardScaler(with_mean=True, with_std=False)   # centre only if scaling
-            # cluster_embeddings = scaler.fit_transform(cluster_embeddings)
-            
-            # Run PCA (keep first component only)
-            pca = PCA(n_components=1, random_state=random_seed, svd_solver="full")
-            # pca_result = pca.fit_transform(cluster_embeddings)
-            pc_proj = pca.fit_transform(cluster_embeddings).ravel()   # shape (n_samples,)
-            ratio = pca.explained_variance_ratio_[0]
-            if np.isnan(ratio) or ratio < EPS:
-            # ---------- 3) fallback --------------------------------------
-                logger.info(
-                    f"Cluster {cluster_id}: PC1 variance too small "
-                    "(ratio={ratio}); using distance-to-centroid fallback"
+            if len(feature_idx) < 2:
+                logger.warning(
+                    f"Feature-cluster {cluster_id} has <2 features – skipping PCA"
                 )
-                centroid = cluster_embeddings.mean(axis=0)
-                diff     = cluster_embeddings - centroid
-                # Euclidean distance; use cosine if that aligns with the rest of
-                # your pipeline.
-                pc_proj  = 1 - (cluster_embeddings @ centroid) / (np.linalg.norm(cluster_embeddings, axis=1) * np.linalg.norm(centroid) + EPS)
-            else:
-                logger.info(
-                    f"Cluster {cluster_id}: PC1 explained variance = {ratio:.5f}"
-                )
-            
-            # Store PC1 values for each dataset in this cluster
-            # cluster_pca_features = {}
-            # for i, dataset_id in enumerate(dataset_ids):
-            #     cluster_pca_features[dataset_id] = float(pc_proj[i])
-            cluster_pca_features = {ds_id: float(val) for ds_id, val in zip(dataset_ids, pc_proj)}
-            
-            # logger.info(f"Cluster {cluster_id}: PC1 explained variance = {ratio:.3f}")
-            return cluster_pca_features
-            
-        except Exception as e:
-            logger.error(f"PCA failed for cluster {cluster_id}: {str(e)}")
-            return {}
+                # fallback → values of the single column
+                return dataset_embeddings[:, feature_idx[0]].copy()
+
+            # slice once; shape (n_samples, n_cluster_features)
+            X_sub = dataset_embeddings[:, feature_idx]
+
+            pca = PCA(
+                n_components=1,
+                random_state=random_seed,
+                svd_solver="full",
+            )
+            pc1 = pca.fit_transform(X_sub).ravel()
+
+            var_ratio = float(pca.explained_variance_ratio_[0])
+            logger.info(
+                f"{cluster_id}: PC1 var ratio = {var_ratio:.4f}"
+            )
+            return pc1
+
+        except Exception as exc:
+            logger.error(f"PCA failed for {cluster_id}: {exc}")
+            raise
 
     @timer_wrap
     def run_per_cluster_pca(
-        self, 
-        dataset_embeddings: Dict[str, np.ndarray], 
-        random_seed: int = None
+        self,
+        dataset_embeddings: np.ndarray,                         # shape (n_samples, n_features)
+        feature_cluster_map: Dict[str, str],   # {feature_name: cluster_label}
+        dataset_ids: List[str],                 # ordered like X rows
+        random_seed: int = None,
     ) -> bool:
         """
-        Group datasets by cluster, run PCA on each cluster's embeddings:
+        Group features by cluster, run PCA on each feature cluster:
         - Keep PC1 (highest explained variance) for each cluster
         - Save as LEIDEN_1, LEIDEN_2, etc. features to DuckDB
         - Fail gracefully if no cluster assignments exist
@@ -492,7 +490,7 @@ class Reducer:
         random_seed = random_seed or self.random_seed
         
         try:
-            logger.info("🔄 Running per-cluster PCA...")
+            logger.info("🔄 Running feature-cluster PCA...")
             
             # Load datasets if not already loaded
             if self.datasets is None:
@@ -502,92 +500,69 @@ class Reducer:
                 logger.error("Failed to load datasets from DuckDB")
                 return False
             
-            # Create mapping from dataset_id to cluster
-            dataset_to_cluster = {ds.dataset_id: ds.cluster for ds in self.datasets}
+            # Build index lists per cluster
+            name_to_idx = {fname: i for i, fname in enumerate(feature_cluster_map)}
+            cluster2cols: Dict[str, List[int]] = defaultdict(list)
+            for fname, cid in feature_cluster_map.items():
+                cluster2cols[cid].append(name_to_idx[fname])
             
-            # Check if any datasets have cluster assignments
-            clustered_datasets = {k: v for k, v in dataset_to_cluster.items() if v is not None}
-            if not clustered_datasets:
-                logger.warning("No datasets with cluster assignments found. Skipping per-cluster PCA.")
-                return False  # Graceful failure
+            logger.info(f"Processing {len(cluster2cols)} feature clusters")
             
-            logger.info(f"Found {len(clustered_datasets)} datasets with cluster assignments")
-            
-            # Group datasets by cluster
-            cluster_to_datasets = {}
-            for dataset_id, cluster in clustered_datasets.items():
-                if dataset_id in dataset_embeddings:
-                    if cluster not in cluster_to_datasets:
-                        cluster_to_datasets[cluster] = []
-                    cluster_to_datasets[cluster].append(dataset_id)
-            
-            logger.info(f"Processing {len(cluster_to_datasets)} clusters")
-            
-            # Run PCA on each cluster in parallel
-            pca_features = {}
-            
-            # Filter out clusters with insufficient datasets for PCA
-            valid_clusters = {
-                cluster_id: dataset_ids 
-                for cluster_id, dataset_ids in cluster_to_datasets.items() 
-                if len(dataset_ids) >= 2
-            }
-            
-            if not valid_clusters:
-                logger.warning("No clusters with sufficient datasets (>=2) for PCA")
-                return True
-            
-            logger.info(f"Running PCA on {len(valid_clusters)} valid clusters in parallel")
-            
-            # Determine number of workers (limit to avoid overwhelming the system)
-            max_workers = min(8, len(valid_clusters))  # Cap at 8 workers
-            
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Submit PCA tasks for each cluster
+            # Parallel PCA
+            with ThreadPoolExecutor(max_workers=min(8, len(cluster2cols))) as ex:
                 futures = {
-                    executor.submit(
+                    ex.submit(
                         self._run_pca_on_cluster,
-                        cluster_id,
-                        dataset_ids,
-                        dataset_embeddings,
-                        random_seed
-                    ): cluster_id
-                    for cluster_id, dataset_ids in valid_clusters.items()
+                        cid, cols, dataset_embeddings, random_seed
+                    ): cid
+                    for cid, cols in cluster2cols.items()
                 }
-                
-                # Collect results as they complete
-                for future in as_completed(futures):
-                    cluster_id = futures[future]
+
+                # collect → stacked array
+                comp_matrix = []
+                for fut in as_completed(futures):
+                    cid = futures[fut]
                     try:
-                        cluster_pca_features = future.result()
-                        
-                        # Merge cluster results into main pca_features dict
-                        for dataset_id, pc1_value in cluster_pca_features.items():
-                            if dataset_id not in pca_features:
-                                pca_features[dataset_id] = {}
-                            pca_features[dataset_id][f"LEIDEN_{cluster_id}"] = pc1_value
-                            
+                        pc1_result = fut.result()
+                        comp_matrix.append((cid, pc1_result))
                     except Exception as e:
-                        logger.error(f"PCA failed for cluster {cluster_id}: {str(e)}")
+                        logger.error(f"PCA failed for cluster {cid}: {str(e)}")
                         continue
             
-            logger.info(f"✅ Completed parallel PCA on {len(valid_clusters)} clusters")
+            if not comp_matrix:
+                logger.warning("No PCA results generated")
+                return True
             
+            # Assemble reduced dataframe
+            comp_matrix.sort()               # keep cluster order stable
+            labels, vectors = zip(*comp_matrix)
+            X_reduced = np.column_stack(vectors)   # shape (n_samples, n_clusters)
+            
+            logger.info(f"✅ Completed parallel PCA on {len(labels)} clusters")
+            
+            # Persist into DuckDB
+            pca_features: Dict[str, Dict[str, float]] = {}
+            for row_idx, ds_id in enumerate(dataset_ids):
+                for col_idx, cid in enumerate(labels):
+                    pca_features.setdefault(ds_id, {})[
+                        f"LEIDEN_{cid}"
+                    ] = float(X_reduced[row_idx, col_idx])
+
             # Save PCA features to DuckDB
             if pca_features:
                 success = self._save_pca_features_to_duckdb(pca_features)
                 if success:
-                    logger.info("✅ Per-cluster PCA completed successfully!")
+                    logger.info("✅ Feature-cluster PCA completed successfully!")
                     return True
                 else:
                     logger.error("❌ Failed to save PCA features to DuckDB")
                     return False
             else:
                 logger.warning("No PCA features generated")
-                return True
+                return False
                 
         except Exception as e:
-            logger.error(f"Per-cluster PCA failed: {str(e)}")
+            logger.error(f"Feature-cluster PCA failed: {str(e)}")
             return False
 
     def _save_pca_features_to_duckdb(self, pca_features: Dict[str, Dict[str, float]]) -> bool:
@@ -683,9 +658,22 @@ class Reducer:
             gt_viz_success = self.create_ground_truth_visualization(umap_embeddings)
             results["ground_truth_visualization"] = {"success": gt_viz_success}
         
-        # Step 6: Run per-cluster PCA
-        logger.info("🔄 Running per-cluster PCA...")
-        pca_success = self.run_per_cluster_pca(dataset_embeddings)
+        # Step 6: Run feature-cluster PCA
+        logger.info("🔄 Running feature-cluster PCA...")
+        
+        # Load feature clusters
+        feature_cluster_map = self.load_feature_clusters()
+        if feature_cluster_map is None:
+            logger.warning("❌ Failed to load feature clusters, skipping feature-cluster PCA")
+            pca_success = False
+        else:
+            # Convert embeddings dict to matrix format
+            dataset_ids = list(dataset_embeddings.keys())
+            dataset_embeddings = np.array([dataset_embeddings[ds_id] for ds_id in dataset_ids])
+            
+            # Run feature-cluster PCA
+            pca_success = self.run_per_cluster_pca(dataset_embeddings, feature_cluster_map, dataset_ids)
+            
         results["per_cluster_pca"] = {"success": pca_success}
         
         # Overall success

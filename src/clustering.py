@@ -13,7 +13,7 @@ import os
 import sys
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 
 import numpy as np
@@ -39,7 +39,8 @@ DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 
 @timer_wrap
 def build_knn_similarity_graph(
-    dataset_embeddings: Dict[str, np.ndarray], 
+    dataset_embeddings: np.ndarray,
+    feature_names: Optional[List[str]] = None,
     k_neighbors: int = 12,
     similarity_threshold: float = None,
     threshold_method: str = "degree_target"
@@ -52,28 +53,31 @@ def build_knn_similarity_graph(
     4. Default to degree-target heuristic for deterministic thresholding
     
     Args:
-        dataset_embeddings: Dictionary mapping dataset_id to embedding vector
+        feature_matrix: shape (n_samples, n_features) - embedding matrix
+        feature_names: Optional list of feature names, defaults to ["f0", "f1", ...]
         k_neighbors: Number of nearest neighbors to consider
         similarity_threshold: Minimum similarity for edge creation
         threshold_method: Method for determining similarity threshold
         
     Returns:
-        igraph.Graph object with similarity edges
+        igraph.Graph object with similarity edges among features
     """
-    logger.info(f"Building k-NN graph for {len(dataset_embeddings)} datasets")
+    if feature_names is None:
+        feature_names = [f"f{i}" for i in range(dataset_embeddings.shape[1])]
     
-    # Convert to arrays for sklearn
-    dataset_ids = list(dataset_embeddings.keys())
-    embeddings_matrix = np.array([dataset_embeddings[id] for id in dataset_ids])
+    logger.info(f"Building k-NN graph for {len(feature_names)} features")
+    
+    # Transpose so rows = features
+    feat_vecs = dataset_embeddings.T  # shape: (n_features, n_samples)
     
     # Build k-NN index
     logger.info(f"Computing {k_neighbors}-NN with sklearn")
-    nbrs = NearestNeighbors(n_neighbors=min(k_neighbors, len(dataset_ids)), 
+    nbrs = NearestNeighbors(n_neighbors=min(k_neighbors, feat_vecs.shape[0]), 
                            metric='cosine', algorithm='brute')
-    nbrs.fit(embeddings_matrix)
+    nbrs.fit(feat_vecs)
     
     # Get distances and indices
-    distances, indices = nbrs.kneighbors(embeddings_matrix)
+    distances, indices = nbrs.kneighbors(feat_vecs)
     
     # Determine similarity threshold if not provided
     if similarity_threshold is None:
@@ -97,9 +101,9 @@ def build_knn_similarity_graph(
     logger.info(f"Created {len(edges)} edges above threshold {similarity_threshold}")
     
     # Create igraph
-    g = ig.Graph(n=len(dataset_ids), edges=edges, directed=False)
+    g = ig.Graph(n=len(feature_names), edges=edges, directed=False)
     g.es['weight'] = edge_weights
-    g.vs['dataset_id'] = dataset_ids
+    g.vs['feature_name'] = feature_names
     
     # Add basic graph stats
     logger.info(f"Graph stats: {g.vcount()} vertices, {g.ecount()} edges, "
@@ -168,83 +172,6 @@ def determine_similarity_threshold(
     else:
         raise ValueError(f"Unknown threshold method: {method}")
 
-
-@timer_wrap
-# def run_leiden_clustering(
-#     graph: ig.Graph, 
-#     resolution: float = 1.0, 
-#     min_cluster_size: int = 8,
-#     random_seed: int = 42
-# ) -> Dict[str, str]:
-#     """
-#     Apply Leiden clustering with safeguards:
-#     1. Use igraph directly (no NetworkX conversion)
-#     2. Set random seed for reproducibility
-#     3. Filter out clusters smaller than min_cluster_size
-#     4. Return {dataset_id: cluster_label} mapping
-    
-#     Args:
-#         graph: igraph.Graph object with similarity edges
-#         resolution: Resolution parameter for Leiden algorithm
-#         min_cluster_size: Minimum size for valid clusters
-#         random_seed: Random seed for reproducibility
-        
-#     Returns:
-#         Dictionary mapping dataset_id to cluster_label
-#     """
-#     logger.info(f"Running Leiden clustering with resolution={resolution}")
-    
-#     if graph.ecount() == 0:
-#         logger.warning("Graph has no edges, assigning all nodes to singleton clusters")
-#         return {graph.vs[i]['dataset_id']: f"cluster_{i}" 
-#                 for i in range(graph.vcount())}
-    
-#     # Set random seed for reproducibility
-#     np.random.seed(random_seed)
-    
-#     # Run Leiden clustering
-#     partition = leidenalg.find_partition(
-#         graph, 
-#         leidenalg.RBConfigurationVertexPartition,
-#         resolution_parameter=resolution,
-#         seed=random_seed
-#     )
-    
-#     logger.info(f"Initial clustering: {len(partition)} clusters, "
-#                 f"modularity: {partition.modularity:.4f}")
-    
-#     # Create cluster assignments
-#     cluster_assignments = {}
-#     cluster_sizes = {}
-    
-#     for i, cluster_id in enumerate(partition.membership):
-#         dataset_id = graph.vs[i]['dataset_id']
-#         cluster_label = f"cluster_{cluster_id}"
-#         cluster_assignments[dataset_id] = cluster_label
-#         cluster_sizes[cluster_label] = cluster_sizes.get(cluster_label, 0) + 1
-    
-#     # Filter small clusters (reassign to largest cluster or mark as noise)
-#     large_clusters = {k: v for k, v in cluster_sizes.items() if v >= min_cluster_size}
-    
-#     if large_clusters:
-#         largest_cluster = max(large_clusters.keys(), key=lambda x: large_clusters[x])
-        
-#         # Reassign small clusters to largest cluster
-#         for dataset_id, cluster_label in cluster_assignments.items():
-#             if cluster_label not in large_clusters:
-#                 cluster_assignments[dataset_id] = largest_cluster
-#                 logger.debug(f"Reassigned {dataset_id} from {cluster_label} to {largest_cluster}")
-    
-#     # Final cluster stats
-#     final_cluster_sizes = {}
-#     for cluster_label in cluster_assignments.values():
-#         final_cluster_sizes[cluster_label] = final_cluster_sizes.get(cluster_label, 0) + 1
-    
-#     logger.info(f"Final clustering: {len(final_cluster_sizes)} clusters")
-#     for cluster_label, size in sorted(final_cluster_sizes.items()):
-#         logger.info(f"  {cluster_label}: {size} datasets")
-    
-#     return cluster_assignments
 @timer_wrap
 def run_leiden_clustering(
     graph: ig.Graph,
@@ -272,7 +199,7 @@ def run_leiden_clustering(
     """
     if graph.ecount() == 0:
         logger.warning("Graph is edgeless; returning singletons")
-        return {v["dataset_id"]: f"cluster_{i}" for i, v in enumerate(graph.vs)}
+        return {v["feature_name"]: f"cluster_{i}" for i, v in enumerate(graph.vs)}
 
     np.random.seed(random_seed)
     optimiser = leidenalg.Optimiser()
@@ -344,7 +271,7 @@ def run_leiden_clustering(
         logger.warning("Reached max_iter=%d without full convergence", max_iter)
 
     # ---------- build mapping ---------------------------------------------
-    assignments = {v["dataset_id"]: f"cluster_{part.membership[v.index]}" for v in graph.vs}
+    assignments = {v["feature_name"]: f"cluster_{part.membership[v.index]}" for v in graph.vs}
     final_sizes = np.bincount(part.membership)
     logger.info("Final: %d clusters (min=%d │ median=%d │ max=%d)",
                 len(final_sizes), final_sizes.min(), int(np.median(final_sizes)),
@@ -464,6 +391,33 @@ def update_dataset_clusters_in_duckdb(
 
 
 @timer_wrap
+def export_feature_clusters(feat2cluster: Dict[str, str], out_dir: str) -> bool:
+    """
+    Export feature cluster mapping to JSON file.
+    
+    Args:
+        feat2cluster: Dictionary mapping feature_name to cluster_label
+        out_dir: Output directory path
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        output_file = Path(out_dir) / "feature_clusters.json"
+        
+        with open(output_file, "w") as fh:
+            json.dump(feat2cluster, fh, indent=2)
+            
+        logger.info(f"Feature clusters exported to {output_file}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error exporting feature clusters: {e}")
+        return False
+
+
+@timer_wrap
 def export_clustering_report(
     cluster_assignments: Dict[str, str],
     graph_stats: Dict[str, Any],
@@ -521,50 +475,136 @@ def export_clustering_report(
         logger.error(f"Error exporting clustering report: {e}")
         return False
 
+# @timer_wrap
+# def run_clustering_pipeline(
+#     dataset_embeddings: Dict[str, np.ndarray],
+#     k_neighbors: int = 30,
+#     similarity_threshold: float = None,
+#     threshold_method: str = "degree_target",
+#     resolution: float = 1.5,
+#     min_cluster_size: int = 6,
+#     max_cluster_size: Optional[int] = None,
+#     split_factor: float = 1.3,
+#     random_seed: int = 42,
+#     target_n: int = 48,
+#     tol: int = 2,
+#     db_path: str = DEFAULT_DUCKDB_PATH,
+#     output_dir: str = "reports/clustering"
+# ) -> bool:
+#     """
+#     Run the complete clustering pipeline.
+#     """
+#     logger.info("Running clustering pipeline")
+#     db_helper = DuckDBHelper(db_path)
+#     try:
+#         graph = build_knn_similarity_graph(dataset_embeddings, k_neighbors, similarity_threshold, threshold_method)
+#         graph_stats = {
+#             "vertices": graph.vcount(),
+#             "edges": graph.ecount(),
+#             "avg_degree": 2*graph.ecount()/graph.vcount()
+#         }
+#         # cluster_assignments = run_leiden_clustering(graph, resolution, min_cluster_size,max_cluster_size, split_factor, random_seed)
+#         cluster_assignments, gamma = find_resolution_for_target(
+#         graph,
+#         target_n=target_n,            # aim for ~48 clusters
+#         tol=tol,
+#         min_cluster_size=min_cluster_size,
+#         max_cluster_size=max_cluster_size,  # effectively disable the upper bound
+#         split_factor=split_factor,
+#         random_seed=random_seed)
+#         logger.info("Final γ = %.3f yielded %d clusters", gamma,
+#                 len(set(cluster_assignments.values())))
+#         update_dataset_clusters_in_duckdb(cluster_assignments, db_helper)
+#         return export_clustering_report(cluster_assignments, graph_stats, output_dir)
+#     except Exception as e:
+#         logger.error(f"Error running clustering pipeline: {e}")
+#         return False
+
+
 @timer_wrap
 def run_clustering_pipeline(
-    dataset_embeddings: Dict[str, np.ndarray],
-    k_neighbors: int = 30,
+    dataset_embeddings: np.ndarray,
+    feature_names: Optional[List[str]] = None,
+    k_neighbors: int = 12,
     similarity_threshold: float = None,
     threshold_method: str = "degree_target",
-    resolution: float = 1.5,
-    min_cluster_size: int = 6,
+    target_n: int = 48,
+    tol: int = 2,
+    min_cluster_size: int = 3,
     max_cluster_size: Optional[int] = None,
     split_factor: float = 1.3,
     random_seed: int = 42,
-    target_n: int = 48,
-    tol: int = 2,
-    db_path: str = DEFAULT_DUCKDB_PATH,
     output_dir: str = "reports/clustering"
-) -> bool:
+) -> Dict[str, str]:
     """
-    Run the complete clustering pipeline.
+    Run feature-level clustering pipeline:
+    1. Build k-NN graph among features (columns)
+    2. Apply Leiden clustering to group similar features
+    3. Compute PCA within each feature cluster
+    4. Return reduced feature matrix and cluster mapping
+    
+    Args:
+        feature_matrix: Input matrix (n_samples, n_features)
+        feature_names: Optional feature names, defaults to ["f0", "f1", ...]
+        k_neighbors: Number of nearest neighbors for graph construction
+        similarity_threshold: Minimum similarity for edge creation
+        threshold_method: Method for determining similarity threshold
+        target_n: Target number of feature clusters
+        tol: Acceptable deviation from target_n
+        min_cluster_size: Minimum cluster size
+        max_cluster_size: Maximum cluster size (None to disable)
+        split_factor: Factor for splitting large clusters
+        random_seed: Random seed for reproducibility
+        n_components: Number of PCA components per cluster
+        output_dir: Output directory for reports
+        
+    Returns:
+        Tuple of (reduced_feature_matrix, feature_cluster_map)
     """
-    logger.info("Running clustering pipeline")
-    db_helper = DuckDBHelper(db_path)
+    logger.info(f"Running feature clustering pipeline on {dataset_embeddings.shape} matrix")
+    
     try:
-        graph = build_knn_similarity_graph(dataset_embeddings, k_neighbors, similarity_threshold, threshold_method)
+        # Build k-NN graph among features
+        graph = build_knn_similarity_graph(
+            dataset_embeddings=dataset_embeddings,
+            feature_names=feature_names,
+            k_neighbors=k_neighbors,
+            similarity_threshold=similarity_threshold,
+            threshold_method=threshold_method
+        )
+        
+        # Find optimal resolution for target cluster count
+        feature_cluster_map, gamma = find_resolution_for_target(
+            graph=graph,
+            target_n=target_n,
+            tol=tol,
+            min_cluster_size=min_cluster_size,
+            max_cluster_size=max_cluster_size,
+            split_factor=split_factor,
+            random_seed=random_seed
+        )
+        
+        logger.info(f"Final γ = {gamma:.3f} yielded {len(set(feature_cluster_map.values()))} clusters")
+        
+        # Export feature clusters for inspection
+        export_feature_clusters(feature_cluster_map, output_dir)
         graph_stats = {
             "vertices": graph.vcount(),
             "edges": graph.ecount(),
             "avg_degree": 2*graph.ecount()/graph.vcount()
         }
-        # cluster_assignments = run_leiden_clustering(graph, resolution, min_cluster_size,max_cluster_size, split_factor, random_seed)
-        cluster_assignments, gamma = find_resolution_for_target(
-        graph,
-        target_n=target_n,            # aim for ~48 clusters
-        tol=tol,
-        min_cluster_size=min_cluster_size,
-        max_cluster_size=max_cluster_size,  # effectively disable the upper bound
-        split_factor=split_factor,
-        random_seed=random_seed)
-        logger.info("Final γ = %.3f yielded %d clusters", gamma,
-                len(set(cluster_assignments.values())))
-        update_dataset_clusters_in_duckdb(cluster_assignments, db_helper)
-        return export_clustering_report(cluster_assignments, graph_stats, output_dir)
+
+        # Export clustering report
+        export_clustering_report(feature_cluster_map, graph_stats, output_dir)
+        
+        logger.info(f"Feature clustering pipeline completed successfully")
+        
+        return feature_cluster_map
+        
     except Exception as e:
-        logger.error(f"Error running clustering pipeline: {e}")
-        return False
+        logger.error(f"Error running feature clustering pipeline: {e}")
+        raise
+
 
 def main():
     """
