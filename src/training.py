@@ -31,7 +31,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -42,10 +42,11 @@ import scipy.stats as ss
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.inspection import permutation_importance
-# from sklearn.metrics import (accuracy_score, f1_score, precision_score,
-                            #  recall_score)
+from sklearn.metrics import (accuracy_score, f1_score, precision_score,
+                             recall_score)
 from sklearn.model_selection import (RandomizedSearchCV, StratifiedGroupKFold,
-                                     StratifiedKFold, cross_validate)
+                                     StratifiedKFold, cross_validate,
+                                     train_test_split, GroupShuffleSplit)
 from sklearn.pipeline import Pipeline
 from sklearn.utils.class_weight import compute_class_weight
 
@@ -89,8 +90,13 @@ def parse_args() -> argparse.Namespace:
                             help="Directory to write all artefacts into.")
         parser.add_argument("--target_col", type=str, default="target",
                             help="Name of the target column in CSV (default: target).")
-        parser.add_argument("--group_col", type=str, default=None,
-                            help="Optional grouping column for StratifiedGroupKFold.")
+        parser.add_argument("--group_col", default=None,
+                    help="Optional grouping column for CV + hold‑out split.")
+
+        parser.add_argument("--val_frac", type=float, default=0.20,
+                    help="Fraction of data to reserve as frozen validation set (0 = no hold‑out).")
+        parser.add_argument("--no_holdout", action="store_true",
+                    help="Disable hold‑out even if --val_frac > 0.")
         parser.add_argument("--seed", type=int, default=42,
                             help="Random seed.")
         parser.add_argument("--n_iter", type=int, default=100,
@@ -157,8 +163,67 @@ def make_logger(out_dir: Path) -> logging.Logger:
         print(f"Unexpected error setting up logger: {e}", file=sys.stderr)
         raise
 
+def _split_train_val(
+    df: pd.DataFrame,
+    target_col: str,
+    group_col: Optional[str],
+    val_frac: float,
+    seed: int,
+) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, Optional[pd.Series]]:
+    """Return X_train, y_train, X_val, y_val (+ groups_train).
 
-def load_data(csv_path: Path, target_col: str) -> tuple[pd.DataFrame, pd.Series]:
+    If *val_frac* == 0 → validation outputs are None and all rows go to train.
+    """
+
+    y_full = df[target_col]
+
+    # Decide whether to split
+    if val_frac <= 0:
+        logging.info("Hold‑out disabled (val_frac <= 0). Using all %d rows for CV.", len(df))
+        return (
+            df.drop(columns=[target_col] + ([group_col] if group_col else [])),
+            y_full,
+            None,
+            None,
+            df[group_col] if group_col else None,
+        )
+
+    if group_col and group_col in df.columns:
+        splitter = GroupShuffleSplit(n_splits=1, test_size=val_frac, random_state=seed)
+        train_idx, val_idx = next(splitter.split(df, y_full, groups=df[group_col]))
+        groups_train = df[group_col].iloc[train_idx]
+    else:
+        train_idx, val_idx = train_test_split(
+            np.arange(len(df)),
+            test_size=val_frac,
+            stratify=y_full,
+            random_state=seed,
+        )
+        groups_train = None
+
+    train_df = df.iloc[train_idx]
+    val_df = df.iloc[val_idx]
+
+    X_train = train_df.drop(columns=[target_col] + ([group_col] if group_col else []))
+    y_train = train_df[target_col]
+    X_val = val_df.drop(columns=[target_col] + ([group_col] if group_col else []))
+    y_val = val_df[target_col]
+
+    logging.info(
+        "Hold‑out split: %d train / %d validation rows (%.1f %%).",
+        len(train_df), len(val_df), val_frac * 100,
+    )
+    return X_train, y_train, X_val, y_val, groups_train
+
+
+def load_data(
+        csv_path: Path, 
+        target_col: str,
+        group_col: Optional[str],
+        val_frac: float,
+        disable_holdout: bool,
+        seed: int
+        ) -> tuple[pd.DataFrame, pd.Series]:
     """Load and validate training data from CSV file.
     
     Parameters
@@ -208,10 +273,14 @@ def load_data(csv_path: Path, target_col: str) -> tuple[pd.DataFrame, pd.Series]
                 f"Target column '{target_col}' not found in CSV. "
                 f"Available columns: {available_cols}"
             )
+        
+        X, y, X_val, y_val, groups_train = _split_train_val(
+        df, target_col, group_col, 0 if disable_holdout else val_frac, seed
+    )
             
         # Split features and target
-        X = df.drop(columns=[target_col])
-        y = df[target_col]
+        # X = df.drop(columns=[target_col])
+        # y = df[target_col]
         
         # Validate we have features
         if X.empty or X.shape[1] == 0:
@@ -235,10 +304,6 @@ def load_data(csv_path: Path, target_col: str) -> tuple[pd.DataFrame, pd.Series]
             logging.warning(f"Non-numeric feature columns detected: {list(non_numeric_cols)}. Removing non-numeric columns.")
             # remove non-numeric columns
             X = X[numeric_cols]
-            # raise ValueError(
-            #     f"Non-numeric feature columns detected: {list(non_numeric_cols)}. "
-            #     "All features must be numeric."
-            # )
             
         # Log missing values info
         if X.isna().any().any():
@@ -255,7 +320,7 @@ def load_data(csv_path: Path, target_col: str) -> tuple[pd.DataFrame, pd.Series]
             X.shape[0], X.shape[1], y.value_counts().to_dict()
         )
         
-        return X, y
+        return X, y, X_val, y_val, groups_train
         
     except Exception as e:
         logging.error(f"Failed to load data from {csv_path}: {e}")
@@ -385,6 +450,17 @@ def build_pipeline(seed: int, use_balanced: bool):
         logging.error(f"Failed to build pipeline: {e}")
         raise
 
+def evaluate_holdout(best_estimator, X_val, y_val, out_dir: Path):
+    preds = best_estimator.predict(X_val)
+    metrics = {
+        "f1": float(f1_score(y_val, preds)),
+        "precision": float(precision_score(y_val, preds)),
+        "recall": float(recall_score(y_val, preds)),
+        "accuracy": float(accuracy_score(y_val, preds)),
+    }
+    json.dump(metrics, open(out_dir / "holdout_metrics.json", "w"), indent=2)
+    logging.info("Hold‑out metrics → %s", metrics)
+    return metrics
 
 def main():
     """Main function to execute the Random Forest training pipeline.
@@ -418,7 +494,15 @@ def main():
 
         # Load and validate data
         try:
-            X, y = load_data(Path(args.input_csv), args.target_col)
+            # X, y = load_data(Path(args.input_csv), args.target_col)
+            X, y, X_val, y_val, groups_train = load_data(
+                Path(args.input_csv),
+                args.target_col,
+                args.group_col,
+                args.val_frac,
+                args.no_holdout,
+                args.seed,
+            )
         except (FileNotFoundError, ValueError, pd.errors.ParserError) as e:
             logger.error("Data loading failed: %s", e)
             sys.exit(1)
@@ -510,6 +594,14 @@ def main():
         except Exception as e:
             logger.error("Cross-validation evaluation failed: %s", e)
             # Continue execution as this is not critical
+        
+        # Hold‑out evaluation (if present)
+        if X_val is not None:
+            try:
+                evaluate_holdout(search.best_estimator_, X_val, y_val, out_dir)
+            except Exception as e:
+                logger.error("Hold‑out evaluation failed: %s", e)
+                # Continue execution as this is not critical
 
         # Compute permutation importance
         try:
@@ -580,7 +672,7 @@ def main():
                 sha256 = hashlib.sha256(model_path.read_bytes()).hexdigest()
                 con.execute(
                     "INSERT OR REPLACE INTO models VALUES (?, ?, ?, ?)",
-                    (sha256, datetime.utcnow(), float(search.best_score_), str(model_path))
+                    (sha256, datetime.now(timezone.utc), float(search.best_score_), str(model_path))
                 )
                 con.close()
                 logger.info("Model metadata registered in DuckDB (%s).", args.duckdb_path)

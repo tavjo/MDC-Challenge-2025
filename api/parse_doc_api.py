@@ -12,6 +12,7 @@ sys.path.append(str(project_root))
 
 from api.services.document_parsing_service import build_document_objects, build_document_object
 from api.utils.duckdb_utils import get_duckdb_helper
+from src.models import BulkParseRequest
 from src.helpers import export_docs, initialize_logging
 
 logger = initialize_logging("parse_doc_api")
@@ -48,14 +49,30 @@ async def parse_doc(pdf_path: str):
         helper.close()
 
 # Parse multiple documents at once
-@app.get("/bulk_parse_docs")
-async def parse_docs(pdf_paths: List[str], export_file: Optional[str] = None, export_path: Optional[str] = None):
+@app.post("/bulk_parse_docs")
+async def parse_docs(payload: BulkParseRequest):
+    pdf_paths = payload.pdf_paths
+    export_file = payload.export_file
+    export_path = payload.export_path
+    subset = payload.subset
+    subset_size = payload.subset_size
+    max_workers = payload.max_workers
+    params = {
+        "pdf_paths": pdf_paths,
+        "subset": subset,
+        "subset_size": subset_size,
+        "max_workers": max_workers
+    }
     helper = get_duckdb_helper(DB_PATH)
     try:
-        documents = build_document_objects(pdf_paths=pdf_paths, subset=False)
+        documents = build_document_objects(**params)
         if not documents:
+            logger.error(f"No document objects built: {pdf_paths}")
             raise HTTPException(status_code=400, detail="No document objects built")
-        helper.store_documents(documents)
+        success = helper.batch_upsert_documents(documents)
+        if not success:
+            logger.error(f"Failed to store documents: {documents}")
+            raise HTTPException(status_code=500, detail="Failed to store documents")
         # also export as a json file
         if export_file:
             export_docs(documents, output_file=export_file, output_dir=export_path)
@@ -67,6 +84,7 @@ async def parse_docs(pdf_paths: List[str], export_file: Optional[str] = None, ex
             export_docs(documents)
         return {"message": f"{len(documents)} Documents parsed and stored successfully"}
     except Exception as e:
+        logger.error(f"Error parsing documents: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         helper.close()

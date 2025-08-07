@@ -4,6 +4,14 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+class BulkParseRequest(BaseModel):
+    pdf_paths: List[str]
+    export_file: Optional[str] = None
+    export_path: Optional[str] = None
+    subset: Optional[bool] = False
+    subset_size: Optional[int] = 20
+    max_workers: Optional[int] = 8
+
 class Section(BaseModel):
     page_start: Optional[int] = None
     page_end: Optional[int] = None

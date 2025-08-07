@@ -239,6 +239,68 @@ class DuckDBHelper:
         except Exception as e:
             logger.error(f"Failed to store documents: {str(e)}")
             return False
+
+    def batch_upsert_documents(self, documents: List[Document]) -> Dict[str, Any]:
+        """
+        Batch-upsert Document objects using a DataFrame buffer approach.
+        
+        This method follows the same efficient pattern as store_chunks_batch and 
+        bulk_upsert_datasets, avoiding row-by-row INSERTs by registering a pandas 
+        DataFrame and executing one INSERT OR REPLACE ... SELECT statement.
+        
+        Args:
+            documents: List of Document objects to upsert
+            
+        Returns:
+            Dict[str, Any]: Result dictionary with success status and statistics
+        """
+        if not documents:
+            logger.warning("No documents supplied for upsert.")
+            return {"success": True, "total_documents_upserted": 0}
+
+        # Start transaction for consistency
+        self.engine.execute("BEGIN TRANSACTION")
+
+        try:
+            # Convert Document objects to DataFrame
+            records = [doc.to_duckdb_row() for doc in documents]
+            df = pd.DataFrame.from_records(records)
+            
+            # Register as a temporary table
+            self.engine.register("documents_buffer", df)
+            
+            # Bulk upsert with one SQL command
+            self.engine.execute("""
+                INSERT OR REPLACE INTO documents 
+                (doi, has_dataset_citation, full_text, total_char_length, 
+                 parsed_timestamp, total_chunks, total_tokens, avg_tokens_per_chunk,
+                 file_hash, file_path, citation_entities, n_pages, created_at, updated_at)
+                SELECT doi, has_dataset_citation, full_text, total_char_length, 
+                       parsed_timestamp, total_chunks, total_tokens, avg_tokens_per_chunk,
+                       file_hash, file_path, citation_entities, n_pages, created_at, updated_at
+                FROM documents_buffer
+            """)
+            
+            # Clean up the temp view
+            self.engine.unregister("documents_buffer")
+            
+            self.engine.execute("COMMIT")
+            
+            # Get total count for reporting
+            total_in_db = self.engine.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+            logger.info(f"✅ Batch upserted {len(documents)} documents via DataFrame (total now {total_in_db}).")
+            
+            return {
+                "success": True,
+                "total_documents_upserted": len(documents),
+                "total_documents_in_db": total_in_db,
+                "method": "dataframe_buffer"
+            }
+            
+        except Exception as e:
+            self.engine.execute("ROLLBACK")
+            logger.error(f"Batch document upsert failed: {e}")
+            raise
     
     def store_chunks(self, chunks: List[Chunk]) -> bool:
         """

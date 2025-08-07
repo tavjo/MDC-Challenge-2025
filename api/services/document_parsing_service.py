@@ -3,13 +3,14 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import List
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 print(f"Project root: {project_root}")
 sys.path.append(project_root)
 
-from src.helpers import timer_wrap, initialize_logging, parallel_processing_decorator, compute_file_hash, num_tokens, export_docs
+from src.helpers import timer_wrap, initialize_logging, compute_file_hash, num_tokens
 from src.models import Document
 from src.extract_pdf_text_unstructured import load_pdf_pages
 
@@ -45,16 +46,38 @@ def build_document_object(pdf_path: str):
     return document
 
 @timer_wrap
-def build_document_objects(pdf_paths: List[str], subset: bool = False, subset_size: int = 20) -> List[Document]:
+def build_document_objects(pdf_paths: List[str], subset: bool = False, subset_size: int = 20, max_workers: int = 8) -> List[Document]:
     # Suppress pdfminer warnings about CropBox/MediaBox
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
-    documents = []
+    
     if subset:
         np.random.seed(42)
-        pdf_paths = np.random.choice(pdf_paths, subset_size, replace=False)
+        pdf_paths = np.random.choice(pdf_paths, subset_size, replace=False).tolist()
         logger.info(f"Subsetting to {subset_size} PDFs")
-    for pdf_path in pdf_paths:
-        document = build_document_object(pdf_path)
-        documents.append(document)
+    
+    # Determine optimal number of workers
+    workers = min(max_workers, len(pdf_paths)) if pdf_paths else 1
+    logger.info(f"Processing {len(pdf_paths)} PDFs with {workers} workers")
+    
+    # Process documents in parallel
+    with ThreadPoolExecutor(max_workers=workers) as exe:
+        futures = {
+            exe.submit(build_document_object, pdf_path): pdf_path
+            for pdf_path in pdf_paths
+        }
+        documents = []
+        for future in as_completed(futures):
+            try:
+                document = future.result()
+                if document is not None:
+                    documents.append(document)
+                else:
+                    pdf_path = futures[future]
+                    logger.warning(f"Failed to build document object for {pdf_path}")
+            except Exception as e:
+                pdf_path = futures[future]
+                logger.error(f"Exception processing {pdf_path}: {str(e)}")
+    
+    logger.info(f"Successfully processed {len(documents)} out of {len(pdf_paths)} PDFs")
     return documents
