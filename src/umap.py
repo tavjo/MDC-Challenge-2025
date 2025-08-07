@@ -468,23 +468,22 @@ class Reducer:
         
         if umap_embeddings is None:
             logger.error("❌ UMAP reduction failed, skipping visualizations")
-        else:
-            # Step 4: Create cluster visualization
-            logger.info("🎨 Creating cluster visualization...")
-            cluster_viz_success = self.create_cluster_visualization(umap_embeddings)
-            results["cluster_visualization"] = {"success": cluster_viz_success}
+        # else:
+        #     # Step 4: Create cluster visualization
+        #     logger.info("🎨 Creating cluster visualization...")
+        #     cluster_viz_success = self.create_cluster_visualization(umap_embeddings)
+        #     results["cluster_visualization"] = {"success": cluster_viz_success}
             
-            # Step 5: Create ground truth visualization
-            logger.info("🎨 Creating ground truth visualization...")
-            gt_viz_success = self.create_ground_truth_visualization(umap_embeddings)
-            results["ground_truth_visualization"] = {"success": gt_viz_success}
+        #     # Step 5: Create ground truth visualization
+        #     logger.info("🎨 Creating ground truth visualization...")
+        #     gt_viz_success = self.create_ground_truth_visualization(umap_embeddings)
+        #     results["ground_truth_visualization"] = {"success": gt_viz_success}
         
         # Overall success
         results["overall_success"] = all([
             results["load_embeddings"]["success"],
             results["load_datasets"]["success"],
             results["umap_reduction"]["success"],
-            results["per_cluster_pca"]["success"]
         ])
         
         if results["overall_success"]:
