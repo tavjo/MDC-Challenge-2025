@@ -207,9 +207,9 @@ class ChunkingResult(BaseModel):
     total_chunks: int = Field(..., description="Total number of chunks created.")
     total_tokens: int = Field(..., description="Total number of tokens in all chunks.")
     avg_tokens_per_chunk: float = Field(..., description="Average number of tokens per chunk.")
-    validation_passed: bool = Field(..., description="Whether the chunking pipeline passed validation.")
+    validation_passed: Optional[bool] = Field(None, description="Whether the chunking pipeline passed validation.")
     pipeline_completed_at: str = Field(..., description="Timestamp of when the pipeline completed or failed.")
-    entity_retention: float = Field(..., description="Percentage of dataset IDs retained after chunking; aim is 100%.")
+    entity_retention: Optional[float] = Field(None, description="Percentage of dataset IDs retained after chunking; aim is 100%.")
     output_path: Optional[str] = Field(None, description="Path to the output files.")
     output_files: Optional[List[str]] = Field(None, description="List of output file paths.")
     lost_entities: Optional[Dict[str, Any]] = Field(None, description="List of dataset IDs that were lost; aim is 0.")
@@ -228,10 +228,10 @@ class DocumentChunkingResult(BaseModel):
     collection_name: str
 
     # citation stats
-    pre_chunk_total_citations: int
-    post_chunk_total_citations: int
-    validation_passed: bool
-    entity_retention: float
+    pre_chunk_total_citations: Optional[int] = None
+    post_chunk_total_citations: Optional[int] = None
+    validation_passed: Optional[bool] = None
+    entity_retention: Optional[float] = None
     lost_entities: Optional[Dict[str, Any]] = None
 
     # chunk stats
@@ -399,6 +399,19 @@ class RetrievalPayload(BaseModel):
     """Payload for the retrieval API"""
     query_texts: Dict[str, List[str]] = Field(..., description="Dictionary of dataset ID to query texts to search for")
     doc_id_map: Dict[str, str] = Field({}, description="Dictionary of dataset ID to document ID")
+    collection_name: str = Field(..., description="Name of the collection in ChromaDB")
+    k: int = Field(3, description="Number of chunks to retrieve")
+    cfg_path: Optional[str] = Field(None, description="Path to the configuration file")
+    model_name: Optional[str] = Field(None, description="Name of the model used for embedding or the path to the local model")
+    symbolic_boost: Optional[float] = Field(0.15, description="Symbolic boost for the retrieval")
+    use_fusion_scoring: Optional[bool] = Field(True, description="Whether to use fusion scoring")
+    analyze_chunk_text: Optional[bool] = Field(False, description="Whether to analyze the chunk text")
+    max_workers: Optional[int] = Field(1, description="Number of parallel worker threads")
+
+class ValRetrievalPayload(BaseModel):
+    """Payload for the retrieval API"""
+    query_embeddings: Dict[str, np.ndarray] = Field(..., description="Dictionary of dataset ID to query embeddings to search for")
+    doc_ids: List[str] = Field(..., description="List of document IDs to search for")
     collection_name: str = Field(..., description="Name of the collection in ChromaDB")
     k: int = Field(3, description="Number of chunks to retrieve")
     cfg_path: Optional[str] = Field(None, description="Path to the configuration file")

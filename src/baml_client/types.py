@@ -43,8 +43,6 @@ def all_succeeded(checks: Dict[CheckName, Check]) -> bool:
 class CitationEntity(BaseModel):
     evidence: List[str]
     data_citation: str
-    doc_id: str
-    pages: List[int]
 
 class Document(BaseModel):
     doi: str

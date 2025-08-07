@@ -21,16 +21,19 @@ sys.path.append(str(project_root))
 
 from src.models import (
     Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload, RetrievalPayload, BatchRetrievalResult, EmbeddingPayload, DatasetConstructionResult, DatasetConstructionPayload, NeighborhoodStatsPayload,
-    LoadChromaDataPayload, LoadChromaDataResult
+    LoadChromaDataPayload, LoadChromaDataResult,
+    ValRetrievalPayload
     )
 from api.services.chunking_and_embedding_services import run_semantic_chunking_pipeline
-from api.services.retriever_services import batch_retrieve_top_chunks, load_embeddings
+from api.services.retriever_services import batch_retrieve_top_chunks, load_embeddings, batch_retrieve_top_chunks_val
 from src.helpers import initialize_logging
 from src.semantic_chunking import sliding_window_chunk_text
 # from api.utils.duckdb_utils import get_duckdb_helper
 from api.services.embeddings_services import get_embedding_result
 from api.services.dataset_construction_service import construct_datasets_from_retrieval_results
 from api.services.neighborhood_stats import run_neighborhood_stats_pipeline as run_neighborhood_stats_pipeline_service
+
+
 
 # Initialize logging
 filename = os.path.basename(__file__)
@@ -116,7 +119,7 @@ async def create_chunks(
     text: str,
     cfg_path: Optional[str] = None,
     model_name: Optional[str] = None,
-    chunk_size: Optional[int] = 200,
+    chunk_size: Optional[int] = 300,
     chunk_overlap: Optional[int] = 20
 ):
     """
@@ -178,6 +181,29 @@ async def embed_chunks(payload: EmbeddingPayload) -> EmbeddingResult:
     except Exception as e:
         logger.error(f"Embeddings failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Embeddings failed: {str(e)}")
+    
+# New Batch Retrieval endpoint
+@app.post("/batch_retrieve_val", response_model=BatchRetrievalResult)
+async def batch_retrieve_val(payload: ValRetrievalPayload) -> BatchRetrievalResult:
+    """
+    Batch retrieve top-k chunks for multiple keys.
+    """
+    try:
+        logger.info(f"Starting batch retrieval for {len(payload.doc_ids)} documents")
+        return batch_retrieve_top_chunks_val(
+            query_embeddings=payload.query_embeddings,
+            max_workers=payload.max_workers or 1,
+            collection_name=payload.collection_name or "mdc_val_data",
+            k=payload.k,
+            cfg_path=payload.cfg_path or DEFAULT_CHROMA_CONFIG,
+            symbolic_boost=payload.symbolic_boost or 0.15,
+            use_fusion_scoring=payload.use_fusion_scoring or True,
+            analyze_chunk_text=payload.analyze_chunk_text or False,
+            doc_ids=payload.doc_ids or []
+        )
+    except Exception as e:
+        logger.error("Batch retrieval failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 # New Batch Retrieval endpoint
 @app.post("/batch_retrieve", response_model=BatchRetrievalResult)
@@ -219,8 +245,6 @@ async def run_pipeline(
         pipeline_params = {
             # Use provided output_dir or default to 'Data'
             "output_dir": payload.output_dir or "Data",
-            # "output_files": payload.output_files,
-            # "output_path": payload.output_path,
             "chunk_size": payload.chunk_size,
             "chunk_overlap": payload.chunk_overlap,
             "collection_name": payload.collection_name or "mdc_training_data",

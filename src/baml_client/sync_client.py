@@ -100,7 +100,7 @@ class BamlSyncClient:
     
     def ExtractCitation(
         self,
-        document: types.Document,
+        document: List[str],
         baml_options: BamlCallOptions = {},
     ) -> List[types.CitationEntity]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -140,7 +140,7 @@ class BamlStreamClient:
     
     def ExtractCitation(
         self,
-        document: types.Document,
+        document: List[str],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[List[partial_types.CitationEntity], List[types.CitationEntity]]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}

@@ -360,6 +360,40 @@ class DuckDBHelper:
         except Exception as e:
             logger.error(f"Batch upsert failed: {e}")
             return False
+
+    def store_citations_batch(self, citations: List[CitationEntity]) -> bool:
+        """
+        Batch upsert citations using a single DataFrame-based SQL query.
+
+        This avoids row-by-row INSERTs by registering a pandas DataFrame and
+        executing one INSERT OR REPLACE ... SELECT statement.
+        
+        Args:
+            citations: List of CitationEntity objects to store
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Convert citation objects to a DataFrame
+            records = [citation.to_duckdb_row() for citation in citations]
+            df = pd.DataFrame.from_records(records)
+            # Register as a temporary table
+            self.engine.register("citations_buffer", df)
+            # Bulk upsert with one SQL command
+            self.engine.execute("""
+                INSERT OR REPLACE INTO citations 
+                (data_citation, document_id, pages, evidence, created_at)
+                SELECT data_citation, document_id, pages, evidence, CURRENT_TIMESTAMP
+                FROM citations_buffer
+            """)
+            logger.info(f"Batch upserted {len(citations)} citations via DataFrame.")
+            # Clean up the temp view
+            self.engine.unregister("citations_buffer")
+            return True
+        except Exception as e:
+            logger.error(f"Batch citations upsert failed: {e}")
+            return False
     
     def get_chunks_by_document_id(self, document_id: str) -> List[Chunk]:
         """

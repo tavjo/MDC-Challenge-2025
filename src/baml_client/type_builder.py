@@ -44,7 +44,7 @@ class CitationEntityAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("CitationEntity")
-        self._properties: typing.Set[str] = set([ "evidence",  "data_citation",  "doc_id",  "pages", ])
+        self._properties: typing.Set[str] = set([ "evidence",  "data_citation", ])
         self._props = CitationEntityProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
@@ -79,14 +79,6 @@ class CitationEntityProperties:
     @property
     def data_citation(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("data_citation"))
-
-    @property
-    def doc_id(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("doc_id"))
-
-    @property
-    def pages(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("pages"))
 
     
 

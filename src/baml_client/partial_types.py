@@ -38,8 +38,6 @@ class StreamState(BaseModel, Generic[T]):
 class CitationEntity(BaseModel):
     evidence: List[str]
     data_citation: Optional[str] = None
-    doc_id: Optional[str] = None
-    pages: List[int]
 
 class Document(BaseModel):
     doi: Optional[str] = None

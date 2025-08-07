@@ -299,7 +299,7 @@ class ChromaRetriever:
             collection_name, self.model_name, use_fusion_scoring
         )
     
-    def retrieve_chunks(self, query_texts: List[str], query_embeddings: Optional[np.ndarray] = None, k: int = 3, doc_id_filter: Optional[str] = None) -> List[Chunk]:
+    def retrieve_chunks(self, query_texts: Optional[List[str]] = None, query_embeddings: Optional[np.ndarray] = None, k: int = 3, doc_id_filter: Optional[str] = None) -> List[Chunk]:
         """
         Retrieve top-K chunks using ChromaDB search + DuckDB data retrieval.
         
@@ -317,7 +317,7 @@ class ChromaRetriever:
         logger.info("Retrieving top-%d chunks for %d queries", k, len(query_texts))
         
         # Step 1: Generate embeddings for queries
-        if query_embeddings is None:
+        if query_embeddings is None and query_texts is not None:
             logger.info("Generating embeddings for queries")
             query_embeddings = _embed_text(query_texts)
 
@@ -483,8 +483,8 @@ class ChromaRetriever:
 # ---------------------------------------------------------------------------
 
 def retrieve_top_chunks(
-    query_texts: List[str],
-    collection_name: str,
+    query_texts: Optional[List[str]] = None,
+    collection_name: str = "mdc_training_data",
     k: int = 4,
     cfg_path: os.PathLike | None = Path(os.path.join(project_root, "configs", "chunking.yaml")),
     symbolic_boost: float = 0.15,
@@ -688,75 +688,123 @@ def batch_retrieve_top_chunks(
     )
     return batch_result
 
-
-# ---------------------------------------------------------------------------
-# Demo and Testing Functions
-# ---------------------------------------------------------------------------
-
-def demo_retrieval(
-    collection_name: str = "test_collection",
-    db_path: str = "artifacts/mdc_challenge.db"
-) -> List[Chunk]:
+@timer_wrap
+def batch_retrieve_top_chunks_val(
+    query_embeddings: Dict[str, np.ndarray],
+    max_workers: int = 1,
+    collection_name: str = "mdc_val_data",
+    k: int = 5,
+    cfg_path: os.PathLike | None = Path(os.path.join(project_root, "configs", "chunking.yaml")),
+    symbolic_boost: float = 0.15,
+    use_fusion_scoring: bool = True,
+    analyze_chunk_text: bool = False,
+    doc_ids: List[str] = []
+) -> BatchRetrievalResult:
     """
-    Demo function to test retrieval system (pending until actually run).
-    
+    Batch retrieve top-k chunks in parallel.
     Args:
-        collection_name: ChromaDB collection to search
-        db_path: Path to DuckDB database
-        
-    Returns:
-        List of retrieved chunks
+        query_embeddings: Dictionary mapping identifier to list of query texts
+        max_workers: Number of parallel worker threads
+        collection_name: ChromaDB collection name
+        k: Number of chunks to retrieve
+        cfg_path: Path to chunking config file (defaults to configs/chunking.yaml)
+        symbolic_boost: Multiplier for symbolic boosting (0.0 to disable)
+        use_fusion_scoring: Whether to enable fusion scoring with entity boosting
+        analyze_chunk_text: Whether to perform enhanced text analysis (slower but more accurate)
     """
-    logger.info("=== ChromaDB + DuckDB Retrieval Demo ===")
+    logger.info(f"---Starting Batch retrieval of top {k} chunks for {len(doc_ids)} documents---")
+    if len(doc_ids) < 1:
+        logger.warning("No document IDs provided. Retrieval will be performed without document ID filtering.")
+    else:
+        logger.info("Retrieving top %d chunks for %d documents", k, len(doc_ids))
     
-    try:
-        
-        # Example queries focused on data citations
-        demo_queries = [
-            "proteomics mass spectrometry dataset repository",
-            "RNA sequencing data deposited NCBI GEO", 
-            "supplementary data downloaded accessed",
-            "gene expression dataset accession number"
-        ]
-        
-        logger.info("Demo queries: %s", demo_queries)
-        
-        # Test basic retrieval
-        chunks = retrieve_top_chunks(
-            query_texts=demo_queries,
-            collection_name=collection_name,
-            k=5,
-            use_fusion_scoring=True,
-            analyze_chunk_text=False
-        )
-        
-        # Display results
-        logger.info("Retrieved %d chunks:", len(chunks))
-        for i, chunk in enumerate(chunks, 1):
-            logger.info(
-                "%d. Chunk %s (doc: %s): score=%.3f, tokens=%d",
-                i, chunk.chunk_id, chunk.document_id, 
-                chunk.score or 0.0, 
-                chunk.chunk_metadata.token_count if chunk.chunk_metadata else 0
-            )
-        
-        # Test enhanced text analysis
-        if chunks:
-            logger.info("\n=== Testing Enhanced Text Analysis ===")
-            enhanced_chunks = retrieve_top_chunks(
-                query_texts=demo_queries[:2],  # Use fewer queries for enhanced analysis
+    # Phase 1: Generate embeddings map
+    logger.info("Generating embeddings map")
+    query_embeddings_map = query_embeddings
+
+    # Phase 2: parallel retrieval per identifier
+    def _retrieve_single(doc_id_filter: str, query_embeddings: np.ndarray) -> RetrievalResult:
+        start = time.time()
+        try:
+            logger.info(f"Retrieving top {k} chunks for {doc_id_filter}")
+            retriever = get_retriever(cfg_path, collection_name, symbolic_boost, use_fusion_scoring)
+            # Use the thread-local retriever instance to avoid re-initialization
+            if analyze_chunk_text:
+                # perform text-analysis enhanced retrieval
+                chunks = retriever.retrieve_chunks_with_text_analysis(k=k, analyze_text=True, doc_id_filter=doc_id_filter, query_embeddings=[query_embeddings])
+            else:
+                chunks = retriever.retrieve_chunks(k=k, doc_id_filter=doc_id_filter, query_embeddings=[query_embeddings])
+            if len(chunks) == 0:
+                elapsed = time.time() - start
+                logger.warning(f"No chunks retrieved for {doc_id_filter}")
+                return RetrievalResult(
+                    collection_name=collection_name,
+                    success=False,
+                    error=f"No chunks retrieved for {doc_id_filter}",
+                    k=k,
+                    chunk_ids=[],
+                    median_score=0,
+                    max_score=0,
+                    retrieval_time=elapsed,
+                )
+            scores = [c.score or 0.0 for c in chunks]
+            elapsed = time.time() - start
+            logger.info(f"Retrieved {len(chunks)} chunks for {doc_id_filter} in {elapsed:.2f} seconds")
+            return RetrievalResult(
                 collection_name=collection_name,
-                k=3,
-                analyze_chunk_text=True
+                success=True,
+                error=None,
+                k=k,
+                chunk_ids=[c.chunk_id for c in chunks],
+                median_score=statistics.median(scores) if scores else None,
+                max_score=max(scores) if scores else None,
+                retrieval_time=elapsed,
             )
-            
-            logger.info("Enhanced analysis retrieved %d chunks", len(enhanced_chunks))
-        
-        return chunks
-        
-    except Exception as e:
-        logger.error("Demo retrieval failed: %s", e)
-        return []
+        except Exception as e:
+            elapsed = time.time() - start
+            return RetrievalResult(
+                collection_name=collection_name,
+                success=False,
+                error=str(e),
+                k=k,
+                chunk_ids=[],
+                median_score=0,
+                max_score=0,
+                retrieval_time=elapsed,
+            )
+
+    workers = min(max_workers, len(doc_ids)) if doc_ids else 1
+    with ThreadPoolExecutor(max_workers=workers) as exe:
+        futures = {
+            exe.submit(_retrieve_single, doc_id_filter=doc_id, query_embeddings=embeddings): doc_id
+            for doc_id, embeddings in query_embeddings_map.items()
+        }
+        results = [fut.result() for fut in as_completed(futures)]
+
+    # Phase 2: aggregate results into BatchRetrievalResult
+    total = len(results)
+    failed = sum(1 for r in results if not r.success)
+    times = [r.retrieval_time or 0.0 for r in results]
+    chunk_ids_map = {doc_id: r.chunk_ids for doc_id, r in zip(doc_ids, results)}
+    # Calculate batch-level statistics, handling empty score lists
+    valid_median_scores = [r.median_score for r in results if r.median_score is not None and r.median_score > 0]
+    valid_max_scores = [r.max_score for r in results if r.max_score is not None and r.max_score > 0]
+    
+    batch_result = BatchRetrievalResult(
+        collection_name=collection_name,
+        total_queries=total,
+        success=(failed == 0),
+        error=None,
+        k=k,
+        chunk_ids=chunk_ids_map,
+        median_score=statistics.median(valid_median_scores) if valid_median_scores else 0.0,
+        max_score=max(valid_max_scores) if valid_max_scores else 0.0,
+        avg_retrieval_time=sum(times)/total if total else None,
+        max_retrieval_time=max(times) if times else None,
+        total_failed_queries=failed,
+    )
+    return batch_result
+
 
 
 def analyze_collection_entities(
@@ -840,7 +888,3 @@ def analyze_collection_entities(
     finally:
         db_helper.close()
 
-
-if __name__ == "__main__":
-    """Run demo if script is executed directly."""
-    demo_retrieval()

@@ -26,9 +26,12 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 print(f"Project root: {project_root}")
 sys.path.append(project_root)
 
-from src.helpers import timer_wrap, initialize_logging, parallel_processing_decorator, export_docs, load_docs, normalise
+from src.helpers import timer_wrap, initialize_logging
 from src.models import CitationEntity, Document
 from src.baml_client import b as baml
+from api.utils.duckdb_utils import DuckDBHelper
+
+DEFAULT_DUCKDB_PATH = "../artifacts/mdc_challenge.db"
 
 
 filename = os.path.basename(__file__)
@@ -42,11 +45,13 @@ class CitationEntityExtractor:
                  known_entities: bool = True,
                  labels_file: Optional[str] = "train_labels.csv", 
                  draw_subset: bool = False,
-                 subset_size: Optional[int] = None
+                 subset_size: Optional[int] = None,
+                 db_path: str = DEFAULT_DUCKDB_PATH
                 #  use_ner: bool = True
                  ):  # Add this parameter
         logger.info(f"Initializing CitationEntityExtractor with data directory: {data_dir}")
         self.data_dir = os.path.join(project_root, data_dir)
+        self.db_path = db_path
         self.known_entities = known_entities
         self.files_dir = os.path.join(self.data_dir,"train","PDF") # assumes similar directory structure as me. 
         self.pdf_files : List[str] = [os.path.join(self.files_dir, f) for f in os.listdir(self.files_dir) if f.endswith('.pdf')]
@@ -62,7 +67,6 @@ class CitationEntityExtractor:
             logger.info("No known entities provided. Using regex patterns to extract citation entities.")
             self.labels_path = None
             self.labels_df = pd.DataFrame(columns = ["article_id", "dataset_id"])
-            # self.patterns = PATTERNS
             self.article_ids = [Path(file).stem for file in self.pdf_files]
 
         
@@ -77,12 +81,15 @@ class CitationEntityExtractor:
             self.pdf_files = self.subset_ids
             self.docs = np.random.choice(self.docs, self.subset_size, replace=False)
     
-    # @parallel_processing_decorator(batch_param_name="pdf_files", batch_size=10, max_workers=8, flatten=True)
+
     def _load_doc_pages(self) -> List[Document]:
         """
         load all document pages into memory once.
         """
-        return load_docs()
+        db_helper = DuckDBHelper(self.db_path)
+        docs = db_helper.get_all_documents()
+        db_helper.close()
+        return docs
     
     def _make_pattern(self, ds_id: str) -> re.Pattern:
         # 1. escape *everything* first
@@ -210,78 +217,33 @@ class CitationEntityExtractor:
             return self.extract_known_entities()
         else:
             return self.bulk_baml_extraction()
-    
-    def export_entities(self, output_file: str = "citation_entities.json") -> None:
+        
+    def save_entities(self) -> None:
         """
-        Export the list of CitationEntity objects as plain dicts,
-        avoiding double-encoded JSON strings.
+        Save the list of CitationEntity objects to a DuckDB table.
         """
-        outfile = os.path.join(self.data_dir, output_file)
-        logger.info(f"Exporting {len(self.citation_entities)} entities to {outfile}")
-        # Use model_dump() to get a JSON-serializable dict directly
-        to_export = [entity.model_dump() for entity in self.citation_entities]
-        with open(outfile, "w") as f:
-            json.dump(to_export, f, indent=4)
+        db_helper = DuckDBHelper(self.db_path)
+        db_helper.store_citations_batch(self.citation_entities)
+        db_helper.close()
+        logger.info(f"Saved {len(self.citation_entities)} entities to {self.db_path}")
 
 
-    def load_entities(self, input_file: str = "citation_entities.json") -> List[CitationEntity]:
+    def load_entities(self) -> List[CitationEntity]:
         """
         Load citation entities from a JSON file of dicts,
         reconstructing each via Pydantic’s model_validate.
         """
-        infile = os.path.join(self.data_dir, input_file)
-        logger.info(f"Loading citation entities from {infile}")
-        with open(infile, "r") as f:
-            raw = json.load(f)  # List[dict]
-        # Validate and instantiate each model in one step
-        return [CitationEntity.model_validate(item) for item in raw]
-    
-    def _update_doc_with_entities(self, doc: Document, citation_entities: List[CitationEntity]) -> Document:
-        """
-        Update the documents with the citation entities.
-        """
-        doc.citation_entities = citation_entities
-        return doc
-    
-    def update_docs_with_entities(self) -> None:
-        """
-        Update the documents with the citation entities.
-        """
-        # new_docs = []
-        for doc in self.docs:
-            citations = []
-            for citation in self.citation_entities:
-                if doc.doi == citation.document_id:
-                    citations.append(citation)
-                    doc = self._update_doc_with_entities(doc, citations)
-                    break # break out of the loop after finding the first citation entity for the document
-        # self.docs = new_docs
-        return self.docs
-    
-    def export_updated_docs(self, output_file: str = "documents.json") -> None:
-        output_file = os.path.join(self.data_dir, "train", output_file)
-        self.update_docs_with_entities()
-        export_docs(self.docs, output_file=output_file)
-        logger.info(f"Exported {len(self.docs)} updated documents to {output_file}")   
+        db_helper = DuckDBHelper( self.db_path)
+        citations = db_helper.get_all_citation_entities()
+        db_helper.close()
+        return [CitationEntity.model_validate(citation) for citation in citations]
 
 @timer_wrap
 def main():
-    # extractor = CitationEntityExtractor(data_dir="Data", known_entities=False, labels_file="train_labels.csv", draw_subset=True, subset_size = 2)
-    # extractor.extract_entities()
-    # if len(extractor.citation_entities) > 0:
-    #     extractor.export_entities(output_file = "citation_entities_unknown.json")
-    #     extractor.export_updated_docs(output_file = "documents_with_unknown_entities.json")
-    # else:
-    #     logger.warning("No citation entities found. Skipping export.")
-
-    # rerun with known entities
-    extractor = CitationEntityExtractor(data_dir="Data", known_entities=True, labels_file="train_labels.csv", draw_subset=False)
+    extractor = CitationEntityExtractor(data_dir="Data", known_entities=True, labels_file="train_labels.csv", draw_subset=False, db_path=DEFAULT_DUCKDB_PATH)
     extractor.extract_entities()
-    if len(extractor.citation_entities) > 0:
-        extractor.export_entities(output_file = "citation_entities_known.json")
-        extractor.export_updated_docs(output_file = "documents_with_known_entities.json")
-    else:
-        logger.warning("No citation entities found. Skipping export.")
+    extractor.save_entities()
+    logger.info(f"Saved {len(extractor.citation_entities)} entities to {extractor.db_path}")
 
 
 if __name__ == "__main__":
