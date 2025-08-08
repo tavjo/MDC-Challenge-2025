@@ -9,6 +9,15 @@ client<llm> CustomGPT4oMini {
   }
 }
 
+client<llm> NanoGPT {
+  provider openai
+  retry_policy Exponential
+  options {
+    model "gpt-4.1-nano"
+    api_key env.OPENAI_API_KEY
+  }
+}
+
 client<llm> CustomGemini {
   provider google-ai
   retry_policy Constant
@@ -34,7 +43,7 @@ client<llm> MyLocalLLM {
   provider ollama
   options {
     // base_url "http://localhost:11434/v1"
-    model "gpt-oss:latest"
+    model "qwen3:latest"
   }
 }
 

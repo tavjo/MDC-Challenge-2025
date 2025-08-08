@@ -24,6 +24,8 @@ import pandas as pd
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
+from src.helpers import initialize_logging, timer_wrap
+
 # logging
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
@@ -51,7 +53,7 @@ from typing import Dict, List, Optional
 import numpy as np
 import requests
 
-
+@timer_wrap
 class GlobalFeatures:
     def __init__(self,
                  base_api_url: str = API_ENDPOINTS["base_api_url"],
@@ -123,7 +125,7 @@ class GlobalFeatures:
             logger.info("Loading datasets from DuckDB...")
             datasets = self.db_helper.get_all_datasets()
             logger.info(f"✅ Successfully loaded {len(datasets)} datasets from DuckDB")
-            self.db_helper.close()
+            # self.db_helper.close()
             self.datasets = datasets
             return datasets
         except Exception as e:

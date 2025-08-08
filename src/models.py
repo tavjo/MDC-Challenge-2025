@@ -410,6 +410,10 @@ class RetrievalPayload(BaseModel):
 
 class ValRetrievalPayload(BaseModel):
     """Payload for the retrieval API"""
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "json_encoders": {np.ndarray: lambda v: v.tolist()}
+    }
     query_embeddings: Dict[str, np.ndarray] = Field(..., description="Dictionary of dataset ID to query embeddings to search for")
     doc_ids: List[str] = Field(..., description="List of document IDs to search for")
     collection_name: str = Field(..., description="Name of the collection in ChromaDB")
