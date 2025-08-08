@@ -180,7 +180,7 @@ def load_pdf_pages(pdf_path: str) -> List[str]:
         raise e
 
 @timer_wrap
-@parallel_processing_decorator(batch_param_name="pdf_files", batch_size=50, max_workers=8, flatten=True)
+# @parallel_processing_decorator(batch_param_name="pdf_files", batch_size=50, max_workers=8, flatten=True)
 def get_all_pdfs(pdf_files: List[str], pdf_dir: str, subset: bool = False, subset_size: int = 20):
     """
     Load and save all PDFs as a single pickle file in a directory.

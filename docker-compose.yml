@@ -15,36 +15,6 @@ x-common-env: &common-env
 
 # ---------- services ----------
 services:
-  # 1️⃣  Document-parsing API  (builds from ./Dockerfile)
-  mdc-parse:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: mdc-parse:latest
-    container_name: mdc-parse
-    environment:
-      <<: *common-env
-      # OPENAI_API_KEY: ${OPENAI_API_KEY}
-      # GEMINI_API_KEY: ${GEMINI_API_KEY}
-    volumes:
-      - uv-cache:/tmp/uv-cache
-      - ./Data:/app/Data
-      - ./src:/app/src
-      - ./artifacts:/app/artifacts
-      - ./tests:/app/tests
-      - ./configs:/app/configs
-      - ./api:/app/api
-      - ./logs:/app/logs
-    ports:
-      - "3000:3000"
-    restart: unless-stopped
-    command: ["uvicorn", "api.parse_doc_api:app", "--host", "0.0.0.0", "--port", "3000"]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/health || exit 1"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-
   # 2️⃣  Chunk-and-embed micro-service  (builds from ./Dockerfile.api)
   mdc-api:
     build:
@@ -54,9 +24,10 @@ services:
     container_name: mdc-challenge-api
     environment:
       <<: *common-env
-      # OPENAI_API_KEY: ${OPENAI_API_KEY}
-      # GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     volumes:
+      - ./Data:/app/Data
       - uv-cache:/tmp/uv-cache
       - ./offline_models:/app/offline_models
       - ./artifacts:/app/artifacts
@@ -75,20 +46,6 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
-
-  # 3️⃣  Dev shell (profile “dev”)
-  mdc-dev:
-    image: mdc-parse:latest            # re-uses built image
-    profiles: ["dev"]
-    container_name: mdc-challenge-dev
-    environment:
-      <<: *common-env
-    volumes:
-      - ./:/app
-      - uv-cache:/tmp/uv-cache
-      - offline_models:/app/offline_models
-    working_dir: /app
-    command: ["tail", "-f", "/dev/null"]
 
   # 4️⃣  Test runner (profile “test”)
   mdc-test:

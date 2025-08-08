@@ -12,7 +12,8 @@ sys.path.append(project_root)
 
 from src.helpers import timer_wrap, initialize_logging, compute_file_hash, num_tokens
 from src.models import Document
-from src.extract_pdf_text_unstructured import load_pdf_pages
+# from src.extract_pdf_text_unstructured import load_pdf_pages
+from src.extract_pdf_text_light import load_pdf_pages, extract_xml_text
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
@@ -24,25 +25,43 @@ def build_document_object(pdf_path: str):
     else:
         logger.error(f"PDF file does not exist: {pdf_path}")
         return None
+    # identify the document type
+    doc_type = Path(pdf_path).suffix.lower()
     article_id = Path(pdf_path).stem
     # Suppress pdfminer warnings about CropBox/MediaBox
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
-    pages = load_pdf_pages(pdf_path)
-    total_char_length = sum(len(page) for page in pages)
-    parsed_timestamp = datetime.now(timezone.utc).isoformat()
-    # calculate total tokens
-    total_tokens = sum([num_tokens(page) for page in pages])
-    document = Document(
-        doi=article_id,
-        full_text=pages,
-        total_char_length=total_char_length,
-        parsed_timestamp=parsed_timestamp,
-        file_hash=compute_file_hash(pdf_path),
-        file_path=pdf_path,
-        n_pages = len(pages),
-        total_tokens=total_tokens
-    )
+    if doc_type == ".pdf":
+        pages = load_pdf_pages(pdf_path)
+        total_char_length = sum(len(page) for page in pages)
+        # calculate total tokens
+        total_tokens = sum([num_tokens(page) for page in pages])
+        document = Document(
+            doi=article_id,
+            full_text=pages,
+            total_char_length=total_char_length,
+            parsed_timestamp=datetime.now(timezone.utc).isoformat(),
+            file_hash=compute_file_hash(pdf_path),
+            file_path=pdf_path,
+            n_pages = len(pages),
+            total_tokens=total_tokens
+        )
+    elif doc_type == ".xml":
+        full_text = extract_xml_text(pdf_path)
+        total_char_length = len(full_text)
+        total_tokens = num_tokens(full_text)
+        document = Document(
+            doi=article_id,
+            full_text=full_text,
+            total_char_length=total_char_length,
+            parsed_timestamp=datetime.now(timezone.utc).isoformat(),
+            file_hash=compute_file_hash(pdf_path),
+            file_path=pdf_path,
+            total_tokens=total_tokens
+        )
+    else:
+        logger.error(f"Unsupported document type: {doc_type}")
+        return None
     return document
 
 @timer_wrap

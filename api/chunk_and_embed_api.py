@@ -20,20 +20,20 @@ project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 from src.models import (
-    Document, ChunkingResult, EmbeddingResult, ChunkingPipelinePayload, RetrievalPayload, BatchRetrievalResult, EmbeddingPayload, DatasetConstructionResult, DatasetConstructionPayload, NeighborhoodStatsPayload,
+    ChunkingResult, EmbeddingResult, ChunkingPipelinePayload, RetrievalPayload, BatchRetrievalResult, EmbeddingPayload, DatasetConstructionResult, DatasetConstructionPayload, NeighborhoodStatsPayload,
     LoadChromaDataPayload, LoadChromaDataResult,
-    ValRetrievalPayload
+    ValRetrievalPayload, BulkParseRequest
     )
 from api.services.chunking_and_embedding_services import run_semantic_chunking_pipeline
 from api.services.retriever_services import batch_retrieve_top_chunks, load_embeddings, batch_retrieve_top_chunks_val
-from src.helpers import initialize_logging
+from src.helpers import initialize_logging, timer_wrap, export_docs
 from src.semantic_chunking import sliding_window_chunk_text
 # from api.utils.duckdb_utils import get_duckdb_helper
 from api.services.embeddings_services import get_embedding_result
 from api.services.dataset_construction_service import construct_datasets_from_retrieval_results
 from api.services.neighborhood_stats import run_neighborhood_stats_pipeline as run_neighborhood_stats_pipeline_service
-
-
+from api.utils.duckdb_utils import DuckDBHelper
+from api.services.document_parsing_service import build_document_objects, build_document_object
 
 # Initialize logging
 filename = os.path.basename(__file__)
@@ -266,74 +266,60 @@ async def run_pipeline(
         logger.error(f"Pipeline failed with error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Pipeline failed: {str(e)}")
 
-@app.post("/chunk/documents", response_model=ChunkingResult)
-async def chunk_specific_documents(
-    documents: List[Document],
-    db_path: Optional[str] = Query(DEFAULT_DUCKDB_PATH, description="Path to DuckDB database"),
-    collection_name: Optional[str] = Query("mdc_training_data", description="ChromaDB collection name"),
-    chunk_size: Optional[int] = Query(200, description="Target chunk size in tokens"),
-    chunk_overlap: Optional[int] = Query(20, description="Overlap between chunks in tokens")
-):
-    """
-    Process specific documents through the chunking pipeline.
-    
-    This endpoint temporarily stores the provided documents in DuckDB and then
-    runs the chunking pipeline on them.
-    """
+# Parse a single document
+@app.get("/parse_doc")
+async def parse_doc(pdf_path: str):
+    helper = DuckDBHelper(DEFAULT_DUCKDB_PATH)
     try:
-        logger.info(f"Processing {len(documents)} specific documents")
-        
-        # Connect to DuckDB and temporarily store documents
-        conn = duckdb.connect(db_path)
-        
-        # Insert documents temporarily (we'll use INSERT OR REPLACE to handle duplicates)
-        for doc in documents:
-            doc_row = doc.to_duckdb_row()
-            conn.execute("""
-                INSERT OR REPLACE INTO documents 
-                (doi, has_dataset_citation, full_text, total_char_length, 
-                 parsed_timestamp, total_chunks, total_tokens, avg_tokens_per_chunk,
-                 file_hash, file_path, citation_entities, n_pages, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                doc_row["doi"],
-                doc_row["has_dataset_citation"],
-                doc_row["full_text"],
-                doc_row["total_char_length"],
-                doc_row["parsed_timestamp"],
-                doc_row["total_chunks"],
-                doc_row["total_tokens"],
-                doc_row["avg_tokens_per_chunk"],
-                doc_row["file_hash"],
-                doc_row["file_path"],
-                doc_row["citation_entities"],
-                doc_row["n_pages"],
-                doc_row["created_at"],
-                doc_row["updated_at"]
-            ))
-        
-        conn.commit()
-        conn.close()
-        
-        # Run the pipeline on the stored documents
-        pipeline_params = {
-            "output_dir": "Data",
-            "chunk_size": chunk_size,
-            "chunk_overlap": chunk_overlap,
-            "collection_name": collection_name,
-            "cfg_path": DEFAULT_CHROMA_CONFIG,
-            "use_duckdb": True,
-            "db_path": db_path
-        }
-        
-        result = run_semantic_chunking_pipeline(**pipeline_params)
-        
-        logger.info(f"Document processing completed with success: {result.success}")
-        return result
-        
+        document = build_document_object(pdf_path=pdf_path)
+        helper.store_document(document)
+        return {"message": "Document parsed and stored successfully"}
     except Exception as e:
-        logger.error(f"Document processing failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Document processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        helper.close()
+
+# Parse multiple documents at once
+@app.post("/bulk_parse_docs")
+async def parse_docs(payload: BulkParseRequest):
+    pdf_paths = payload.pdf_paths
+    export_file = payload.export_file
+    export_path = payload.export_path
+    subset = payload.subset
+    subset_size = payload.subset_size
+    max_workers = payload.max_workers
+    params = {
+        "pdf_paths": pdf_paths,
+        "subset": subset,
+        "subset_size": subset_size,
+        "max_workers": max_workers
+    }
+    helper = DuckDBHelper(DEFAULT_DUCKDB_PATH)
+    try:
+        documents = build_document_objects(**params)
+        if not documents:
+            logger.error(f"No document objects built: {pdf_paths}")
+            raise HTTPException(status_code=400, detail="No document objects built")
+        success = helper.batch_upsert_documents(documents)
+        if not success:
+            logger.error(f"Failed to store documents: {documents}")
+            raise HTTPException(status_code=500, detail="Failed to store documents")
+        # also export as a json file
+        if export_file:
+            export_docs(documents, output_file=export_file, output_dir=export_path)
+        elif export_path:
+            export_docs(documents, output_dir=export_path)
+        elif export_file and export_path:
+            export_docs(documents, output_file=export_file, output_dir=export_path)
+        else:
+            export_docs(documents)
+        return {"message": f"{len(documents)} Documents parsed and stored successfully"}
+    except Exception as e:
+        logger.error(f"Error parsing documents: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        helper.close()
+
 
 @app.get("/health")
 async def health_check(db_path: Optional[str] = Query(DEFAULT_DUCKDB_PATH, description="Path to DuckDB database"), model_name: Optional[str] = Query("bge-small-en-v1.5", description="Model name")):

@@ -571,7 +571,7 @@ def batch_retrieve_top_chunks(
     cfg_path: os.PathLike | None = Path(os.path.join(project_root, "configs", "chunking.yaml")),
     symbolic_boost: float = 0.15,
     use_fusion_scoring: bool = True,
-    analyze_chunk_text: bool = False,
+    analyze_chunk_text: bool = True,
     doc_id_map: Dict[str, str] = {}
 ) -> BatchRetrievalResult:
     """
@@ -697,7 +697,7 @@ def batch_retrieve_top_chunks_val(
     cfg_path: os.PathLike | None = Path(os.path.join(project_root, "configs", "chunking.yaml")),
     symbolic_boost: float = 0.15,
     use_fusion_scoring: bool = True,
-    analyze_chunk_text: bool = False,
+    analyze_chunk_text: bool = True,
     doc_ids: List[str] = []
 ) -> BatchRetrievalResult:
     """

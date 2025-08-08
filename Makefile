@@ -1,14 +1,13 @@
 # Makefile – MDC Challenge 2025 (Compose-Spec edition)
 .PHONY: help build build-no-cache up down start stop restart logs \
-        clean dev-shell api-shell parse-shell status ps \
+        clean dev-shell api-shell status ps \
         build-up build-up-no-cache \
-        logs-parse logs-api \
-        test-main test-api test-unit test \
+        logs-api \
+        test-api test-unit test \
         dev prod-setup clean-images clean-all
 
 # ---------- variables ----------
 COMPOSE=docker compose                      # canonical Compose v2 CLI
-SERVICE_PARSE=mdc-parse                    # from compose.yaml
 SERVICE_API=mdc-api
 SERVICE_DEV=mdc-dev
 SERVICE_TEST=mdc-test
@@ -68,16 +67,10 @@ build-up-no-cache: ## Build (no cache) & start
 
 # ---------- logs ----------
 logs: ## Follow logs for both services
-	$(COMPOSE) logs -f $(SERVICE_PARSE) $(SERVICE_API)
-
-logs-parse: ## Logs for parse service
-	$(COMPOSE) logs -f $(SERVICE_PARSE)
+	$(COMPOSE) logs -f $(SERVICE_API)
 
 logs-api: ## Logs for chunk-and-embed API
 	$(COMPOSE) logs -f $(SERVICE_API)
-
-# backward-compat aliases
-logs-main: logs-parse
 
 # ---------- status ----------
 status: ## Show container status
@@ -93,19 +86,13 @@ dev-shell: ## Interactive shell in dev container (profile dev)
 api-shell: ## Shell in API container
 	$(COMPOSE) exec $(SERVICE_API) /bin/bash
 
-parse-shell: ## Shell in parse container
-	$(COMPOSE) exec $(SERVICE_PARSE) /bin/bash
-
-# backward-compat alias
-main-shell: parse-shell
-
 # ---------- clean ----------
 clean: ## Stop & remove containers/vols/orphans
 	$(COMPOSE) down --volumes --remove-orphans
 	$(COMPOSE) --profile dev down --volumes --remove-orphans
 
 clean-images: ## Remove project images
-	-docker image rm -f mdc-parse:latest mdc-chunk-api:latest || true
+	-docker image rm -f  mdc-chunk-api:latest || true
 
 clean-all: clean clean-images ## Full clean
 
@@ -120,10 +107,6 @@ prod-setup: build-no-cache up ## Prod-like build & start
 test-unit: ## Run unit tests inside API container
 	$(COMPOSE) run --rm $(SERVICE_API) \
 	  pytest tests/test_chunking_and_embedding_services.py -q --disable-warnings --maxfail=1
-
-test-main: ## Quick health check on parse API
-	curl -f http://localhost:3000/health 2>/dev/null || \
-	  echo "$(YELLOW)Parse API not responding$(NC)"
 
 test-api: ## Quick health check on chunk API
 	curl -f http://localhost:8000/health 2>/dev/null || \
