@@ -254,6 +254,12 @@ class GlobalFeatures:
             logger.error(f"Error saving PCA features: {str(e)}")
             return False
     
+    def run_sample_umap_and_pca(self) -> Optional[Dict[str, np.ndarray]]:
+        """Run UMAP and PCA on the sample dataset."""
+        umap_results = self.run_sample_umap()
+        pca_results = self.run_sample_pca()
+        return {**umap_results, **pca_results}
+    
     #########################################################
     # Feature UMAP + PCA
     #########################################################
@@ -368,7 +374,7 @@ class GlobalFeatures:
             logger.error(f"PCA reduction failed: {str(e)}")
             return pd.DataFrame()
         
-    def feature_decomposition(self, embeddings: Dict[str, np.ndarray], output_path: str = "feature_decomposition.pkl") -> pd.DataFrame:
+    def run_feature_decomposition(self, embeddings: Dict[str, np.ndarray], output_path: str = "feature_decomposition.pkl") -> pd.DataFrame:
         """Run feature UMAP + PCA, combine results, and save to pickle."""
         import pickle
         

@@ -38,6 +38,8 @@ DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
 
+DEFAULT_GLOBALS_PATH = "../../artifacts/feature_decomposition.pkl"
+
 
 @timer_wrap
 class UnknownCitationEntityExtractor:
@@ -76,6 +78,7 @@ class UnknownCitationEntityExtractor:
         self.symbolic_boost = symbolic_boost
         self.use_fusion_scoring = use_fusion_scoring
         self.analyze_chunk_text = analyze_chunk_text
+        self.globals_path = globals_path
         if draw_subset:
             self.subset_size = subset_size if subset_size is not None else 20
             logger.info(f"Drawing subset of {self.subset_size} files from {len(self.pdf_files)} files.")

@@ -7,7 +7,7 @@ specification from chunk_and_embedding_api.md.
 
 import sys, os
 from pathlib import Path
-from typing import List, Iterable, Union, Tuple, Dict, Any, Optional
+from typing import List, Iterable, Union, Tuple, Dict, Any, Optional, Literal
 
 import duckdb
 import pandas as pd  # for bulk DataFrame-based upserts
@@ -759,6 +759,17 @@ class DuckDBHelper:
         except Exception as e:
             logger.error(f"Failed to delete PCA features: {str(e)}")
             return False
+    
+    def get_counts(self, table_name: Literal["documents", "citations", "chunks", "datasets", "engineered_feature_values"]) -> Union[Dict[str, int], None]:
+        """Get counts of all rows in a table."""
+        try:
+            result = self.engine.execute(f"SELECT COUNT(*) FROM {table_name}")
+            count = result.fetchone()[0]
+            logger.info(f"✅ {table_name} has {count} rows")
+            return {table_name: count}
+        except Exception as e:
+            logger.error(f"Failed to get counts for {table_name}: {str(e)}")
+            return None
     
     def get_full_dataset_dataframe(
         self,
