@@ -37,4 +37,5 @@ dependencies = [
     "imbalanced-learn>=0.12.4",
     "pymupdf>=1.24.10",
     "pdfminer.six>=20231228",
+    "unstructured[all]>=0.18.11",
 ]

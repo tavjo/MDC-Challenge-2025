@@ -97,6 +97,7 @@ services:
       - ./:/app
       - uv-cache:/tmp/uv-cache
       - offline_models:/app/offline_models
+      - ./tests:/app/tests
     working_dir: /app
     command: ["pytest", "tests/test_chunking_and_embedding_services.py", "-q",
               "--disable-warnings", "--maxfail=1"]

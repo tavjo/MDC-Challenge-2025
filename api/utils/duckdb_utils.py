@@ -240,6 +240,47 @@ class DuckDBHelper:
             logger.error(f"Failed to store documents: {str(e)}")
             return False
 
+    def update_document_text(self, document: Document) -> bool:
+        """Safely update text-related fields for an existing document without REPLACE.
+
+        Avoids foreign-key violations caused by INSERT OR REPLACE when other tables
+        reference `documents(doi)`.
+
+        Fields updated:
+        - full_text, total_char_length, parsed_timestamp, file_hash, file_path,
+          n_pages, total_tokens
+        """
+        try:
+            doc_row = document.to_duckdb_row()
+            self.engine.execute(
+                """
+                UPDATE documents
+                SET full_text = ?,
+                    total_char_length = ?,
+                    parsed_timestamp = ?,
+                    file_hash = ?,
+                    file_path = ?,
+                    n_pages = ?,
+                    total_tokens = ?
+                WHERE doi = ?
+                """,
+                (
+                    doc_row["full_text"],
+                    doc_row["total_char_length"],
+                    doc_row["parsed_timestamp"],
+                    doc_row["file_hash"],
+                    doc_row["file_path"],
+                    doc_row["n_pages"],
+                    doc_row["total_tokens"],
+                    doc_row["doi"],
+                ),
+            )
+            logger.info(f"Updated text fields for document {document.doi}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update text fields for document {document.doi}: {e}")
+            return False
+
     def batch_upsert_documents(self, documents: List[Document]) -> Dict[str, Any]:
         """
         Batch-upsert Document objects using a DataFrame buffer approach.

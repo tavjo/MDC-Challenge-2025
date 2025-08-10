@@ -121,7 +121,9 @@ test-api: ## Test chunking API endpoints (assuming it runs on port 8000)
 
 test-unit: ## Run unit tests inside API container
 	@echo "$(YELLOW)Running unit tests...$(NC)"
-	docker compose run --rm mdc-api pytest tests/test_chunking_and_embedding_services.py -q --disable-warnings --maxfail=1
+	docker compose --profile test up --build -d mdc-test
+	docker compose --profile test logs -f mdc-test | cat
+	docker compose --profile test down
 
 # Modify test target to include unit tests
 test: ## Test both API endpoints and unit tests

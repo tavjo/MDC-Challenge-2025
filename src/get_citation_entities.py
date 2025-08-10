@@ -82,7 +82,6 @@ class CitationEntityExtractor:
             self.pdf_files = self.subset_ids
             self.docs = np.random.choice(self.docs, self.subset_size, replace=False)
     
-
     def _load_doc_pages(self) -> List[Document]:
         """
         load all document pages into memory once.
@@ -100,13 +99,18 @@ class CitationEntityExtractor:
         - Keeps alphanumeric token order intact
         - Adds word boundaries for simple accession-like IDs
         """
+        # First, build accession-aware patterns for known ID families
+        accession_pat = self._build_accession_pattern(ds_id)
+        if accession_pat is not None:
+            return accession_pat
+
         ds_id_norm = clean_text_for_urls(ds_id).strip()
         # Split on common separators, keep alnum tokens
         tokens = [t for t in re.split(r"[-_/:.\s]+", ds_id_norm) if t]
         if not tokens:
             tokens = [ds_id_norm]
-        # Join tokens with a flexible separator class (including optional spaces)
-        sep = r"[-_/:.\s]*"
+        # Join tokens with a flexible separator class (including optional spaces, NBSP, and Unicode dashes)
+        sep = r"[\s\u00A0\-\u2010-\u2015_/:.,]*"
         pat = sep.join(re.escape(t) for t in tokens)
 
         # Word boundaries for simple accessions (avoid overmatching inside words)
@@ -114,45 +118,152 @@ class CitationEntityExtractor:
             pat = rf"\b{pat}\b"
 
         return re.compile(pat, flags=re.IGNORECASE)
+
+    def _build_accession_pattern(self, ds_id: str) -> Optional[re.Pattern]:
+        """Return a compiled regex tailored for common accession-like IDs, or None.
+
+        Families handled:
+        - PXD\d+
+        - SRR\d+
+        - ERR\d+
+        - E-PROT-\d+ (and tolerant hyphen/space variants)
+        - ENS[A-Z]+\d+
+        - UniProt 6 or 10 character accessions
+        - Generic: ^[A-Z0-9]{2,6}\d{3,}$
+
+        All variants allow optional spaces/hyphens between logical parts.
+        """
+        s = ds_id.strip()
+        flags = re.IGNORECASE
+
+        def join_chars_with_seps(text: str) -> str:
+            # Build a pattern that allows optional separators between every character
+            # Escapes each character for safety
+            pieces = [re.escape(c) for c in text]
+            # Allow spaces, NBSP, unicode dashes, underscores, commas, and periods as soft separators in PDFs
+            return r"[\s\u00A0\-\u2010-\u2015_,.]*".join(pieces)
+
+        # PXD / SRR / ERR with exact digit counts
+        m = re.match(r"(?i)^(PXD|SRR|ERR)(\d+)$", s)
+        if m:
+            prefix, digits = m.group(1).upper(), m.group(2)
+            prefix_pat = join_chars_with_seps(prefix)
+            # enforce the exact number of digits, allowing optional separators between digits
+            digit_pat = rf"(?:\d[\s\u00A0\-\u2010-\u2015_,.]*){{{len(digits)}}}"
+            pat = rf"\b{prefix_pat}[\s\u00A0\-\u2010-\u2015]*{digit_pat}\b"
+            return re.compile(pat, flags=flags)
+
+        # E-PROT-\d+ (tolerate missing or extra hyphens/spaces around parts)
+        m = re.match(r"(?i)^E-?PROT-?(\d+)$", s)
+        if m:
+            digits = m.group(1)
+            e_pat = join_chars_with_seps("E")
+            prot_pat = join_chars_with_seps("PROT")
+            digit_pat = rf"(?:\d[\s\u00A0\-\u2010-\u2015_,.]*){{{len(digits)}}}"
+            seps = r"[\s\u00A0\-\u2010-\u2015]*"
+            pat = rf"\b{e_pat}{seps}{prot_pat}{seps}-?{seps}{digit_pat}\b"
+            return re.compile(pat, flags=flags)
+
+        # ENS[A-Z]+\d+ (letters segment preserved exactly, with optional separators)
+        m = re.match(r"(?i)^(ENS)([A-Z]+)(\d+)$", s)
+        if m:
+            prefix, letters, digits = m.group(1).upper(), m.group(2).upper(), m.group(3)
+            prefix_pat = join_chars_with_seps(prefix)
+            letters_pat = r"[\s\u00A0\-\u2010-\u2015_,.]*".join(re.escape(ch) for ch in letters)
+            digit_pat = rf"(?:\d[\s\u00A0\-\u2010-\u2015_,.]*){{{len(digits)}}}"
+            pat = rf"\b{prefix_pat}[\s\u00A0\-\u2010-\u2015]*{letters_pat}[\s\u00A0\-\u2010-\u2015]*{digit_pat}\b"
+            return re.compile(pat, flags=flags)
+
+        # UniProt accessions (6 or 10 chars). Reference pattern (simplified):
+        # - 6-char: (?:[OPQ][0-9][A-Z0-9]{3}[0-9])|(?:[A-NR-Z][0-9][A-Z][A-Z0-9]{2}[0-9])
+        # - Optional 4-char extension: (?:[A-Z0-9]{3}[0-9])? to make 10 chars
+        uniprot_re = re.compile(
+            r"(?ix)^(?: (?:[OPQ][0-9][A-Z0-9]{3}[0-9]) | (?:[A-NR-Z][0-9][A-Z][A-Z0-9]{2}[0-9]) )(?:[A-Z0-9]{3}[0-9])?$"
+        )
+        if uniprot_re.match(s):
+            # Allow optional separators between EVERY character to catch splits in text
+            per_char = join_chars_with_seps(s)
+            pat = rf"\b{per_char}\b"
+            return re.compile(pat, flags=flags)
+
+        # Generic accession: short alnum head then 3+ trailing digits
+        if re.match(r"(?i)^[A-Z0-9]{2,6}\d{3,}$", s):
+            # Build a per-character tolerant matcher with word boundaries
+            per_char = join_chars_with_seps(s)
+            pat = rf"\b{per_char}\b"
+            return re.compile(pat, flags=flags)
+
+        return None
     
     def _generate_id_variants(self, dataset_id: str) -> List[str]:
         """Produce tolerant variants for a labeled dataset_id.
 
         - Strip DOI host, optional ".vN" suffix, optional "/tN" suffix
-        - Keep original as first candidate
+        - Strip terminal dot-number (e.g., dryad.5q1sb.1 -> dryad.5q1sb)
+        - Keep original as first candidate and cleaned URL variant
         - Map E-GEOD-12345 -> GSE12345 synonym
         """
         variants: Set[str] = set()
         raw = dataset_id.strip()
-        norm = clean_text_for_urls(raw)
         variants.add(raw)
-        variants.add(norm)
-        no_ver = re.sub(r"(?i)\.v\d+$", "", norm)
+        # cleaned URL variant (fixes spaced 'doi . org', etc.)
+        cleaned = clean_text_for_urls(raw)
+        variants.add(cleaned)
+        # DOI host stripped
+        host_stripped = re.sub(r"(?i)^https?://(?:dx\.)?doi\.org/", "", cleaned)
+        variants.add(host_stripped)
+        # common suffix normalization
+        no_ver = re.sub(r"(?i)\.v\d+$", "", host_stripped)
         variants.add(no_ver)
         no_tbl = re.sub(r"(?i)/t\d+$", "", no_ver)
         variants.add(no_tbl)
+        # terminal dot-number (e.g., ".1", ".2") often used in Dryad labels
+        no_trailing_dotnum = re.sub(r"(?i)\.(\d+)$", "", no_tbl)
+        variants.add(no_trailing_dotnum)
         # E-GEOD ↔ GSE
         if re.match(r"(?i)^E-GEOD-\d+$", raw):
             variants.add(re.sub(r"(?i)^E-GEOD-", "GSE", raw))
+
+        # Accession-style split variants to tolerate hyphen/space splits in text
+        m = re.match(r"(?i)^(PXD|SRR|ERR)(\d+)$", raw)
+        if m:
+            prefix, digits = m.group(1).upper(), m.group(2)
+            variants.add(f"{prefix}-{digits}")
+            variants.add(f"{prefix} {digits}")
+
+        m = re.match(r"(?i)^E-?PROT-?(\d+)$", raw)
+        if m:
+            digits = m.group(1)
+            variants.add(f"E-PROT-{digits}")
+            variants.add(f"E PROT {digits}")
+            variants.add(f"EPROT{digits}")
+
+        m = re.match(r"(?i)^(ENS)([A-Z]+)(\d+)$", raw)
+        if m:
+            prefix, letters, digits = m.group(1).upper(), m.group(2).upper(), m.group(3)
+            variants.add(f"{prefix}-{letters}-{digits}")
+            variants.add(f"{prefix} {letters} {digits}")
+
+        # Generic short accession with trailing digits: introduce a single split between head and digit tail
+        if re.match(r"(?i)^([A-Z0-9]{2,6})(\d{3,})$", raw):
+            head, tail = re.match(r"(?i)^([A-Z0-9]{2,6})(\d{3,})$", raw).groups()
+            variants.add(f"{head}-{tail}")
+            variants.add(f"{head} {tail}")
         return [v for v in variants if v]
 
     @staticmethod
     def _alnum_collapse(text: str) -> str:
         return re.sub(r"[^a-z0-9]", "", text.lower())
-    
-    # def _make_pattern(self, dataset_id: str) -> re.Pattern:
-    #     """Create pattern for dataset citation: substring match anywhere, case-insensitive."""
-    #     pat = re.escape(dataset_id)
-    #     return re.compile(pat, flags=re.IGNORECASE)
 
     def find_citation_in_text(self, citation: str, text: str) -> List[str]:
         """Robust dual matching: raw substring or preprocessed substring."""
         # Normalise citation id and page text consistently
-        citation_norm = clean_text_for_urls(citation).lower()
+        # citation_norm = clean_text_for_urls(citation).lower()
+        citation_norm = citation.lower()
         lower_cit = re.escape(citation_norm)
         # find all occurrences in raw and cleaned/normalised variants
         raw_matches = re.findall(lower_cit, text.lower())
-        normalised_matches = re.findall(lower_cit, normalise(text).lower())
+        normalised_matches = re.findall(lower_cit, normalise(text.lower()))
         preprocessed_matches = re.findall(lower_cit, preprocess_text(text))
         return raw_matches + normalised_matches + preprocessed_matches
 
@@ -186,6 +297,8 @@ class CitationEntityExtractor:
                         matches = regex.findall(normalise(page))
                     if not matches:
                         matches = regex.findall(preprocess_text(page))
+                    if not matches:
+                        matches = regex.findall(preprocess_text(normalise(page)))
                     if matches:
                         dataset_pages.setdefault(dataset_id, set()).add(page_num)
                         found = True
@@ -193,9 +306,14 @@ class CitationEntityExtractor:
                 if not found:
                     # Aggressive fallback for long IDs (e.g., DOIs): collapsed alnum substring
                     id_alnum = self._alnum_collapse(dataset_id)
-                    if dataset_id.startswith("10.") or len(id_alnum) >= 12:
+                    # Also attempt with DOI host stripped for raw DOIs
+                    id_alnum_host_stripped = self._alnum_collapse(re.sub(r"(?i)^https?://(?:dx\.)?doi\.org/", "", dataset_id))
+                    if dataset_id.startswith("10.") or len(id_alnum) >= 12 or id_alnum_host_stripped:
                         page_alnum = self._alnum_collapse(page)
                         if id_alnum and id_alnum in page_alnum:
+                            dataset_pages.setdefault(dataset_id, set()).add(page_num)
+                            found = True
+                        elif id_alnum_host_stripped and id_alnum_host_stripped in page_alnum:
                             dataset_pages.setdefault(dataset_id, set()).add(page_num)
                             found = True
                 if not found:
@@ -203,6 +321,7 @@ class CitationEntityExtractor:
                     if matches:
                         dataset_pages.setdefault(dataset_id, set()).add(page_num)
                         logger.info(f"Found {len(matches)} matches for {dataset_id} on page {page_num}")
+
         # Create one CitationEntity per unique dataset_id found (after processing all pages)
         for dataset_id, pages_set in dataset_pages.items():
             citation_entity = CitationEntity(

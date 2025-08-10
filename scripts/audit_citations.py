@@ -14,9 +14,10 @@ df_nm2 = df_nm.rename(columns={"article_id": "document_id", "dataset_id": "data_
 con = duckdb.connect(DB_PATH)
 df_cit = con.execute("SELECT document_id, data_citation, pages FROM citations").df()
 con.close()
-df_cit = df_cit.drop_duplicates()
+# pages may be list-like; only dedup by hashable id columns
+df_cit = df_cit.drop_duplicates(subset=["document_id", "data_citation"]) 
 
-merged = df_nm2.merge(df_cit, how="left", left_on=["document_id", "data_citation_label"], right_on=["document_id", "data_citation"])
+merged = df_nm2.merge(df_cit, how="left", left_on=["document_id", "data_citation_label"], right_on=["document_id", "data_citation"]) 
 found = merged[merged["data_citation"].notna()].copy()
 missing = merged[merged["data_citation"].isna()].copy()
 

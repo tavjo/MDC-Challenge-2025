@@ -109,7 +109,7 @@ def extract_pdf_text(
     -------
     list | (list, list)
         * When *return_elements* is ``False`` (default):
-          ``List[{'page_number': int, 'text': str}]``
+          ``List({'page_number': int, 'text': str})``
         * When *True*: a tuple ``(pages, elements)`` where *pages* 
         is the same
           list described above and *elements* is the unmodified list 
@@ -120,37 +120,58 @@ def extract_pdf_text(
     if not path.exists():
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-    logger.info("Parsing PDF %s with unstructured.partition_pdf (strategy: %s)…", path, strategy)
+    def _run(strategy_name: str):
+        logger.info("Parsing PDF %s with unstructured.partition_pdf (strategy: %s)…", path, strategy_name)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
+            # Enable table structure inference when running high-fidelity modes, or if explicitly requested
+            infer_tables_env = os.getenv("UNSTRUCTURED_INFER_TABLES", "auto").lower()
+            if infer_tables_env in ("1", "true", "yes"):  # force on
+                infer_table_structure = True
+            elif infer_tables_env in ("0", "false", "no"):  # force off
+                infer_table_structure = False
+            else:  # auto
+                infer_table_structure = strategy_name in ("hi_res", "ocr_only")
 
-    # Suppress pdfminer warnings about CropBox/MediaBox
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
-        
-        # Enhanced partition_pdf call with more options
-        elements: List[Element] = partition_pdf(
-            str(path), 
-            include_page_breaks=include_page_breaks,
-            strategy=strategy,
-            include_metadata=include_metadata
-        )
+            elems: List[Element] = partition_pdf(
+                str(path),
+                include_page_breaks=include_page_breaks,
+                strategy=strategy_name,
+                include_metadata=include_metadata,
+                infer_table_structure=infer_table_structure,
+            )
+        pages_acc: Dict[int, List[str]] = {}
+        for el in elems:
+            pn = el.metadata.page_number or 1
+            el.text = clean_page(el.text)
+            pages_acc.setdefault(pn, []).append(el.text.strip())
+        pages_local = [
+            {"page_number": pn, "text": "\n\n".join(blocks)}
+            for pn, blocks in sorted(pages_acc.items())
+        ]
+        return pages_local, elems
 
-    # Group texts by page number
-    pages_acc: Dict[int, List[str]] = {}
-    for el in elements:
-        pn = el.metadata.page_number or 1
-        el.text = clean_page(el.text)
-        pages_acc.setdefault(pn, []).append(el.text.strip())
+    # Try requested strategy first, then fall back to hi_res, then ocr_only if no pages
+    strategies = [strategy]
+    for fallback in ("hi_res", "ocr_only"):
+        if fallback not in strategies:
+            strategies.append(fallback)
 
-    pages = [
-        {"page_number": pn, "text": "\n\n".join(blocks)}
-        for pn, blocks in sorted(pages_acc.items())
-    ]
+    last_elements: Optional[List[Element]] = None
+    for strat in strategies:
+        pages, elements = _run(strat)
+        last_elements = elements
+        logger.info("Extracted %d pages (%d elements) from %s using %s.", len(pages), len(elements), path, strat)
+        if len(pages) > 0:
+            if return_elements:
+                return pages, elements
+            return pages
 
-    logger.info("Extracted %d pages (%d elements) from %s.", len(pages), len(elements), path)
-
+    # If still empty, return empty consistent structure
+    logger.warning("All strategies failed to yield pages for %s; returning empty result.", path)
     if return_elements:
-        return pages, elements
-    return pages
+        return [], (last_elements or [])
+    return []
 
 @timer_wrap
 def load_pdf_pages(pdf_path: str) -> List[str]:
@@ -163,14 +184,21 @@ def load_pdf_pages(pdf_path: str) -> List[str]:
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
     # --------------------------------------------------
-    # 1) Parse PDF once and get both pages + elements
+    # 1) Parse PDF with fallback strategies
     # --------------------------------------------------
     logger.info(f"Extracting text from {pdf_path}")
-    # Suppress pdfminer warnings about CropBox/MediaBox
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
     try:
-        pages_json = extract_pdf_text(str(path), return_elements=False)
+        # Allow forcing a specific starting strategy via env var for hard cases
+        start_strategy = os.getenv("PDF_PARSE_STRATEGY", "fast")
+        pages_json = extract_pdf_text(str(path), return_elements=False, strategy=start_strategy)
+        if not pages_json:
+            logger.warning("Fast strategy returned no pages for %s; trying hi_res.", pdf_path)
+            pages_json = extract_pdf_text(str(path), return_elements=False, strategy="hi_res")
+        if not pages_json:
+            logger.warning("hi_res returned no pages for %s; trying ocr_only.", pdf_path)
+            pages_json = extract_pdf_text(str(path), return_elements=False, strategy="ocr_only")
         pages: List[str] = [p["text"] for p in pages_json]
         num_pages = len(pages_json)
         logger.info(f"Loaded {num_pages} pages from {pdf_path}")
@@ -234,7 +262,7 @@ def extract_xml_text(xml_path: str, encoding: Optional[str] = None) -> str:
     try:
         root = ET.fromstring(data)
     except ET.ParseError as e:
-        logger.error(f"Failed to parse XML %s: %s", path, e)
+        logger.error(f"Failed to parse XML %s: {e}")
         raise
 
     text_fragments = list(root.itertext())

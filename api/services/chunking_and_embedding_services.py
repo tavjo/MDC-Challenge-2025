@@ -654,7 +654,10 @@ def prepare_document(
         chunks, _ = repair_lost_citations_strict(document, chunks, lost_df)
 
     # recalc post stats across all citations
-    citation_ids = pre_df['citation_id'].unique()
+    if 'citation_id' in pre_df.columns:
+        citation_ids = pre_df['citation_id'].unique()
+    else:
+        citation_ids = [ce.data_citation for ce in citation_entities] if citation_entities else []
     post_total = sum(
         len(make_pattern(cid).findall(preprocess_text(ck.text)))
         for ck in chunks
@@ -669,7 +672,7 @@ def prepare_document(
         "pre_total_citations": int(pre_total),
         "post_total_citations": int(post_total),
         "validation_passed": post_passed,
-        "lost_entities": lost_df.to_dict(orient="records") if not post_passed else None,
+        "lost_entities": lost_df.to_dict() if not post_passed else None,
         "total_chunks": len(chunks),
         "total_tokens": total_tokens,
         "avg_tokens": avg_tokens,
