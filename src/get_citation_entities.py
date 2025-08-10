@@ -26,12 +26,13 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 print(f"Project root: {project_root}")
 sys.path.append(project_root)
 
-from src.helpers import timer_wrap, initialize_logging
+from src.helpers import timer_wrap, initialize_logging, preprocess_text, normalise, clean_text_for_urls
 from src.models import CitationEntity, Document
 from src.baml_client import b as baml
 from api.utils.duckdb_utils import DuckDBHelper
 
-DEFAULT_DUCKDB_PATH = "../artifacts/mdc_challenge.db"
+# Use a project-relative path so Docker doesn't try to write to root '/'
+DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 
 
 filename = os.path.basename(__file__)
@@ -92,17 +93,68 @@ class CitationEntityExtractor:
         return docs
     
     def _make_pattern(self, ds_id: str) -> re.Pattern:
-        # 1. escape *everything* first
-        pat = re.escape(ds_id)
+        """Build a tolerant regex for a dataset ID.
 
-        # 2. then widen the single underscore
-        pat = pat.replace('_', r'[_/]')     # now [_/] stays “live”
+        - Normalises common URL prefixes (doi.org, dx.doi.org)
+        - Treats separators [-_/:.\s] as interchangeable/flexible
+        - Keeps alphanumeric token order intact
+        - Adds word boundaries for simple accession-like IDs
+        """
+        ds_id_norm = clean_text_for_urls(ds_id).strip()
+        # Split on common separators, keep alnum tokens
+        tokens = [t for t in re.split(r"[-_/:.\s]+", ds_id_norm) if t]
+        if not tokens:
+            tokens = [ds_id_norm]
+        # Join tokens with a flexible separator class (including optional spaces)
+        sep = r"[-_/:.\s]*"
+        pat = sep.join(re.escape(t) for t in tokens)
 
-        # 3. add word-boundaries only for simple accessions
-        if re.fullmatch(r'[A-Z]{1,4}\d+', ds_id, re.I):
-            pat = rf'\b{pat}\b'
+        # Word boundaries for simple accessions (avoid overmatching inside words)
+        if re.fullmatch(r"[A-Z]{1,6}\d+[A-Z0-9]*", ds_id, re.I):
+            pat = rf"\b{pat}\b"
 
         return re.compile(pat, flags=re.IGNORECASE)
+    
+    def _generate_id_variants(self, dataset_id: str) -> List[str]:
+        """Produce tolerant variants for a labeled dataset_id.
+
+        - Strip DOI host, optional ".vN" suffix, optional "/tN" suffix
+        - Keep original as first candidate
+        - Map E-GEOD-12345 -> GSE12345 synonym
+        """
+        variants: Set[str] = set()
+        raw = dataset_id.strip()
+        norm = clean_text_for_urls(raw)
+        variants.add(raw)
+        variants.add(norm)
+        no_ver = re.sub(r"(?i)\.v\d+$", "", norm)
+        variants.add(no_ver)
+        no_tbl = re.sub(r"(?i)/t\d+$", "", no_ver)
+        variants.add(no_tbl)
+        # E-GEOD ↔ GSE
+        if re.match(r"(?i)^E-GEOD-\d+$", raw):
+            variants.add(re.sub(r"(?i)^E-GEOD-", "GSE", raw))
+        return [v for v in variants if v]
+
+    @staticmethod
+    def _alnum_collapse(text: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", text.lower())
+    
+    # def _make_pattern(self, dataset_id: str) -> re.Pattern:
+    #     """Create pattern for dataset citation: substring match anywhere, case-insensitive."""
+    #     pat = re.escape(dataset_id)
+    #     return re.compile(pat, flags=re.IGNORECASE)
+
+    def find_citation_in_text(self, citation: str, text: str) -> List[str]:
+        """Robust dual matching: raw substring or preprocessed substring."""
+        # Normalise citation id and page text consistently
+        citation_norm = clean_text_for_urls(citation).lower()
+        lower_cit = re.escape(citation_norm)
+        # find all occurrences in raw and cleaned/normalised variants
+        raw_matches = re.findall(lower_cit, text.lower())
+        normalised_matches = re.findall(lower_cit, normalise(text).lower())
+        preprocessed_matches = re.findall(lower_cit, preprocess_text(text))
+        return raw_matches + normalised_matches + preprocessed_matches
 
     # @parallel_processing_decorator(batch_param_name="pages", batch_size=5, max_workers=8, flatten=True)
     def _get_known_entities(self, pages: List[str], article_id: str, dataset_ids: List[str]) -> List[CitationEntity]:
@@ -110,25 +162,48 @@ class CitationEntityExtractor:
         Get known entities from the document text using the known entities from the labels file.
         """
         num_pages = len(pages)
+        # full_text = " ".join(pages)
+        # Collect CitationEntity objects found for this document
+        entities: List[CitationEntity] = []
         
         # Track pages per dataset_id
         dataset_pages = {}  # dataset_id -> set of pages where it appears
         
         for idx, page in enumerate(pages):
-            # page = normalise(page)
+            page = page
             page_num = idx + 1
             logger.info(f"Processing page {page_num} of {num_pages} for document: {article_id}")
-            
+        # logger.info(f"Processing document: {article_id}")
+        
             for dataset_id in dataset_ids:
                 logger.info(f"Processing dataset: {dataset_id}")
-                regex = self._make_pattern(dataset_id)
-                matches = regex.findall(page)
-                if matches:
-                    dataset_pages.setdefault(dataset_id,set()).add(page_num)
-                    logger.info(f"Found {len(matches)} matches for {dataset_id} on page {page_num}")
-        
-        # Create one CitationEntity per unique dataset_id found
-        entities = []
+                found = False
+                for variant in self._generate_id_variants(dataset_id):
+                    regex = self._make_pattern(variant)
+                    # try against multiple text variants
+                    matches = regex.findall(page)
+                    if not matches:
+                        matches = regex.findall(normalise(page))
+                    if not matches:
+                        matches = regex.findall(preprocess_text(page))
+                    if matches:
+                        dataset_pages.setdefault(dataset_id, set()).add(page_num)
+                        found = True
+                        break
+                if not found:
+                    # Aggressive fallback for long IDs (e.g., DOIs): collapsed alnum substring
+                    id_alnum = self._alnum_collapse(dataset_id)
+                    if dataset_id.startswith("10.") or len(id_alnum) >= 12:
+                        page_alnum = self._alnum_collapse(page)
+                        if id_alnum and id_alnum in page_alnum:
+                            dataset_pages.setdefault(dataset_id, set()).add(page_num)
+                            found = True
+                if not found:
+                    matches = self.find_citation_in_text(dataset_id, page)
+                    if matches:
+                        dataset_pages.setdefault(dataset_id, set()).add(page_num)
+                        logger.info(f"Found {len(matches)} matches for {dataset_id} on page {page_num}")
+        # Create one CitationEntity per unique dataset_id found (after processing all pages)
         for dataset_id, pages_set in dataset_pages.items():
             citation_entity = CitationEntity(
                 data_citation=dataset_id,
@@ -158,7 +233,7 @@ class CitationEntityExtractor:
         for article_id in articles_ids:
             dataset_ids = self.labels_df[
                 (self.labels_df["article_id"] == article_id) & 
-                (self.labels_df["dataset_id"] != "Missing")
+                (self.labels_df["type"] != "Missing")
             ]["dataset_id"].tolist()
             labels_dict[article_id] = dataset_ids
         # check if there are any pdf files
@@ -176,15 +251,31 @@ class CitationEntityExtractor:
                 dataset_ids = labels_dict[article_id]
             self._get_known_entities(pages=pages, article_id=article_id, dataset_ids=dataset_ids)
             # self.citation_entities.extend(list(citation_entities))
-        #final check: compare length of citation entities with length of dataset IDs
-        known_entities_count = len(self.labels_df[self.labels_df["dataset_id"] != "Missing"])
-        if len(self.citation_entities) != known_entities_count:
-            logger.warning(f"Number of extracted citation entities from pdfs ({len(self.citation_entities)}) does not match number of dataset IDs in labels file ({known_entities_count})")
-            # check which dataset IDs are missing
-            self.missing_entities = set(self.labels_df[self.labels_df["dataset_id"] != "Missing"]["dataset_id"].tolist()) - set([entity.data_citation for entity in self.citation_entities])
-            logger.warning(f"Missing dataset IDs: {self.missing_entities}")
+        #final check: compare length of citation entities with expected count LIMITED to parsed docs
+        parsed_doc_ids: Set[str] = {doc.doi for doc in self.docs}
+        labels_in_parsed_docs = self.labels_df[
+            (self.labels_df["article_id"].isin(parsed_doc_ids)) & (self.labels_df["type"] != "Missing")
+        ]
+        expected_within_parsed = len(labels_in_parsed_docs)
+        if len(self.citation_entities) != expected_within_parsed:
+            logger.warning(
+                f"Extracted citations ({len(self.citation_entities)}) != expected within parsed docs ({expected_within_parsed})."
+            )
+            # Log high-signal diagnostics
+            missing_docs = set(self.labels_df["article_id"].unique()) - parsed_doc_ids
+            if missing_docs:
+                logger.warning(
+                    f"There are {len(missing_docs)} labeled article_ids not present in the documents table; "
+                    "their citations cannot be extracted until those PDFs are parsed."
+                )
+            # check which dataset IDs are missing within parsed docs
+            labeled_ds_in_parsed = set(labels_in_parsed_docs["dataset_id"].tolist())
+            found_ds = {entity.data_citation for entity in self.citation_entities}
+            self.missing_entities = labeled_ds_in_parsed - found_ds
+            if self.missing_entities:
+                logger.warning(f"Missing dataset IDs within parsed docs (n={len(self.missing_entities)}).")
         else:
-            logger.info("Known Entity extraction complete. No missing entities found.")
+            logger.info("Known Entity extraction complete. No missing entities within parsed docs.")
         return self.citation_entities
     
     def _extract_entities_baml(self, doc: Document) -> List[CitationEntity]:

@@ -101,6 +101,7 @@ def _extract_with_pymupdf(pdf_path: Path) -> List[Dict[str, Union[int, str]]]:
             # "text" is a good balance of fidelity and simplicity
             raw_text: str = page.get_text("text") or ""
             cleaned = clean_page(raw_text)
+            # cleaned = raw_text
             pages.append({"page_number": page_index + 1, "text": cleaned})
 
     return pages

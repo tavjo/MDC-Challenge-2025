@@ -57,6 +57,8 @@ from collections import defaultdict, Counter
 
 import numpy as np
 
+from .helpers import cosine_sim_matrix
+
 # ================================
 # DAS miner (lexicon + heuristics)
 # ================================
@@ -327,6 +329,164 @@ def _normalize_scores(d: Dict[str, float]) -> Dict[str, float]:
     return {k: (v - lo) / (hi - lo) for k, v in d.items()}
 
 
+# def hybrid_retrieve_with_boost(
+#     *,
+#     query_text: str,
+#     dense_query_vec: np.ndarray,
+#     id_to_dense: Dict[str, np.ndarray],
+#     id_to_text: Dict[str, str],
+#     id_to_section: Optional[Dict[str, Optional[str]]] = None,
+#     id_to_neighbors: Optional[Dict[str, List[str]]] = None,
+#     regex_index: Optional[Dict[str, Dict[str, int]]] = None,
+#     boost_cfg: BoostConfig = BoostConfig(),
+# ) -> List[str]:
+#     """Run sparse+dense → RRF, then apply DAS/Methods/regex boosts, then MMR diversify.
+
+#     Returns: final ranked list of chunk_ids.
+#     """
+#     # 1) Retrieve
+#     sparse_ids = _sparse_topk(query_text, id_to_text, k=boost_cfg.sparse_k)
+#     dense_ids  = _dense_topk(dense_query_vec, id_to_dense, k=boost_cfg.dense_k)
+
+#     rrf = reciprocal_rank_fusion([sparse_ids, dense_ids], k=boost_cfg.rrf_k)
+#     base_scores = rrf.scores  # id -> RRF score
+
+#     # 2) Prepare regex counts
+#     if regex_index is None:
+#         regex_index = build_regex_index(id_to_text)
+
+#     # Neighbor map
+#     id_to_neighbors = id_to_neighbors or {}
+
+#     # 3) Apply boosts
+#     boosted: Dict[str, float] = dict(base_scores)
+
+#     # Precompute which ids have regex hits
+#     regex_positive_ids = {cid for cid, c in regex_index.items() if c.get("_total", 0) > 0}
+
+#     # Direct regex boost
+#     for cid in list(boosted.keys()):
+#         if cid in regex_positive_ids:
+#             n = regex_index[cid].get("_total", 0)
+#             boosted[cid] = boosted[cid] + boost_cfg.regex_hit_boost * min(3.0, float(n))
+
+#     # Neighbor regex boost
+#     if id_to_neighbors:
+#         for cid, neighbors in id_to_neighbors.items():
+#             if cid not in boosted:
+#                 continue
+#             if any(nid in regex_positive_ids for nid in neighbors):
+#                 boosted[cid] = boosted[cid] + boost_cfg.regex_neighbor_boost
+
+#     # Section boost (Methods / Data Availability)
+#     for cid in list(boosted.keys()):
+#         sec = id_to_section[cid] if id_to_section and cid in id_to_section else None
+#         txt = id_to_text.get(cid, "")
+#         if _is_methods_or_das(sec, txt):
+#             boosted[cid] = boosted[cid] + boost_cfg.das_methods_boost
+
+#     # 4) Re-rank by boosted score, keep a pool for MMR
+#     boosted = _normalize_scores(boosted)
+#     pool_rank = [cid for cid, _ in sorted(boosted.items(), key=lambda x: -x[1])]
+
+#     # 5) MMR diversification on the pool using dense vectors
+#     pool_rank = [cid for cid in pool_rank if cid in id_to_dense]
+#     final_ids = mmr_rerank(
+#         candidate_ids=pool_rank,
+#         query_vec=dense_query_vec,
+#         id_to_vec=id_to_dense,
+#         lambda_diversity=boost_cfg.mmr_lambda,
+#         top_k=boost_cfg.mmr_top_k,
+#     )
+#     return final_ids
+
+# ------------------------------
+# Boost configuration (updated)
+# ------------------------------
+@dataclass
+class BoostConfig:
+    # Retrieval pools
+    sparse_k: int = 30
+    dense_k: int = 30
+    rrf_k: int = 60
+
+    # Section / regex boosts
+    regex_hit_boost: float = 0.25
+    regex_neighbor_boost: float = 0.10
+    das_methods_boost: float = 0.20
+
+    # Prototype priors (NEW)
+    # 1) Add a prototype-based ranked list as another "ranker" in RRF
+    proto_add_to_rrf: bool = True
+    proto_rrf_k: int = 50         # how many items from the prototype rank list to feed into RRF
+    # 2) Add an additive prototype boost post-RRF
+    proto_weight: float = 0.20    # weight of prototype affinity boost
+    proto_mode: str = "max"       # "max" or "mean_top_m"
+    proto_top_m: int = 3          # if mode == "mean_top_m"
+    proto_min_sim: float = 0.00   # floor to ignore tiny affinities (on normalized [0,1] scale)
+
+    # Final diversification
+    mmr_lambda: float = 0.70
+    mmr_top_k: int = 15
+
+
+# ------------------------------
+# Prototype affinity helpers
+# ------------------------------
+
+
+def _prototype_affinity(
+    id_to_dense: Dict[str, np.ndarray],
+    prototypes,  # Prototypes | np.ndarray of centroids [P, D]
+    mode: str = "max",
+    top_m: int = 3,
+) -> Dict[str, float]:
+    """
+    Compute a per-chunk prototype affinity in [0,1] via min-max normalization.
+    Affinity = max over centroids, or mean of top-M sims to centroids.
+    """
+    if prototypes is None:
+        return {cid: 0.0 for cid in id_to_dense.keys()}
+
+    # Accept either Prototypes dataclass or raw centroids
+    C = getattr(prototypes, "centroids", prototypes)
+    if C is None or len(C) == 0:
+        return {cid: 0.0 for cid in id_to_dense.keys()}
+
+    ids = list(id_to_dense.keys())
+    V = np.vstack([id_to_dense[cid] for cid in ids])  # [N, D]
+    S = cosine_sim_matrix(V, C)                      # [N, P]
+
+    if mode == "mean_top_m":
+        m = max(1, min(top_m, S.shape[1]))
+        # Take mean of top-m per row (no full sort: partial partition is faster)
+        part = np.partition(S, -m, axis=1)[:, -m:]
+        raw = part.mean(axis=1)
+    else:  # "max"
+        raw = S.max(axis=1)
+
+    # Min-max normalize across all chunks so boosts are comparable to other signals
+    lo, hi = float(raw.min()), float(raw.max())
+    if hi - lo < 1e-8:
+        norm = np.zeros_like(raw, dtype=np.float32)
+    else:
+        norm = (raw - lo) / (hi - lo)
+    return dict(zip(ids, norm))
+
+def _rank_by_prototype_affinity(
+    id_to_dense: Dict[str, np.ndarray],
+    prototypes,
+    mode: str = "max",
+    top_m: int = 3,
+) -> List[str]:
+    """Return chunk_ids ranked by descending prototype affinity (no truncation here)."""
+    aff = _prototype_affinity(id_to_dense, prototypes, mode=mode, top_m=top_m)
+    return [cid for cid, _ in sorted(aff.items(), key=lambda x: -x[1])]
+
+
+# ----------------------------------------
+# Hybrid retrieval with prototype priors
+# ----------------------------------------
 def hybrid_retrieve_with_boost(
     *,
     query_text: str,
@@ -337,38 +497,55 @@ def hybrid_retrieve_with_boost(
     id_to_neighbors: Optional[Dict[str, List[str]]] = None,
     regex_index: Optional[Dict[str, Dict[str, int]]] = None,
     boost_cfg: BoostConfig = BoostConfig(),
+    prototypes=None,  # Prototypes | np.ndarray of centroids [P, D] | None
 ) -> List[str]:
-    """Run sparse+dense → RRF, then apply DAS/Methods/regex boosts, then MMR diversify.
+    """Run sparse+dense → (optionally + prototype rank) → RRF → boosts (regex/section/prototype) → MMR.
 
     Returns: final ranked list of chunk_ids.
     """
+    # ----------------
     # 1) Retrieve
+    # ----------------
     sparse_ids = _sparse_topk(query_text, id_to_text, k=boost_cfg.sparse_k)
     dense_ids  = _dense_topk(dense_query_vec, id_to_dense, k=boost_cfg.dense_k)
 
-    rrf = reciprocal_rank_fusion([sparse_ids, dense_ids], k=boost_cfg.rrf_k)
-    base_scores = rrf.scores  # id -> RRF score
+    rank_lists = [sparse_ids, dense_ids]
 
-    # 2) Prepare regex counts
+    # Optional: include prototype-based ranking as another signal into RRF
+    if boost_cfg.proto_add_to_rrf and prototypes is not None:
+        proto_rank = _rank_by_prototype_affinity(
+            id_to_dense=id_to_dense,
+            prototypes=prototypes,
+            mode=boost_cfg.proto_mode,
+            top_m=boost_cfg.proto_top_m,
+        )
+        # Limit how many from this source we feed into RRF to avoid overpowering
+        proto_rank = proto_rank[:boost_cfg.proto_rrf_k]
+        rank_lists.append(proto_rank)
+
+    rrf = reciprocal_rank_fusion(rank_lists, k=boost_cfg.rrf_k)
+    base_scores = rrf.scores  # id -> RRF score (assumes your implementation exposes .scores)
+
+    # ----------------
+    # 2) Prep indices
+    # ----------------
     if regex_index is None:
         regex_index = build_regex_index(id_to_text)
-
-    # Neighbor map
     id_to_neighbors = id_to_neighbors or {}
 
+    # ----------------
     # 3) Apply boosts
+    # ----------------
     boosted: Dict[str, float] = dict(base_scores)
 
-    # Precompute which ids have regex hits
+    # (a) Regex hits on the chunk itself
     regex_positive_ids = {cid for cid, c in regex_index.items() if c.get("_total", 0) > 0}
-
-    # Direct regex boost
     for cid in list(boosted.keys()):
         if cid in regex_positive_ids:
             n = regex_index[cid].get("_total", 0)
             boosted[cid] = boosted[cid] + boost_cfg.regex_hit_boost * min(3.0, float(n))
 
-    # Neighbor regex boost
+    # (b) Neighbor regex proximity
     if id_to_neighbors:
         for cid, neighbors in id_to_neighbors.items():
             if cid not in boosted:
@@ -376,19 +553,33 @@ def hybrid_retrieve_with_boost(
             if any(nid in regex_positive_ids for nid in neighbors):
                 boosted[cid] = boosted[cid] + boost_cfg.regex_neighbor_boost
 
-    # Section boost (Methods / Data Availability)
+    # (c) Section prior (Methods / Data Availability)
     for cid in list(boosted.keys()):
         sec = id_to_section[cid] if id_to_section and cid in id_to_section else None
         txt = id_to_text.get(cid, "")
         if _is_methods_or_das(sec, txt):
             boosted[cid] = boosted[cid] + boost_cfg.das_methods_boost
 
-    # 4) Re-rank by boosted score, keep a pool for MMR
+    # (d) Prototype affinity boost (NEW)
+    if prototypes is not None and boost_cfg.proto_weight > 0:
+        aff = _prototype_affinity(
+            id_to_dense=id_to_dense,
+            prototypes=prototypes,
+            mode=boost_cfg.proto_mode,
+            top_m=boost_cfg.proto_top_m,
+        )  # normalized [0,1]
+        for cid in list(boosted.keys()):
+            a = aff.get(cid, 0.0)
+            if a > boost_cfg.proto_min_sim:
+                boosted[cid] = boosted[cid] + boost_cfg.proto_weight * (a - boost_cfg.proto_min_sim)
+
+    # ----------------
+    # 4) Re-rank & MMR
+    # ----------------
     boosted = _normalize_scores(boosted)
     pool_rank = [cid for cid, _ in sorted(boosted.items(), key=lambda x: -x[1])]
+    pool_rank = [cid for cid in pool_rank if cid in id_to_dense]  # ensure we can MMR with dense vecs
 
-    # 5) MMR diversification on the pool using dense vectors
-    pool_rank = [cid for cid in pool_rank if cid in id_to_dense]
     final_ids = mmr_rerank(
         candidate_ids=pool_rank,
         query_vec=dense_query_vec,

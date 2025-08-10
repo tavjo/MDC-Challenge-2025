@@ -12,11 +12,19 @@ sys.path.append(project_root)
 
 from src.helpers import timer_wrap, initialize_logging, compute_file_hash, num_tokens
 from src.models import Document
-# from src.extract_pdf_text_unstructured import load_pdf_pages
-from src.extract_pdf_text_light import load_pdf_pages, extract_xml_text
+
+# Prefer the unstructured-based extractor; fall back to the lightweight extractor if unavailable
+_EXTRACTOR_SOURCE = None
+try:
+    from src.extract_pdf_text_unstructured import load_pdf_pages, extract_xml_text  # type: ignore
+    _EXTRACTOR_SOURCE = "unstructured"
+except Exception:
+    from src.extract_pdf_text_light import load_pdf_pages, extract_xml_text  # type: ignore
+    _EXTRACTOR_SOURCE = "light"
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
+logger.info(f"Using '{_EXTRACTOR_SOURCE}' text extractor backend in document_parsing_service")
 
 @timer_wrap
 def build_document_object(pdf_path: str):

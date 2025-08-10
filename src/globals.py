@@ -30,7 +30,7 @@ from src.helpers import initialize_logging, timer_wrap
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
 
-DEFAULT_DUCKDB_PATH = "../artifacts/mdc_challenge.db"
+DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
 DEFAULT_COLLECTION_NAME = "dataset-aggregates-train"
 

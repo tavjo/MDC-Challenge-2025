@@ -618,8 +618,7 @@ def create_chunks_summary_csv(chunks: List[Chunk], export: bool = True, output_p
     summary_df = pd.DataFrame(summary_rows)
     if export:
         summary_df.to_csv(output_path, index=False)
-    
-    logger.info(f"✅ Exported chunk summary to CSV: {output_path}")
+        logger.info(f"✅ Exported chunk summary to CSV: {output_path}")
     return summary_df 
 
 # ---------------------------------------------------------------------------
@@ -670,7 +669,7 @@ def prepare_document(
         "pre_total_citations": int(pre_total),
         "post_total_citations": int(post_total),
         "validation_passed": post_passed,
-        "lost_entities": lost_df.to_dict() if not post_passed else None,
+        "lost_entities": lost_df.to_dict(orient="records") if not post_passed else None,
         "total_chunks": len(chunks),
         "total_tokens": total_tokens,
         "avg_tokens": avg_tokens,
@@ -692,11 +691,14 @@ def build_document_result(prep: dict, db_path: str) -> Tuple[DocumentChunkingRes
     now = datetime.now().isoformat()
     summary_df = create_chunks_summary_csv(chunks, export=False)
     # create dict of document_id to list of lost citation entities
-    if prep["lost_entities"] is not None:
+    lost_entities = None
+    if prep["lost_entities"]:
         lost_entities = {doc.doi: prep["lost_entities"]}
+    else:
+        lost_entities = None
     
     # calculate entity retention
-    if lost_entities is not None:
+    if lost_entities and doc.doi in lost_entities:
         diff = prep["pre_total_citations"] - len(lost_entities[doc.doi])
         entity_retention = diff / prep["pre_total_citations"] * 100
     else:
@@ -742,7 +744,7 @@ def summarize_run(doc_results: List[DocumentChunkingResult], total_unique_datase
     validation_passed = all(r.validation_passed for r in doc_results)
     entity_retention = sum(r.entity_retention for r in doc_results) / total_documents if total_documents else 0.0
     # get lost entities across all documents
-    lost_entities = {doc_id: doc_result.lost_entities for doc_id, doc_result in doc_results.items()}
+    lost_entities = {r.document_id: r.lost_entities for r in doc_results if r.lost_entities}
     error_messages = [r.error for r in doc_results if r.error]
     error = "; ".join(error_messages) if error_messages else None
     # Only successful overall if entity retention is 100% and all commits succeeded
@@ -803,22 +805,27 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
     else:
         docs, cites = load_input_data(documents_path, citation_entities_path)
     
+    if len(docs) == 0:
+        raise ValueError("No documents found in the database.")
+    if len(cites) == 0:
+        raise ValueError("No citation entities found in the database.")
+    
     # find documents with citations
     cite_ids = {c.document_id for c in cites}
     docs_with_citations = [doc for doc in docs if doc.doi in cite_ids]
     logger.info(f"Found {len(docs_with_citations)} documents with citations.")
 
     if subset:
+        available = len(docs_with_citations)
         if subset_size is None:
-            subset_size = 20
-            logger.warning(f"No subset size provided using default size of {subset_size}.")
+            subset_size = min(20, available)
+            logger.warning(f"No subset size provided; using {subset_size} based on availability ({available}).")
+        elif subset_size > available:
+            logger.warning(f"Requested {subset_size} docs but only {available} available; sampling all.")
         np.random.seed(42)
         # choose randomly from docs with citations
-        logger.info(f"Choosing {subset_size} documents randomly from {len(docs_with_citations)} documents with citations.")
-        docs = np.random.choice(docs_with_citations, size=subset_size, replace=False)
-        if subset_size > len(docs_with_citations):
-            logger.warning(f"Requested {subset_size} docs but only {len(docs_with_citations)} documents with citations available; sampling all.")
-            subset_size = len(docs_with_citations)
+        logger.info(f"Choosing {subset_size} documents randomly from {available} documents with citations.")
+        docs = np.random.choice(docs_with_citations, size=subset_size, replace=False).tolist()
         # filter cites to only include those with document_id in docs
         doc_ids = {doc.doi for doc in docs}
         cites = [cite for cite in cites if cite.document_id in doc_ids]

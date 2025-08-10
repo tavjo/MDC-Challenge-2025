@@ -1,115 +1,141 @@
-# Makefile – MDC Challenge 2025 (Compose-Spec edition)
-.PHONY: help build build-no-cache up down start stop restart logs \
-        clean dev-shell api-shell status ps \
-        build-up build-up-no-cache \
-        logs-api \
-        test-api test-unit test \
-        dev prod-setup clean-images clean-all
+# Makefile for MDC Challenge 2025 Docker Services
+.PHONY: help build build-no-cache up down start stop restart logs clean dev-shell api-shell status ps
 
-# ---------- variables ----------
-COMPOSE=docker compose                      # canonical Compose v2 CLI
-SERVICE_API=mdc-api
-SERVICE_DEV=mdc-dev
-SERVICE_TEST=mdc-test
-
-# ---------- colours ----------
-YELLOW := \033[1;33m
-GREEN  := \033[1;32m
-BLUE   := \033[1;34m
-NC     := \033[0m  # No colour
-
+# Default target
 .DEFAULT_GOAL := help
 
-# ---------- help ----------
+# Colors for output
+YELLOW := \033[1;33m
+GREEN := \033[1;32m
+BLUE := \033[1;34m
+NC := \033[0m # No Color
+
 help: ## Show this help message
-	@echo "$(YELLOW)MDC Challenge 2025 – Docker Management$(NC)"
+	@echo "$(YELLOW)MDC Challenge 2025 - Docker Management$(NC)"
 	@echo "$(BLUE)Available commands:$(NC)"
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make $(GREEN)<target>$(NC)\n\nTargets:\n"} /^[a-zA-Z_-]+:.*##/ { printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make $(GREEN)<target>$(NC)\n\nTargets:\n"} /^[a-zA-Z_-]+:.*##/ { printf "  $(GREEN)%-15s$(NC) %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-# ---------- build ----------
-build: ## Build all images (parallel)
-	@echo "$(YELLOW)Building all services…$(NC)"
-	$(COMPOSE) build --parallel $(SERVICE_PARSE) $(SERVICE_API)
+build: ## Build both services
+	@echo "$(YELLOW)Building all services...$(NC)"
+	docker compose build mdc-parse
+	docker compose build mdc-api
 
-build-no-cache: ## Build all images without cache
-	@echo "$(YELLOW)Building all services (no cache)…$(NC)"
-	$(COMPOSE) build --no-cache $(SERVICE_PARSE) $(SERVICE_API)
+build-no-cache: ## Build both services without cache
+	@echo "$(YELLOW)Building all services (no cache)...$(NC)"
+	docker compose build --no-cache mdc-parse
+	docker compose build --no-cache mdc-api
 
-# ---------- up / down ----------
-up: ## Start both services (detached)
-	@echo "$(YELLOW)Starting services…$(NC)"
-	$(COMPOSE) up -d $(SERVICE_PARSE) $(SERVICE_API)
+up: ## Start both services in detached mode
+	@echo "$(YELLOW)Starting both services...$(NC)"
+	docker compose up -d mdc-parse
+	docker compose up -d mdc-api
+	@echo "$(GREEN)Services started successfully!$(NC)"
 	@make status
 
-down: ## Stop & remove all services
-	@echo "$(YELLOW)Stopping all services…$(NC)"
-	$(COMPOSE) down
+down: ## Stop and remove both services
+	@echo "$(YELLOW)Stopping all services...$(NC)"
+	docker compose down
 	@echo "$(GREEN)Services stopped successfully!$(NC)"
 
 start: ## Start existing containers
-	$(COMPOSE) start $(SERVICE_PARSE) $(SERVICE_API)
+	@echo "$(YELLOW)Starting existing containers...$(NC)"
+	docker compose start mdc-parse
+	docker compose start mdc-api
 
-stop: ## Stop running containers
-	$(COMPOSE) stop $(SERVICE_PARSE) $(SERVICE_API)
+stop: ## Stop running containers without removing them
+	@echo "$(YELLOW)Stopping containers...$(NC)"
+	docker compose stop mdc-parse
+	docker compose stop mdc-api
 
 restart: ## Restart both services
+	@echo "$(YELLOW)Restarting services...$(NC)"
 	@make stop
 	@make start
 
-# ---------- combo ----------
-build-up: ## Build & start services
+build-up: ## Build and start both services
+	@echo "$(YELLOW)Building and starting services...$(NC)"
 	@make build
 	@make up
 
-build-up-no-cache: ## Build (no cache) & start
+build-up-no-cache: ## Build (no cache) and start both services
+	@echo "$(YELLOW)Building (no cache) and starting services...$(NC)"
 	@make build-no-cache
 	@make up
 
-# ---------- logs ----------
-logs: ## Follow logs for both services
-	$(COMPOSE) logs -f $(SERVICE_API)
+logs: ## Show logs for both services
+	@echo "$(YELLOW)Showing logs for both services...$(NC)"
+	docker compose logs -f mdc-parse mdc-api
 
-logs-api: ## Logs for chunk-and-embed API
-	$(COMPOSE) logs -f $(SERVICE_API)
+logs-main: ## Show logs for main service only
+	docker compose logs -f mdc-parse
 
-# ---------- status ----------
-status: ## Show container status
-	@echo "$(BLUE)Service status:$(NC)"
-	@$(COMPOSE) ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+logs-api: ## Show logs for API service only
+	docker compose logs -f mdc-api
 
-ps: status ## alias
+status: ## Show status of all services
+	@echo "$(BLUE)Service Status:$(NC)"
+	@docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 
-# ---------- shells ----------
-dev-shell: ## Interactive shell in dev container (profile dev)
-	$(COMPOSE) --profile dev run --rm $(SERVICE_DEV) /bin/bash
+ps: status ## Alias for status
 
-api-shell: ## Shell in API container
-	$(COMPOSE) exec $(SERVICE_API) /bin/bash
+dev-shell: ## Open shell in development container
+	@echo "$(YELLOW)Opening shell in development container...$(NC)"
+	docker compose --profile dev run --rm mdc-dev /bin/bash
 
-# ---------- clean ----------
-clean: ## Stop & remove containers/vols/orphans
-	$(COMPOSE) down --volumes --remove-orphans
-	$(COMPOSE) --profile dev down --volumes --remove-orphans
+api-shell: ## Open shell in API container
+	@echo "$(YELLOW)Opening shell in API container...$(NC)"
+	docker compose exec mdc-api /bin/bash
 
-clean-images: ## Remove project images
-	-docker image rm -f  mdc-chunk-api:latest || true
+main-shell: ## Open shell in main container
+	@echo "$(YELLOW)Opening shell in main container...$(NC)"
+	docker compose exec mdc-parse /bin/bash
 
-clean-all: clean clean-images ## Full clean
+clean: ## Stop and remove all containers, networks, and volumes
+	@echo "$(YELLOW)Cleaning up Docker resources...$(NC)"
+	docker compose down --volumes --remove-orphans
+	docker compose --profile dev down --volumes --remove-orphans
+	@echo "$(GREEN)Cleanup completed!$(NC)"
 
-# ---------- dev / prod shortcuts ----------
-dev: ## Start dev profile containers
-	$(COMPOSE) --profile dev up -d
+clean-images: ## Remove all built images for this project
+	@echo "$(YELLOW)Removing project images...$(NC)"
+	docker image rm -f mdc-parse-2025 || true
+	docker image rm -f mdc-parse-dev || true
+	docker image rm -f mdc-parse-api || true
+	@echo "$(GREEN)Images removed!$(NC)"
+
+clean-all: clean clean-images ## Full cleanup: containers, networks, volumes, and images
+
+# Development shortcuts
+dev: ## Start development environment
+	@echo "$(YELLOW)Starting development environment...$(NC)"
+	docker compose --profile dev up -d
 	@make status
 
-prod-setup: build-no-cache up ## Prod-like build & start
+test-main: ## Test main API endpoints (assuming it runs on port 3000)
+	@echo "$(YELLOW)Testing main API...$(NC)"
+	curl -f http://localhost:3000/health || curl -f http://localhost:3000/ || echo "$(YELLOW)Main API not responding - check if it's running$(NC)"
 
-# ---------- tests ----------
+test-api: ## Test chunking API endpoints (assuming it runs on port 8000)
+	@echo "$(YELLOW)Testing chunking API...$(NC)"
+	curl -f http://localhost:8000/health || curl -f http://localhost:8000/ || echo "$(YELLOW)API not responding - check if it's running$(NC)"
+
 test-unit: ## Run unit tests inside API container
-	$(COMPOSE) run --rm $(SERVICE_API) \
-	  pytest tests/test_chunking_and_embedding_services.py -q --disable-warnings --maxfail=1
+	@echo "$(YELLOW)Running unit tests...$(NC)"
+	docker compose run --rm mdc-api pytest tests/test_chunking_and_embedding_services.py -q --disable-warnings --maxfail=1
 
-test-api: ## Quick health check on chunk API
-	curl -f http://localhost:8000/health 2>/dev/null || \
-	  echo "$(YELLOW)Chunk API not responding$(NC)"
+# Modify test target to include unit tests
+test: ## Test both API endpoints and unit tests
+	@make test-unit
+	@make test-main
+	@make test-api
 
-test: test-unit test-main test-api ## Run tests & health checks
+# Quick development workflow
+dev-setup: build-up ## Complete setup for development (build and start)
+	@echo "$(GREEN)Development environment is ready!$(NC)"
+	@echo "$(BLUE)Main API:$(NC) http://localhost:3000"
+	@echo "$(BLUE)Chunking API:$(NC) http://localhost:8000"
+
+# Production-like workflow
+prod-setup: build-no-cache up ## Production setup (clean build and start)
+	@echo "$(GREEN)Production environment is ready!$(NC)"
+	@make test 

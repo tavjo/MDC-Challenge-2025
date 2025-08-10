@@ -10,6 +10,7 @@ import time
 import inspect
 from functools import wraps
 import logging
+import numpy as np
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(project_root)
@@ -85,3 +86,11 @@ def sliding_window_chunks(text: str, window_size: int = 300, overlap: int = 30) 
     chunks = refined_chunks
     logger.info(f"Successfully created {len(chunks)} chunks after merging small fragments")
     return chunks
+
+def cosine_sim_matrix(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+    """Row-wise cosine similarity between A [N,D] and B [M,D]."""
+    A = A.astype(np.float32, copy=False)
+    B = B.astype(np.float32, copy=False)
+    A = A / (np.linalg.norm(A, axis=1, keepdims=True) + 1e-8)
+    B = B / (np.linalg.norm(B, axis=1, keepdims=True) + 1e-8)
+    return A @ B.T  # [N, M]

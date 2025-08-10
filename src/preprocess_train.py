@@ -49,6 +49,7 @@ DATASET_AGGS_COLLECTION = "dataset-aggregates-train"
 class PreprocessTrainingData:
     def __init__(
         self,
+        pdf_paths: List[str],
         db_path: str = DEFAULT_DUCKDB_PATH,
         cfg_path: str = DEFAULT_CHROMA_CONFIG,
         doc_collection_name: str = DOC_CHUNKS_COLLECTION,
@@ -64,6 +65,7 @@ class PreprocessTrainingData:
         force_dimred: bool = False,
         force_globals: bool = False,
     ) -> None:
+        self.pdf_paths = pdf_paths
         self.db_path = db_path
         self.cfg_path = cfg_path
         self.doc_collection_name = doc_collection_name
@@ -91,32 +93,32 @@ class PreprocessTrainingData:
         finally:
             helper.close()
 
-    def _list_pdf_paths(self, pdf_dir: Optional[str] = None) -> List[str]:
-        base_dir = pdf_dir or os.path.join(project_root, "Data", "train", "PDF")
-        if not os.path.isdir(base_dir):
-            logger.error(f"PDF directory not found: {base_dir}")
-            return []
-        pdf_paths = [os.path.join(base_dir, f) for f in os.listdir(base_dir) if f.lower().endswith(".pdf")]
-        logger.info(f"Found {len(pdf_paths)} PDFs under {base_dir}")
-        return pdf_paths
+    # def _list_pdf_paths(self, pdf_dir: Optional[str] = None) -> List[str]:
+    #     base_dir = pdf_dir or os.path.join(project_root, "Data", "train", "PDF")
+    #     if not os.path.isdir(base_dir):
+    #         logger.error(f"PDF directory not found: {base_dir}")
+    #         return []
+    #     pdf_paths = [os.path.join(base_dir, f) for f in os.listdir(base_dir) if f.lower().endswith(".pdf")]
+    #     logger.info(f"Found {len(pdf_paths)} PDFs under {base_dir}")
+    #     return pdf_paths
 
     @timer_wrap
-    def run_documents(self, pdf_dir: Optional[str] = None, max_workers: int = 8) -> bool:
+    def run_documents(self, max_workers: int = 8) -> bool:
         if not self.force_docs and self._table_has_rows("documents"):
             logger.info("Skipping document parsing (reuse enabled and documents exist)")
             return True
 
-        pdf_paths = self._list_pdf_paths(pdf_dir)
-        if not pdf_paths:
+        if not self.pdf_paths:
             logger.error("No PDF files found; cannot build document objects")
             return False
+        pdf_paths = self.pdf_paths
 
         try:
             response = get_document_objects(
                 pdf_paths=pdf_paths,
                 subset=self.subset,
                 subset_size=self.subset_size or 20,
-                export_file="documents.json",
+                export_file=None,
                 export_path=self.output_dir,
                 max_workers=max_workers,
             )
@@ -209,6 +211,7 @@ class PreprocessTrainingData:
                 collection_name=self.dataset_collection_name,
                 cfg_path=self.cfg_path,
                 db_path=self.db_path,
+                target_n=70,
             )
             results = pipeline.run_pipeline()
             ok = bool(results and results.get("overall_success", False))
@@ -340,6 +343,7 @@ class PreprocessTrainingData:
             ("datasets", self.run_construct_datasets),
             ("clustering", self.run_clustering),
             ("dimensionality_reduction", self.run_dimensionality_reduction),
+            ("globals", self.run_global_umap_pca),
         ]
         for name, fn in steps:
             ok = fn()
@@ -348,10 +352,19 @@ class PreprocessTrainingData:
                 return False, None
         return self.build_and_export_training_data(format=export_format)
 
+@timer_wrap
+def main():
+    pdf_paths = os.listdir(os.path.join(project_root, "Data/train/PDF"))
+    pdf_paths = [os.path.join("Data/train/PDF", pdf) for pdf in pdf_paths if pdf.endswith(".pdf")]
+    processor = PreprocessTrainingData(pdf_paths=pdf_paths, force_citations=True)
+    success, path = processor.run_all(export_format="csv")
+    if success:
+        logger.info(f"Training data saved to {path}")
+    else:
+        logger.error("Failed to build training data")
+        raise SystemExit(1)
 
 if __name__ == "__main__":
-    processor = PreprocessTrainingData(subset=True, subset_size=20)
-    success, path = processor.run_all(export_format="csv")
-    if not success:
-        raise SystemExit(1)
+    main()
+
 

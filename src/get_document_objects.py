@@ -22,7 +22,7 @@ DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 
 @timer_wrap
 def get_document_object(pdf_path: str):
-    response = requests.get(f"http://localhost:8000/parse_doc?pdf_path={pdf_path}")
+    response = requests.get(f"http://localhost:3000/parse_doc?pdf_path={pdf_path}")
     return response.json()
 
 def build_payload(pdf_paths: List[str], subset: bool = False, subset_size: int = 20, export_file: Optional[str] = None, export_path: Optional[str] = None, max_workers: int = 8):
@@ -46,7 +46,7 @@ def get_document_objects(pdf_paths: List[str], subset: bool = False, subset_size
         pdf_paths = np.random.choice(pdf_paths, subset_size, replace=False)
         logger.info(f"Subsetting to {subset_size} PDFs")
     payload = build_payload(pdf_paths=pdf_paths, subset=subset, subset_size=subset_size, export_file=export_file, export_path=export_path, max_workers=max_workers)
-    response = requests.post(f"http://localhost:8000/bulk_parse_docs", json=payload.model_dump(exclude_none=True))
+    response = requests.post(f"http://localhost:3000/bulk_parse_docs", json=payload.model_dump(exclude_none=True))
     return response.json()
 
 

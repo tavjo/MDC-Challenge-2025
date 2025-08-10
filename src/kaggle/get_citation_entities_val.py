@@ -32,7 +32,7 @@ from src.baml_client import b as baml
 from api.utils.duckdb_utils import DuckDBHelper
 import requests
 
-DEFAULT_DUCKDB_PATH = "../artifacts/mdc_challenge.db"
+DEFAULT_DUCKDB_PATH = "artifacts/mdc_challenge.db"
 DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
 
 filename = os.path.basename(__file__)

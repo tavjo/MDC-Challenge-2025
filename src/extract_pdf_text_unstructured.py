@@ -1,6 +1,6 @@
 import os, sys
 from pathlib import Path
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union, Optional
 import warnings
 
 try:
@@ -19,7 +19,7 @@ import pickle
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
-from src.helpers import initialize_logging, timer_wrap, parallel_processing_decorator
+from src.helpers import initialize_logging, timer_wrap
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(log_file = filename)
@@ -49,7 +49,7 @@ _LIGATURE_MAP = str.maketrans({
     "ﬄ": "ffl",
 })
 
-
+@timer_wrap
 def clean_page(text: str) -> str:
     # 1. join   exam- \n ple  → example      (already present)
     text = _HYPHEN_LINEBREAK_RE.sub("", text)
@@ -78,7 +78,7 @@ def clean_page(text: str) -> str:
     text = unicodedata.normalize("NFKD", text)
     return text
 
-
+@timer_wrap
 def extract_pdf_text(
     pdf_path: str,
     *,
@@ -152,7 +152,7 @@ def extract_pdf_text(
         return pages, elements
     return pages
 
-
+@timer_wrap
 def load_pdf_pages(pdf_path: str) -> List[str]:
     """
     Load Document pages from a PDF file.
@@ -180,7 +180,6 @@ def load_pdf_pages(pdf_path: str) -> List[str]:
         raise e
 
 @timer_wrap
-# @parallel_processing_decorator(batch_param_name="pdf_files", batch_size=50, max_workers=8, flatten=True)
 def get_all_pdfs(pdf_files: List[str], pdf_dir: str, subset: bool = False, subset_size: int = 20):
     """
     Load and save all PDFs as a single pickle file in a directory.
@@ -196,6 +195,7 @@ def get_all_pdfs(pdf_files: List[str], pdf_dir: str, subset: bool = False, subse
         pdf_dicts[article_id] = pages
     return pdf_dicts
 
+@timer_wrap
 def save_pdf_dicts(pdf_dicts: Dict[str, List[str]], pdf_dir: str):
     """
     Save the PDF dictionary to a pickle file.
@@ -213,4 +213,45 @@ if __name__ == "__main__":
     pdf_dicts = get_all_pdfs(pdf_files=pdf_files, pdf_dir=pdf_dir)
     save_pdf_dicts(pdf_dicts=pdf_dicts, pdf_dir=pdf_dir)
 
-__all__ = ["extract_pdf_text"]
+@timer_wrap
+def extract_xml_text(xml_path: str, encoding: Optional[str] = None) -> str:
+    """Extract raw text content from an XML file as cleanly as possible.
+
+    - Uses xml.etree.ElementTree to parse the document
+    - Concatenates all text nodes (itertext)
+    - Applies the same normalization as `clean_page` for consistency
+    """
+    from xml.etree import ElementTree as ET
+
+    path = Path(xml_path)
+    if not path.exists():
+        raise FileNotFoundError(f"XML file not found: {xml_path}")
+
+    # Read as bytes to let ET infer encoding from the XML header if present
+    with open(path, "rb") as f:
+        data = f.read()
+
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError as e:
+        logger.error(f"Failed to parse XML %s: %s", path, e)
+        raise
+
+    text_fragments = list(root.itertext())
+    raw_text = " ".join(fragment.strip() for fragment in text_fragments if fragment and fragment.strip())
+    normalized = clean_page(raw_text)
+    return normalized
+
+
+if __name__ == "__main__":
+    # Simple smoke test similar to the unstructured variant's __main__
+    project_root_local = project_root
+    pdf_dir = os.path.join(project_root_local, "Data/train/PDF")
+    if os.path.isdir(pdf_dir):
+        pdf_files = [f for f in os.listdir(pdf_dir) if f.lower().endswith(".pdf")]
+        pdf_dicts = get_all_pdfs(pdf_files=pdf_files, pdf_dir=pdf_dir)
+        # save_pdf_dicts(pdf_dicts=pdf_dicts, pdf_dir=pdf_dir)
+    else:
+        logger.info("PDF directory not found at %s; skipping demo run.", pdf_dir)
+
+__all__ = ["extract_pdf_text", "extract_xml_text"]

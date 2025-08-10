@@ -33,7 +33,7 @@ from api.services.embeddings_services import get_embedding_result
 from api.services.dataset_construction_service import construct_datasets_from_retrieval_results
 from api.services.neighborhood_stats import run_neighborhood_stats_pipeline as run_neighborhood_stats_pipeline_service
 from api.utils.duckdb_utils import DuckDBHelper
-from api.services.document_parsing_service import build_document_objects, build_document_object
+# from api.services.document_parsing_service import build_document_objects, build_document_object
 
 # Initialize logging
 filename = os.path.basename(__file__)
