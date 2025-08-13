@@ -1,5 +1,0 @@
-template_string DataCitationPatterns() #"
-    
-
-
-"#

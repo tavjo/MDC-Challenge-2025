@@ -43,16 +43,3 @@ def all_succeeded(checks: Dict[CheckName, Check]) -> bool:
 class CitationEntity(BaseModel):
     evidence: List[str]
     data_citation: str
-
-class Document(BaseModel):
-    doi: str
-    has_dataset_citation: Optional[bool] = None
-    full_text: List[str]
-    total_char_length: int
-    parsed_timestamp: str
-    total_tokens: int
-    avg_tokens_per_chunk: Optional[float] = None
-    file_hash: str
-    file_path: str
-    n_pages: int
-    citation_entities: Optional[List["CitationEntity"]] = None

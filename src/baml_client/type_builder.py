@@ -22,7 +22,7 @@ from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIM
 class TypeBuilder(_TypeBuilder):
     def __init__(self):
         super().__init__(classes=set(
-          ["CitationEntity","Document",]
+          ["CitationEntity",]
         ), enums=set(
           []
         ), runtime=DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME)
@@ -31,10 +31,6 @@ class TypeBuilder(_TypeBuilder):
     @property
     def CitationEntity(self) -> "CitationEntityAst":
         return CitationEntityAst(self)
-
-    @property
-    def Document(self) -> "DocumentAst":
-        return DocumentAst(self)
 
 
 
@@ -79,84 +75,6 @@ class CitationEntityProperties:
     @property
     def data_citation(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("data_citation"))
-
-    
-
-class DocumentAst:
-    def __init__(self, tb: _TypeBuilder):
-        _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("Document")
-        self._properties: typing.Set[str] = set([ "doi",  "has_dataset_citation",  "full_text",  "total_char_length",  "parsed_timestamp",  "total_tokens",  "avg_tokens_per_chunk",  "file_hash",  "file_path",  "n_pages",  "citation_entities", ])
-        self._props = DocumentProperties(self._bldr, self._properties)
-
-    def type(self) -> FieldType:
-        return self._bldr.field()
-
-    @property
-    def props(self) -> "DocumentProperties":
-        return self._props
-
-
-class DocumentViewer(DocumentAst):
-    def __init__(self, tb: _TypeBuilder):
-        super().__init__(tb)
-
-    
-    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
-        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
-
-
-
-class DocumentProperties:
-    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
-        self.__bldr = bldr
-        self.__properties = properties
-
-    
-
-    @property
-    def doi(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("doi"))
-
-    @property
-    def has_dataset_citation(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("has_dataset_citation"))
-
-    @property
-    def full_text(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("full_text"))
-
-    @property
-    def total_char_length(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("total_char_length"))
-
-    @property
-    def parsed_timestamp(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("parsed_timestamp"))
-
-    @property
-    def total_tokens(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("total_tokens"))
-
-    @property
-    def avg_tokens_per_chunk(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("avg_tokens_per_chunk"))
-
-    @property
-    def file_hash(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("file_hash"))
-
-    @property
-    def file_path(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("file_path"))
-
-    @property
-    def n_pages(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("n_pages"))
-
-    @property
-    def citation_entities(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("citation_entities"))
 
     
 

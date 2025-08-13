@@ -475,50 +475,6 @@ def export_clustering_report(
         logger.error(f"Error exporting clustering report: {e}")
         return False
 
-# @timer_wrap
-# def run_clustering_pipeline(
-#     dataset_embeddings: Dict[str, np.ndarray],
-#     k_neighbors: int = 30,
-#     similarity_threshold: float = None,
-#     threshold_method: str = "degree_target",
-#     resolution: float = 1.5,
-#     min_cluster_size: int = 6,
-#     max_cluster_size: Optional[int] = None,
-#     split_factor: float = 1.3,
-#     random_seed: int = 42,
-#     target_n: int = 48,
-#     tol: int = 2,
-#     db_path: str = DEFAULT_DUCKDB_PATH,
-#     output_dir: str = "reports/clustering"
-# ) -> bool:
-#     """
-#     Run the complete clustering pipeline.
-#     """
-#     logger.info("Running clustering pipeline")
-#     db_helper = DuckDBHelper(db_path)
-#     try:
-#         graph = build_knn_similarity_graph(dataset_embeddings, k_neighbors, similarity_threshold, threshold_method)
-#         graph_stats = {
-#             "vertices": graph.vcount(),
-#             "edges": graph.ecount(),
-#             "avg_degree": 2*graph.ecount()/graph.vcount()
-#         }
-#         # cluster_assignments = run_leiden_clustering(graph, resolution, min_cluster_size,max_cluster_size, split_factor, random_seed)
-#         cluster_assignments, gamma = find_resolution_for_target(
-#         graph,
-#         target_n=target_n,            # aim for ~48 clusters
-#         tol=tol,
-#         min_cluster_size=min_cluster_size,
-#         max_cluster_size=max_cluster_size,  # effectively disable the upper bound
-#         split_factor=split_factor,
-#         random_seed=random_seed)
-#         logger.info("Final γ = %.3f yielded %d clusters", gamma,
-#                 len(set(cluster_assignments.values())))
-#         update_dataset_clusters_in_duckdb(cluster_assignments, db_helper)
-#         return export_clustering_report(cluster_assignments, graph_stats, output_dir)
-#     except Exception as e:
-#         logger.error(f"Error running clustering pipeline: {e}")
-#         return False
 
 
 @timer_wrap

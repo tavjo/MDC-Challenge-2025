@@ -8,7 +8,7 @@ class CitationEntity {
 
 // Create a function to extract the data citations from a list of strings.
 function ExtractCitation(document: string[]) -> CitationEntity[] {
-  client MyLocalLLM
+  client QwenLocal
   prompt #"
     You are a research assistant tasked with extracting dataset citations from a text. Extract ALL unique dataset citations from the text.
     The evidence should be the snippet of text that contains the dataset citation.

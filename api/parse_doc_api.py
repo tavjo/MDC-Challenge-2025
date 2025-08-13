@@ -57,11 +57,13 @@ async def parse_docs(payload: BulkParseRequest):
     subset = payload.subset
     subset_size = payload.subset_size
     max_workers = payload.max_workers
+    strategy = payload.strategy
     params = {
         "pdf_paths": pdf_paths,
         "subset": subset,
         "subset_size": subset_size,
-        "max_workers": max_workers
+        "max_workers": max_workers,
+        "strategy": strategy
     }
     helper = get_duckdb_helper(DB_PATH)
     try:

@@ -11,12 +11,40 @@ import inspect
 from functools import wraps
 import logging
 import numpy as np
+from pathlib import Path
+import hashlib
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-sys.path.append(project_root)
+root_dir = Path(__file__).parent
+print(root_dir)
+sys.path.append(str(root_dir))
+
+from .models import CitationEntity
+from .baml_wrapper import extract_cites
 
 logger = logging.getLogger(__name__)
 
+def initialize_logging(filename: str) -> logging.Logger:
+    """
+    Initialize logging for a given filename.
+    """
+    logger = logging.getLogger(filename)
+    logger.setLevel(logging.INFO)
+    return logger
+
+def ensure_dir(path) -> Path:
+    """
+    Create a directory if it doesn't exist. Returns a Path.
+    Expands '~' and env vars.
+    """
+    p = Path(os.path.expanduser(os.path.expandvars(str(path))))
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+def ensure_dirs(*paths) -> list[Path]:
+    """
+    Create multiple directories if they don't exist. Returns list[Path].
+    """
+    return [ensure_dir(p) for p in paths]
 
 def timer_wrap(func):
     if inspect.iscoroutinefunction(func):
@@ -56,6 +84,19 @@ def timer_wrap(func):
             return result
         return sync_wrapper
 
+def num_tokens(text: str, model: str = "gpt-4o-mini") -> int:
+    import tiktoken
+    encoding = tiktoken.encoding_for_model(model)
+    return len(encoding.encode(text))
+
+def compute_file_hash(file_path: Path) -> str:
+    """Compute MD5 hash of XML file for debugging reference."""
+    try:
+        with open(file_path, 'rb') as f:
+            return hashlib.md5(f.read()).hexdigest()
+    except Exception:
+        return ""
+
 
 def sliding_window_chunks(text: str, window_size: int = 300, overlap: int = 30) -> List[str]:
     """
@@ -94,3 +135,43 @@ def cosine_sim_matrix(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     A = A / (np.linalg.norm(A, axis=1, keepdims=True) + 1e-8)
     B = B / (np.linalg.norm(B, axis=1, keepdims=True) + 1e-8)
     return A @ B.T  # [N, M]
+
+# --- Embedding with local BGE-small ---
+def load_bge_model(local_dir: str | Path):
+    """
+    Load a local, pre-downloaded BGE-small v1.5 SentenceTransformers model (offline-friendly).
+    """
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer(str(local_dir))  # local path works offline
+    return model
+
+def embed_texts(model, texts: List[str], batch_size: int = 64) -> np.ndarray:
+    """
+    Encode texts with L2-normalized embeddings for cosine similarity.
+    """
+    emb = model.encode(
+        texts,
+        batch_size=batch_size,
+        convert_to_numpy=True,
+        normalize_embeddings=True,  # recommended for BGE
+        show_progress_bar=True,
+    )
+    return emb
+
+def extract_entities_baml(doc: List[str], doc_id: str) -> List[CitationEntity]:
+    """
+    Extract citation entities from the document text using the BAML client.
+    """
+    logger.info(f"Extracting citation entities using BAML client for {doc_id}.")
+    citations = extract_cites(doc)
+    if citations:
+        entities = [{
+            "data_citation": entity.data_citation,
+            "document_id": doc_id,
+            "evidence": entity.evidence,
+        } for entity in citations]
+        citation_entities = [CitationEntity.model_validate(entity) for entity in entities]
+        return citation_entities
+    else:
+        logger.warning("No citation entities found using BAML client.")
+        return []

@@ -49,43 +49,47 @@ _LIGATURE_MAP = str.maketrans({
     "ﬄ": "ffl",
 })
 
-@timer_wrap
+
 def clean_page(text: str) -> str:
-    # 1. join   exam- \n ple  → example      (already present)
+    """
+    Tidy a raw PDF-extracted page so that downstream regexes
+    (e.g., citation patterns) match reliably.
+
+    Steps:
+    1.  Join words split with hyphen at line-end.
+    2.  Remove discretionary/soft hyphens.
+    3.  Replace ligature glyphs with ASCII equivalents.
+    4.  Collapse bare new-lines into a single space.
+    5.  Collapse runs of spaces/tabs.
+    6.  NFKD normalisation (helps “weird” accents).
+    """
+    # 1. join   exam- \n ple  → example
     text = _HYPHEN_LINEBREAK_RE.sub("", text)
 
-    # 2. strip soft-hyphens                       (already present)
+    # 2. strip the invisible soft hyphen
     text = _SOFT_HYPHEN_RE.sub("", text)
 
-    # 3. replace ligatures                        (already present)
+    # 3. replace common ligatures
     text = text.translate(_LIGATURE_MAP)
 
-    # 4. convert all remaining line breaks → space
+    # 4. convert remaining line breaks to spaces
     text = _NEWLINES_RE.sub(" ", text)
-    
-    # 4 b. **NEW**  delete any “dash + spaces” that remain inside a token  
-    #               e.g. “bca- d9957” → “bcad9957”
-    text = re.sub(r'-\s+(?=\w)', '', text)
 
-    # 4 c. NEW – delete any spaces *inside* a token that follows a dash
-    #(handles “…bca- d9957…”  →  “…bcad9957…”)
-    text = re.sub(r'(?<=-)\s+(?=\w)', '', text)
-
-    # 5. squeeze multiple spaces / tabs
+    # 5. squeeze multiple consecutive spaces/tabs/non-breaking spaces
     text = _MULTISPACE_RE.sub(" ", text).strip()
 
-    # 6. Unicode normalisation
+    # 6. Unicode normalisation – makes “ﬃ”→“ffi” consistent, etc.
     text = unicodedata.normalize("NFKD", text)
+
     return text
 
-@timer_wrap
+
 def extract_pdf_text(
     pdf_path: str,
     *,
     include_page_breaks: bool = True,
     return_elements: bool = False,
-    strategy: str = "fast",  # "fast", "hi_res", "ocr_only"
-    include_metadata: bool = True,
+    strategy: str = "hi_res"
 ) -> Union[List[Dict[str, str]], Tuple[List[Dict[str, str]], List[Element]]]:
     """Parse *pdf_path* with **unstructured** and return page-wise text.
 
@@ -96,85 +100,48 @@ def extract_pdf_text(
     include_page_breaks : bool, optional
         Whether to tell ``partition_pdf`` to insert explicit page breaks.
     return_elements : bool, optional
-        If ``True``, also return the raw ``Element`` list so that 
-        callers can
-        compute table/figure counts, language detection, etc.  
-        Default is
+        If ``True``, also return the raw ``Element`` list so that callers can
+        compute table/figure counts, language detection, etc.  Default is
         ``False`` for backward compatibility.
-        Partitioning strategy: "fast", "hi_res", or "ocr_only".
-    include_metadata : bool, optional
-        Whether to include metadata in the output.
-    
+
     Returns
     -------
     list | (list, list)
         * When *return_elements* is ``False`` (default):
-          ``List({'page_number': int, 'text': str})``
-        * When *True*: a tuple ``(pages, elements)`` where *pages* 
-        is the same
-          list described above and *elements* is the unmodified list 
-          of
+          ``List[{'page_number': int, 'text': str}]``
+        * When *True*: a tuple ``(pages, elements)`` where *pages* is the same
+          list described above and *elements* is the unmodified list of
           :class:`unstructured.documents.elements.Element` objects.
     """
     path = Path(pdf_path)
     if not path.exists():
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-    def _run(strategy_name: str):
-        logger.info("Parsing PDF %s with unstructured.partition_pdf (strategy: %s)…", path, strategy_name)
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
-            # Enable table structure inference when running high-fidelity modes, or if explicitly requested
-            infer_tables_env = os.getenv("UNSTRUCTURED_INFER_TABLES", "auto").lower()
-            if infer_tables_env in ("1", "true", "yes"):  # force on
-                infer_table_structure = True
-            elif infer_tables_env in ("0", "false", "no"):  # force off
-                infer_table_structure = False
-            else:  # auto
-                infer_table_structure = strategy_name in ("hi_res", "ocr_only")
+    logger.info("Parsing PDF %s with unstructured.partition_pdf with strategy %s …", path, strategy)
 
-            elems: List[Element] = partition_pdf(
-                str(path),
-                include_page_breaks=include_page_breaks,
-                strategy=strategy_name,
-                include_metadata=include_metadata,
-                infer_table_structure=infer_table_structure,
-            )
-        pages_acc: Dict[int, List[str]] = {}
-        for el in elems:
-            pn = el.metadata.page_number or 1
-            el.text = clean_page(el.text)
-            pages_acc.setdefault(pn, []).append(el.text.strip())
-        pages_local = [
-            {"page_number": pn, "text": "\n\n".join(blocks)}
-            for pn, blocks in sorted(pages_acc.items())
-        ]
-        return pages_local, elems
+    # Single pass over the PDF
+    elements: List[Element] = partition_pdf(str(path), include_page_breaks=include_page_breaks, strategy=strategy)
 
-    # Try requested strategy first, then fall back to hi_res, then ocr_only if no pages
-    strategies = [strategy]
-    for fallback in ("hi_res", "ocr_only"):
-        if fallback not in strategies:
-            strategies.append(fallback)
+    # Group texts by page number
+    pages_acc: Dict[int, List[str]] = {}
+    for el in elements:
+        pn = el.metadata.page_number or 1
+        el.text = clean_page(el.text)
+        pages_acc.setdefault(pn, []).append(el.text.strip())
 
-    last_elements: Optional[List[Element]] = None
-    for strat in strategies:
-        pages, elements = _run(strat)
-        last_elements = elements
-        logger.info("Extracted %d pages (%d elements) from %s using %s.", len(pages), len(elements), path, strat)
-        if len(pages) > 0:
-            if return_elements:
-                return pages, elements
-            return pages
+    pages = [
+        {"page_number": pn, "text": "\n\n".join(blocks)}
+        for pn, blocks in sorted(pages_acc.items())
+    ]
 
-    # If still empty, return empty consistent structure
-    logger.warning("All strategies failed to yield pages for %s; returning empty result.", path)
+    logger.info("Extracted %d pages (%d elements) from %s.", len(pages), len(elements), path)
+
     if return_elements:
-        return [], (last_elements or [])
-    return []
+        return pages, elements
+    return pages
 
-@timer_wrap
-def load_pdf_pages(pdf_path: str) -> List[str]:
+
+def load_pdf_pages(pdf_path: str, strategy: str = "hi_res") -> List[str]:
     """
     Load Document pages from a PDF file.
     """
@@ -184,21 +151,11 @@ def load_pdf_pages(pdf_path: str) -> List[str]:
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
     # --------------------------------------------------
-    # 1) Parse PDF with fallback strategies
+    # 1) Parse PDF once and get both pages + elements
     # --------------------------------------------------
     logger.info(f"Extracting text from {pdf_path}")
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
     try:
-        # Allow forcing a specific starting strategy via env var for hard cases
-        start_strategy = os.getenv("PDF_PARSE_STRATEGY", "fast")
-        pages_json = extract_pdf_text(str(path), return_elements=False, strategy=start_strategy)
-        if not pages_json:
-            logger.warning("Fast strategy returned no pages for %s; trying hi_res.", pdf_path)
-            pages_json = extract_pdf_text(str(path), return_elements=False, strategy="hi_res")
-        if not pages_json:
-            logger.warning("hi_res returned no pages for %s; trying ocr_only.", pdf_path)
-            pages_json = extract_pdf_text(str(path), return_elements=False, strategy="ocr_only")
+        pages_json = extract_pdf_text(str(path), return_elements=False, strategy=strategy)
         pages: List[str] = [p["text"] for p in pages_json]
         num_pages = len(pages_json)
         logger.info(f"Loaded {num_pages} pages from {pdf_path}")

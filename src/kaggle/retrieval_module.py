@@ -55,6 +55,14 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple, Optional, Iterable
 from collections import defaultdict, Counter
 
+from pathlib import Path
+import sys
+
+# Allow importing sibling kaggle helpers/models when used as a standalone script
+THIS_DIR = Path(__file__).parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.append(str(THIS_DIR))
+
 import numpy as np
 
 from .helpers import cosine_sim_matrix
@@ -328,77 +336,6 @@ def _normalize_scores(d: Dict[str, float]) -> Dict[str, float]:
         return d
     return {k: (v - lo) / (hi - lo) for k, v in d.items()}
 
-
-# def hybrid_retrieve_with_boost(
-#     *,
-#     query_text: str,
-#     dense_query_vec: np.ndarray,
-#     id_to_dense: Dict[str, np.ndarray],
-#     id_to_text: Dict[str, str],
-#     id_to_section: Optional[Dict[str, Optional[str]]] = None,
-#     id_to_neighbors: Optional[Dict[str, List[str]]] = None,
-#     regex_index: Optional[Dict[str, Dict[str, int]]] = None,
-#     boost_cfg: BoostConfig = BoostConfig(),
-# ) -> List[str]:
-#     """Run sparse+dense → RRF, then apply DAS/Methods/regex boosts, then MMR diversify.
-
-#     Returns: final ranked list of chunk_ids.
-#     """
-#     # 1) Retrieve
-#     sparse_ids = _sparse_topk(query_text, id_to_text, k=boost_cfg.sparse_k)
-#     dense_ids  = _dense_topk(dense_query_vec, id_to_dense, k=boost_cfg.dense_k)
-
-#     rrf = reciprocal_rank_fusion([sparse_ids, dense_ids], k=boost_cfg.rrf_k)
-#     base_scores = rrf.scores  # id -> RRF score
-
-#     # 2) Prepare regex counts
-#     if regex_index is None:
-#         regex_index = build_regex_index(id_to_text)
-
-#     # Neighbor map
-#     id_to_neighbors = id_to_neighbors or {}
-
-#     # 3) Apply boosts
-#     boosted: Dict[str, float] = dict(base_scores)
-
-#     # Precompute which ids have regex hits
-#     regex_positive_ids = {cid for cid, c in regex_index.items() if c.get("_total", 0) > 0}
-
-#     # Direct regex boost
-#     for cid in list(boosted.keys()):
-#         if cid in regex_positive_ids:
-#             n = regex_index[cid].get("_total", 0)
-#             boosted[cid] = boosted[cid] + boost_cfg.regex_hit_boost * min(3.0, float(n))
-
-#     # Neighbor regex boost
-#     if id_to_neighbors:
-#         for cid, neighbors in id_to_neighbors.items():
-#             if cid not in boosted:
-#                 continue
-#             if any(nid in regex_positive_ids for nid in neighbors):
-#                 boosted[cid] = boosted[cid] + boost_cfg.regex_neighbor_boost
-
-#     # Section boost (Methods / Data Availability)
-#     for cid in list(boosted.keys()):
-#         sec = id_to_section[cid] if id_to_section and cid in id_to_section else None
-#         txt = id_to_text.get(cid, "")
-#         if _is_methods_or_das(sec, txt):
-#             boosted[cid] = boosted[cid] + boost_cfg.das_methods_boost
-
-#     # 4) Re-rank by boosted score, keep a pool for MMR
-#     boosted = _normalize_scores(boosted)
-#     pool_rank = [cid for cid, _ in sorted(boosted.items(), key=lambda x: -x[1])]
-
-#     # 5) MMR diversification on the pool using dense vectors
-#     pool_rank = [cid for cid in pool_rank if cid in id_to_dense]
-#     final_ids = mmr_rerank(
-#         candidate_ids=pool_rank,
-#         query_vec=dense_query_vec,
-#         id_to_vec=id_to_dense,
-#         lambda_diversity=boost_cfg.mmr_lambda,
-#         top_k=boost_cfg.mmr_top_k,
-#     )
-#     return final_ids
 
 # ------------------------------
 # Boost configuration (updated)

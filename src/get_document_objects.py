@@ -25,19 +25,20 @@ def get_document_object(pdf_path: str):
     response = requests.get(f"http://localhost:3000/parse_doc?pdf_path={pdf_path}")
     return response.json()
 
-def build_payload(pdf_paths: List[str], subset: bool = False, subset_size: int = 20, export_file: Optional[str] = None, export_path: Optional[str] = None, max_workers: int = 8):
+def build_payload(pdf_paths: List[str], subset: bool = False, subset_size: int = 20, export_file: Optional[str] = None, export_path: Optional[str] = None, max_workers: int = 8, strategy: str = "hi_res"):
     payload = BulkParseRequest(
         pdf_paths=pdf_paths,
         export_file=export_file,
         export_path=export_path,
         subset=subset,
         subset_size=subset_size,
-        max_workers=max_workers
+        max_workers=max_workers,
+        strategy=strategy
     )
     return payload
 
 @timer_wrap
-def get_document_objects(pdf_paths: List[str], subset: bool = False, subset_size: int = 20, export_file: Optional[str] = None, export_path: Optional[str] = None, max_workers: int = 8):
+def get_document_objects(pdf_paths: List[str], subset: bool = False, subset_size: int = 20, export_file: Optional[str] = None, export_path: Optional[str] = None, max_workers: int = 8, strategy: str = "hi_res"):
     # Suppress pdfminer warnings about CropBox/MediaBox
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
@@ -45,7 +46,7 @@ def get_document_objects(pdf_paths: List[str], subset: bool = False, subset_size
         np.random.seed(42)
         pdf_paths = np.random.choice(pdf_paths, subset_size, replace=False)
         logger.info(f"Subsetting to {subset_size} PDFs")
-    payload = build_payload(pdf_paths=pdf_paths, subset=subset, subset_size=subset_size, export_file=export_file, export_path=export_path, max_workers=max_workers)
+    payload = build_payload(pdf_paths=pdf_paths, subset=subset, subset_size=subset_size, export_file=export_file, export_path=export_path, max_workers=max_workers, strategy=strategy)
     response = requests.post(f"http://localhost:3000/bulk_parse_docs", json=payload.model_dump(exclude_none=True))
     return response.json()
 
@@ -56,10 +57,10 @@ def main():
     pdf_paths = [os.path.join("Data/train/PDF", pdf) for pdf in pdf_paths if pdf.endswith(".pdf")]
     # subset to 20
     # response = get_document_objects(pdf_paths=pdf_paths, subset=True,
-    #                                subset_size=20)
+    #                                subset_size=5, strategy="fast")
     # logger.info(f"Response: {response}")
     # run full
-    response = get_document_objects(pdf_paths=pdf_paths, subset=False)
+    response = get_document_objects(pdf_paths=pdf_paths, subset=False, strategy="fast")
     logger.info(f"Bulk response: {response}")
 
 if __name__ == "__main__":

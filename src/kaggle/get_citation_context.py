@@ -21,8 +21,16 @@ Notes:
 from __future__ import annotations
 import os, sys, logging
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import numpy as np
+
+from pathlib import Path
+import sys
+
+# Allow importing sibling kaggle helpers/models when used as a standalone script
+THIS_DIR = Path(__file__).parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.append(str(THIS_DIR))
 
 # --- Logging ---
 logging.basicConfig(level=logging.INFO)
@@ -32,58 +40,9 @@ logger = logging.getLogger("mdc_integration_demo")
 # Ensure the path containing mdc_retrieval_module.py is on sys.path
 # sys.path.append("/path/to/your/module")  # if needed
 from src.kaggle.retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON
+from src.kaggle.helpers import load_bge_model, embed_texts
+from src.kaggle.duckdb import get_duckdb_helper
 
-# --- Your provided chunker ---
-def sliding_window_chunks(text: str, window_size: int = 300, overlap: int = 30) -> List[str]:
-    """
-    Split the input text into sliding window chunks based on word count.
-    """
-    logger.info(f"Creating chunks with window size {window_size} and overlap {overlap}")
-    words = text.replace('\n', ' ').split()
-    chunks = []
-    start = 0
-    total_words = len(words)
-
-    while start < total_words:
-        end = min(start + window_size, total_words)
-        chunk_words = words[start:end]
-        chunks.append(" ".join(chunk_words))
-        start += window_size - overlap
-
-    # Merge any too-small tail fragments
-    min_size = overlap * 2
-    refined_chunks: List[str] = []
-    for ch in chunks:
-        word_count = len(ch.split())
-        if refined_chunks and word_count < min_size:
-            refined_chunks[-1] += " " + ch
-        else:
-            refined_chunks.append(ch)
-    chunks = refined_chunks
-    logger.info(f"Successfully created {len(chunks)} chunks after merging small fragments")
-    return chunks
-
-# --- Embedding with local BGE-small ---
-def load_bge_model(local_dir: str | Path):
-    """
-    Load a local, pre-downloaded BGE-small v1.5 SentenceTransformers model (offline-friendly).
-    """
-    from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer(str(local_dir))  # local path works offline
-    return model
-
-def embed_texts(model, texts: List[str], batch_size: int = 64) -> np.ndarray:
-    """
-    Encode texts with L2-normalized embeddings for cosine similarity.
-    """
-    emb = model.encode(
-        texts,
-        batch_size=batch_size,
-        convert_to_numpy=True,
-        normalize_embeddings=True,  # recommended for BGE
-        show_progress_bar=False,
-    )
-    return emb
 
 # --- Simple query builder for dataset-citation hunting ---
 def build_query_text() -> str:
@@ -108,19 +67,20 @@ def maybe_add_bge_instruction(query: str, use_instruction: bool = True) -> str:
 
 # --- Run retrieval on a single new document ---
 def run_hybrid_retrieval_on_document(
-    doc_text: str,
+    doc_id: str,
     model_dir: str | Path,
     top_k: int = 15,
-    window_size: int = 300,
-    overlap: int = 30,
     use_instruction: bool = True,
+    prototypes: Optional[np.ndarray] = None,
+    db_path: str | None = None,
 ) -> List[Tuple[str, str]]:
     """
     Returns a list of (chunk_id, chunk_preview) for top_k hits.
     """
-    # 1) Chunk the document
-    chunks = sliding_window_chunks(doc_text, window_size=window_size, overlap=overlap)
-    id_to_text: Dict[str, str] = {f"chunk_{i}": ch for i, ch in enumerate(chunks)}
+    db_helper = get_duckdb_helper(db_path)
+    chunks = db_helper.get_chunks_by_document_id(doc_id)
+    db_helper.close()
+    id_to_text: Dict[str, str] = {f"chunk_{i}": ch.text for i, ch in enumerate(chunks)}
 
     # 2) Load local BGE-small and embed chunks
     model = load_bge_model(model_dir)
@@ -135,13 +95,14 @@ def run_hybrid_retrieval_on_document(
     query_vec = embed_texts(model, [query_for_embedding])[0]
 
     # 4) Run hybrid retrieval: sparse (BM25/TF-IDF) + dense -> RRF -> MMR
-    ranked_ids = hybrid_retrieve_with_boost(
+    ranked_ids = hybrid_retrieve_with_boost( # TODO: Fix to include the prototype ranker
         query_text=query_text,               # sparse side uses raw query text
         dense_query_vec=query_vec,           # dense side uses BGE embedding
         id_to_dense=id_to_dense,             # {chunk_id: 384-d vec}
         id_to_text=id_to_text,               # {chunk_id: raw text}
         sparse_k=30, dense_k=30, rrf_k=60,   # tweak as you like
         mmr_lambda=0.7, mmr_top_k=top_k,
+        prototypes=prototypes,
     )
 
     # 5) Return top_k chunks with a short preview
@@ -155,7 +116,7 @@ def run_hybrid_retrieval_on_document(
 # --- Example usage ---
 if __name__ == "__main__":
     # Point this to your already-downloaded BGE-small v1.5 directory
-    LOCAL_BGE_DIR = "/path/to/BAAI/bge-small-en-v1.5"  # e.g., ./models/bge-small-en-v1.5
+    LOCAL_BGE_DIR = "offline_models/BAAI/bge-small-en-v1.5"
 
     # New document text (replace with your actual content)
     doc_text = """
@@ -176,3 +137,5 @@ if __name__ == "__main__":
     print("\nTop hits (chunk_id, preview):")
     for cid, preview in hits:
         print(f"- {cid}: {preview}")
+
+

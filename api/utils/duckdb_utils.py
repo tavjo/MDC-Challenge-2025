@@ -281,6 +281,49 @@ class DuckDBHelper:
             logger.error(f"Failed to update text fields for document {document.doi}: {e}")
             return False
 
+    def force_update_document_text(self, document: Document) -> bool:
+        """Update text-related fields with FK checks temporarily disabled.
+
+        Workaround for DuckDB constraint errors observed when updating non-key
+        columns while foreign keys reference the primary key.
+        """
+        try:
+            self.engine.execute("PRAGMA foreign_keys=OFF")
+            doc_row = document.to_duckdb_row()
+            self.engine.execute(
+                """
+                UPDATE documents
+                SET full_text = ?,
+                    total_char_length = ?,
+                    parsed_timestamp = ?,
+                    file_hash = ?,
+                    file_path = ?,
+                    n_pages = ?,
+                    total_tokens = ?
+                WHERE doi = ?
+                """,
+                (
+                    doc_row["full_text"],
+                    doc_row["total_char_length"],
+                    doc_row["parsed_timestamp"],
+                    doc_row["file_hash"],
+                    doc_row["file_path"],
+                    doc_row["n_pages"],
+                    doc_row["total_tokens"],
+                    doc_row["doi"],
+                ),
+            )
+            logger.info(f"Force-updated text fields for document {document.doi}")
+            return True
+        except Exception as e:
+            logger.error(f"Force update failed for document {document.doi}: {e}")
+            return False
+        finally:
+            try:
+                self.engine.execute("PRAGMA foreign_keys=ON")
+            except Exception:
+                pass
+
     def batch_upsert_documents(self, documents: List[Document]) -> Dict[str, Any]:
         """
         Batch-upsert Document objects using a DataFrame buffer approach.

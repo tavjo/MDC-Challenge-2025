@@ -14,20 +14,21 @@ from src.helpers import timer_wrap, initialize_logging, compute_file_hash, num_t
 from src.models import Document
 
 # Prefer the unstructured-based extractor; fall back to the lightweight extractor if unavailable
-_EXTRACTOR_SOURCE = None
-try:
-    from src.extract_pdf_text_unstructured import load_pdf_pages, extract_xml_text  # type: ignore
-    _EXTRACTOR_SOURCE = "unstructured"
-except Exception:
-    from src.extract_pdf_text_light import load_pdf_pages, extract_xml_text  # type: ignore
-    _EXTRACTOR_SOURCE = "light"
+# _EXTRACTOR_SOURCE = None
+# try:
+from src.extract_pdf_text_unstructured import load_pdf_pages, extract_xml_text  # type: ignore
+from src.extract_pdf_text_light import load_pdf_pages as load_pdf_pages_light  # type: ignore
+#     _EXTRACTOR_SOURCE = "unstructured"
+# except Exception:
+#     from src.extract_pdf_text_light import load_pdf_pages, extract_xml_text  # type: ignore
+#     _EXTRACTOR_SOURCE = "light"
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)
-logger.info(f"Using '{_EXTRACTOR_SOURCE}' text extractor backend in document_parsing_service")
+# logger.info(f"Using '{_EXTRACTOR_SOURCE}' text extractor backend in document_parsing_service")
 
 @timer_wrap
-def build_document_object(pdf_path: str):
+def build_document_object(pdf_path: str, strategy: str = "hi_res"):
     if os.path.exists(pdf_path):
         logger.info(f"Building document object for {pdf_path}")
     else:
@@ -40,7 +41,40 @@ def build_document_object(pdf_path: str):
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
     if doc_type == ".pdf":
-        pages = load_pdf_pages(pdf_path)
+        pages = []
+        # 1) Try lightweight extractor first
+        try:
+            pages = load_pdf_pages_light(pdf_path)
+            if not pages:
+                logger.warning(f"Lightweight extractor returned 0 pages for {pdf_path}")
+        except Exception as e:
+            logger.warning(f"Lightweight extractor failed for {pdf_path}: {e}")
+            pages = []
+
+        # 2) Fallback to unstructured with fast strategy
+        if not pages:
+            try:
+                pages = load_pdf_pages(pdf_path, strategy="fast")
+                if not pages:
+                    logger.warning(f"Unstructured extractor (strategy='fast') returned 0 pages for {pdf_path}")
+            except Exception as e:
+                logger.warning(f"Unstructured extractor (strategy='fast') failed for {pdf_path}: {e}")
+                pages = []
+
+        # 3) Final fallback to unstructured with hi_res strategy
+        if not pages:
+            try:
+                pages = load_pdf_pages(pdf_path, strategy="hi_res")
+                if not pages:
+                    logger.error(f"Unstructured extractor (strategy='hi_res') returned 0 pages for {pdf_path}")
+            except Exception as e:
+                logger.error(f"Unstructured extractor (strategy='hi_res') failed for {pdf_path}: {e}")
+                pages = []
+
+        if not pages:
+            logger.error(f"All extraction strategies yielded no pages for {pdf_path}")
+            return None
+
         total_char_length = sum(len(page) for page in pages)
         # calculate total tokens
         total_tokens = sum([num_tokens(page) for page in pages])
@@ -73,7 +107,7 @@ def build_document_object(pdf_path: str):
     return document
 
 @timer_wrap
-def build_document_objects(pdf_paths: List[str], subset: bool = False, subset_size: int = 20, max_workers: int = 8) -> List[Document]:
+def build_document_objects(pdf_paths: List[str], subset: bool = False, subset_size: int = 20, max_workers: int = 8, strategy: str = "hi_res") -> List[Document]:
     # Suppress pdfminer warnings about CropBox/MediaBox
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
@@ -90,7 +124,7 @@ def build_document_objects(pdf_paths: List[str], subset: bool = False, subset_si
     # Process documents in parallel
     with ThreadPoolExecutor(max_workers=workers) as exe:
         futures = {
-            exe.submit(build_document_object, pdf_path): pdf_path
+            exe.submit(build_document_object, pdf_path, strategy=strategy): pdf_path
             for pdf_path in pdf_paths
         }
         documents = []

@@ -63,3 +63,6 @@ models/
 # Documentation
 docs/
 *.md
+
+# irrelevant files
+src/kaggle/

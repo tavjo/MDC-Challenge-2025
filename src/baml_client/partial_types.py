@@ -38,16 +38,3 @@ class StreamState(BaseModel, Generic[T]):
 class CitationEntity(BaseModel):
     evidence: List[str]
     data_citation: Optional[str] = None
-
-class Document(BaseModel):
-    doi: Optional[str] = None
-    has_dataset_citation: Optional[bool] = None
-    full_text: List[str]
-    total_char_length: Optional[int] = None
-    parsed_timestamp: Optional[str] = None
-    total_tokens: Optional[int] = None
-    avg_tokens_per_chunk: Optional[float] = None
-    file_hash: Optional[str] = None
-    file_path: Optional[str] = None
-    n_pages: Optional[int] = None
-    citation_entities: Optional[List["CitationEntity"]] = None
