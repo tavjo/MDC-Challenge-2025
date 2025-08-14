@@ -143,7 +143,7 @@ class Reducer:
             logger.info("Loading datasets from DuckDB...")
             datasets = self.db_helper.get_all_datasets()
             logger.info(f"✅ Successfully loaded {len(datasets)} datasets from DuckDB")
-            self.db_helper.close()
+            # self.db_helper.close()
             self.datasets = datasets
             return datasets
         except Exception as e:
@@ -355,7 +355,6 @@ class Reducer:
         results = {
             "load_embeddings": None,
             "load_datasets": None,
-            "umap_reduction": None,
             "cluster_visualization": None,
             "ground_truth_visualization": None,
             "per_cluster_pca": None,
@@ -404,7 +403,6 @@ class Reducer:
         results["overall_success"] = all([
             results["load_embeddings"]["success"],
             results["load_datasets"]["success"],
-            results["umap_reduction"]["success"],
             results["per_cluster_pca"]["success"]
         ])
         

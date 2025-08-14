@@ -1,0 +1,12 @@
+{
+  "analysis_timestamp": "20250814_161836",
+  "total_samples": 692,
+  "total_features": 67,
+  "primary_samples": 259,
+  "secondary_samples": 433,
+  "primary_percentage": 37.42774566473989,
+  "max_pearson_correlation": 0.4488442912110166,
+  "max_spearman_correlation": 0.45194455568015096,
+  "top_pearson_feature": "LEIDEN_cluster_37",
+  "top_spearman_feature": "PCA_1"
+}

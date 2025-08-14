@@ -52,6 +52,7 @@ from src.models import LoadChromaDataPayload, LoadChromaDataResult, Dataset, Eng
 from typing import Dict, List, Optional
 import numpy as np
 import requests
+import umap as umap_lib
 
 @timer_wrap
 class GlobalFeatures:
@@ -136,14 +137,147 @@ class GlobalFeatures:
     # Sample (dataset citation) UMAP + PCA
     #########################################################
 
-    def run_sample_umap(self,
-                        n_neighbors: int = None,
-                        min_dist: float = None,
-                        n_components: int = None,
-                        random_seed: int = None) -> Optional[Dict[str, np.ndarray]]:
-        from src.umap import Reducer
-        reducer = Reducer(self.db_path)
-        return reducer.run_umap_reduction(self.embeddings, n_neighbors, min_dist, n_components, random_seed)
+    @timer_wrap  
+    def run_sample_umap(
+        self,
+        # embeddings: Dict[str, np.ndarray],
+        n_neighbors: int = None,
+        min_dist: float = None,
+        n_components: int = None,
+        random_seed: int = None
+    ) -> Optional[Dict[str, np.ndarray]]:
+        """
+        Apply UMAP dimensionality reduction with reproducibility:
+        - Set random_state for deterministic embedding layout
+        - Save UMAP_1, UMAP_2 features to DuckDB via upsert_engineered_features_batch
+        """
+        # if not UMAP_AVAILABLE or umap_lib is None:
+        #     logger.error("❌ UMAP is not available. Please install umap-learn")
+        #     return None
+            
+        # Use instance defaults if not provided
+        n_neighbors = n_neighbors or self.n_neighbors
+        min_dist = min_dist or self.min_dist
+        n_components = n_components or self.n_components
+        random_seed = random_seed or self.random_seed
+
+        # Load embeddings if not already loaded
+        if self.embeddings is None:
+            self.embeddings = self.load_embeddings_from_api()
+        
+        if self.embeddings is None:
+            logger.error("Failed to load embeddings for UMAP")
+            return None
+        
+        embeddings = self.embeddings
+        
+        logger.info(f"🔄 Running UMAP reduction on {len(embeddings)} embeddings...")
+        logger.info(f"Parameters: n_neighbors={n_neighbors}, min_dist={min_dist}, "
+                   f"n_components={n_components}, random_state={random_seed}")
+        
+        try:
+            # Prepare embeddings matrix
+            dataset_ids = list(embeddings.keys())
+            embedding_matrix = np.array([embeddings[dataset_id] for dataset_id in dataset_ids])
+            # embedding_matrix = embedding_matrix.T
+            
+            logger.info(f"Embedding matrix shape: {embedding_matrix.shape}")
+            
+            # Initialize and fit UMAP
+            reducer = umap_lib.UMAP(
+                n_neighbors=n_neighbors,
+                min_dist=min_dist,
+                n_components=n_components,
+                random_state=random_seed,
+                verbose=True
+            )
+            
+            # Fit and transform embeddings
+            umap_embeddings = reducer.fit_transform(embedding_matrix)
+            logger.info(f"UMAP embeddings shape: {umap_embeddings.shape}")
+            
+            # Create dictionary mapping dataset_id to UMAP coordinates
+            umap_results = {}
+            for i, dataset_id in enumerate(dataset_ids):
+                umap_results[dataset_id] = umap_embeddings[i]
+            
+            # Save UMAP features to DuckDB
+            self._save_umap_features_to_duckdb(umap_results)
+            
+            logger.info("✅ UMAP reduction completed successfully!")
+            return umap_results
+            
+        except Exception as e:
+            logger.error(f"UMAP reduction failed: {str(e)}")
+            return None
+
+    def _save_umap_features_to_duckdb(self, umap_results: Dict[str, np.ndarray]) -> bool:
+        """Save UMAP features to DuckDB using EngineeredFeatures model."""
+        try:
+            logger.info(f"Saving UMAP features for {len(umap_results)} datasets to DuckDB...")
+            
+            # Load datasets if not already loaded
+            if self.datasets is None:
+                self.datasets = self.load_datasets_from_duckdb()
+            
+            if self.datasets is None:
+                logger.error("Failed to load datasets from DuckDB")
+                return False
+            
+            # Create mapping from dataset_id to document_id
+            dataset_to_doc = {ds.dataset_id: ds.document_id for ds in self.datasets}
+
+            # turn into pandas dataframe
+            df = pd.DataFrame(umap_results) # rows should be UMAP_1 and UMAP_2 and columns should be dataset_id
+            
+            # Create EngineeredFeatures objects
+            features_list = []
+            for dataset_id in df.columns:
+                umap_coords = df[[dataset_id]].values
+                if len(umap_coords) == 0:
+                    logger.error(f"No UMAP coordinates found for dataset {dataset_id}")
+                    continue
+                if dataset_id in dataset_to_doc:
+                    features = EngineeredFeatures(
+                        dataset_id=dataset_id,
+                        document_id=dataset_to_doc[dataset_id],
+                        UMAP_1=float(umap_coords[0]),
+                        UMAP_2=float(umap_coords[1]) if len(umap_coords) > 1 else 0.0,
+                    )
+                    features_list.append(features)
+            
+            # Batch upsert to DuckDB
+            success = self.db_helper.upsert_engineered_features_batch(features_list)
+            self.db_helper.close()
+            if success:
+                logger.info(f"✅ Successfully saved UMAP features for {len(features_list)} datasets")
+                return True
+            else:
+                logger.error("❌ Failed to save UMAP features to DuckDB")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error saving UMAP features: {str(e)}")
+            return False
+
+    # def run_sample_umap(self,
+    #                     n_neighbors: int = None,
+    #                     min_dist: float = None,
+    #                     n_components: int = None,
+    #                     random_seed: int = None) -> Optional[Dict[str, np.ndarray]]:
+    #     from src.umap import Reducer
+    #     reducer = Reducer(self.db_path)
+    #     if self.embeddings is None:
+    #         self.embeddings = self.load_embeddings_from_api()
+    #     if self.embeddings is None:
+    #         logger.error("Failed to load embeddings for UMAP")
+    #         return None
+        
+    #     logger.info(f"Running UMAP reduction on {len(self.embeddings)} embeddings...")
+    #     logger.info(f"Parameters: n_neighbors={n_neighbors}, min_dist={min_dist}, "
+    #                f"n_components={n_components}, random_state={random_seed}")
+        
+    #     return reducer.run_umap_reduction(self.embeddings, n_neighbors, min_dist, n_components, random_seed)
     
     @timer_wrap
     def run_sample_pca(self, n_components: int = None, random_seed: int = None) -> Optional[Dict[str, np.ndarray]]:
@@ -232,9 +366,6 @@ class GlobalFeatures:
                     features = EngineeredFeatures(
                         dataset_id=dataset_id,
                         document_id=dataset_to_doc[dataset_id],
-                        UMAP_1=0.0,  # Placeholder, will be updated by UMAP
-                        UMAP_2=0.0,  # Placeholder, will be updated by UMAP
-                        LEIDEN_1=0.0,  # Placeholder, will be updated by clustering
                         PCA_1=float(pca_coords[0]),
                         PCA_2=float(pca_coords[1]) if len(pca_coords) > 1 else 0.0
                     )
@@ -256,8 +387,8 @@ class GlobalFeatures:
     
     def run_sample_umap_and_pca(self) -> Optional[Dict[str, np.ndarray]]:
         """Run UMAP and PCA on the sample dataset."""
-        umap_results = self.run_sample_umap()
         pca_results = self.run_sample_pca()
+        umap_results = self.run_sample_umap()
         return {**umap_results, **pca_results}
     
     #########################################################
@@ -278,7 +409,7 @@ class GlobalFeatures:
         - Set random_state for deterministic embedding layout
         - Save UMAP_1, UMAP_2 features to DuckDB via upsert_engineered_features_batch
         """
-        import umap
+        import umap as umap_lib
         # if not UMAP_AVAILABLE or umap_lib is None:
         #     logger.error("❌ UMAP is not available. Please install umap-learn")
         #     return None
@@ -302,7 +433,7 @@ class GlobalFeatures:
             logger.info(f"Embedding matrix shape: {embedding_matrix.shape}")
             
             # Initialize and fit UMAP
-            reducer = umap.UMAP(
+            reducer = umap_lib.UMAP(
                 n_neighbors=n_neighbors,
                 min_dist=min_dist,
                 n_components=n_components,
@@ -398,10 +529,15 @@ class GlobalFeatures:
 
 def main():
     global_features = GlobalFeatures()
-    logger.info("Generating feature prototypes for retrieval...")
-    global_features.run_feature_decomposition(output_path="feature_decomposition.pkl")
     logger.info("Running sample UMAP and PCA...")
-    global_features.run_sample_umap_and_pca()
+    res = global_features.run_sample_umap_and_pca()
+    if res:
+        logger.info("✅ Sample UMAP and PCA completed successfully!")
+    else:
+        logger.error("❌ Sample UMAP and PCA failed!")
+    logger.info("Generating feature prototypes for retrieval...")
+    vecs = global_features.embeddings
+    global_features.run_feature_decomposition(vecs,output_path="feature_decomposition.pkl")
     logger.info("Done!")
     
 if __name__ == "__main__":

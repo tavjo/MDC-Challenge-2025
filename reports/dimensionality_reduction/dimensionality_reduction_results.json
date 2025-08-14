@@ -1,0 +1,22 @@
+{
+  "load_embeddings": {
+    "success": true
+  },
+  "load_datasets": {
+    "success": true
+  },
+  "umap_reduction": {
+    "success": false
+  },
+  "cluster_visualization": null,
+  "ground_truth_visualization": null,
+  "per_cluster_pca": null,
+  "overall_success": false,
+  "timestamp": "2025-08-14T19:48:13.368227+00:00",
+  "parameters": {
+    "n_neighbors": 15,
+    "min_dist": 0.1,
+    "n_components": 2,
+    "random_seed": 42
+  }
+}
