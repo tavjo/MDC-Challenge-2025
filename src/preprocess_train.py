@@ -64,6 +64,7 @@ class PreprocessTrainingData:
         force_clustering: bool = False,
         force_dimred: bool = False,
         force_globals: bool = False,
+        progress: bool = True
     ) -> None:
         self.pdf_paths = pdf_paths
         self.db_path = db_path
@@ -79,7 +80,7 @@ class PreprocessTrainingData:
         self.force_clustering = force_clustering
         self.force_dimred = force_dimred
         self.force_globals = force_globals
-
+        self.progress = progress
         self.output_dir = output_dir or os.path.join(project_root, "Data", "train")
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
@@ -92,15 +93,6 @@ class PreprocessTrainingData:
             return (n or 0) > 0
         finally:
             helper.close()
-
-    # def _list_pdf_paths(self, pdf_dir: Optional[str] = None) -> List[str]:
-    #     base_dir = pdf_dir or os.path.join(project_root, "Data", "train", "PDF")
-    #     if not os.path.isdir(base_dir):
-    #         logger.error(f"PDF directory not found: {base_dir}")
-    #         return []
-    #     pdf_paths = [os.path.join(base_dir, f) for f in os.listdir(base_dir) if f.lower().endswith(".pdf")]
-    #     logger.info(f"Found {len(pdf_paths)} PDFs under {base_dir}")
-    #     return pdf_paths
 
     @timer_wrap
     def run_documents(self, max_workers: int = 8) -> bool:
@@ -121,6 +113,7 @@ class PreprocessTrainingData:
                 export_file=None,
                 export_path=self.output_dir,
                 max_workers=max_workers,
+                progress=self.progress
             )
             logger.info(f"Document API response: {response}")
             return True
@@ -354,9 +347,9 @@ class PreprocessTrainingData:
 
 @timer_wrap
 def main():
-    pdf_paths = os.listdir(os.path.join(project_root, "Data/train/PDF"))
-    pdf_paths = [os.path.join("Data/train/PDF", pdf) for pdf in pdf_paths if pdf.endswith(".pdf")]
-    processor = PreprocessTrainingData(pdf_paths=pdf_paths, force_citations=True)
+    import glob
+    pdf_paths = glob.glob("Data/train/PDF/*.pdf")
+    processor = PreprocessTrainingData(pdf_paths=pdf_paths, )
     success, path = processor.run_all(export_format="csv")
     if success:
         logger.info(f"Training data saved to {path}")

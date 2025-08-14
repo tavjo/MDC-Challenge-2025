@@ -282,13 +282,13 @@ class DuckDBHelper:
             return False
 
     def force_update_document_text(self, document: Document) -> bool:
-        """Update text-related fields with FK checks temporarily disabled.
+        """Update text-related fields for an existing document.
 
-        Workaround for DuckDB constraint errors observed when updating non-key
-        columns while foreign keys reference the primary key.
+        Note: DuckDB does not support toggling foreign key enforcement via
+        PRAGMA foreign_keys. A standard UPDATE is sufficient here because
+        we are not modifying the primary key.
         """
         try:
-            self.engine.execute("PRAGMA foreign_keys=OFF")
             doc_row = document.to_duckdb_row()
             self.engine.execute(
                 """
@@ -313,16 +313,132 @@ class DuckDBHelper:
                     doc_row["doi"],
                 ),
             )
-            logger.info(f"Force-updated text fields for document {document.doi}")
+            logger.info(f"Updated text fields for document {document.doi}")
             return True
         except Exception as e:
-            logger.error(f"Force update failed for document {document.doi}: {e}")
+            logger.error(f"Failed to update text fields for document {document.doi}: {e}")
             return False
-        finally:
+
+    def update_document_text_preserving_citations(self, document: Document) -> bool:
+        """Fallback: update document text by temporarily removing and restoring citations.
+
+        Workaround for DuckDB FK enforcement on updates: we snapshot referencing rows for this
+        document_id from child tables (citations, chunks, datasets), delete them, update the
+        document row, then re-insert child rows. All done transactionally.
+        All within a single transaction.
+        """
+        try:
+            # Start transaction
+            self.engine.execute("BEGIN TRANSACTION")
+
+            # Snapshot child tables
+            df_cit = self.engine.execute(
+                "SELECT * FROM citations WHERE document_id = ?",
+                [document.doi],
+            ).df()
+            df_chunks = self.engine.execute(
+                "SELECT * FROM chunks WHERE document_id = ?",
+                [document.doi],
+            ).df()
+            df_datasets = self.engine.execute(
+                "SELECT * FROM datasets WHERE document_id = ?",
+                [document.doi],
+            ).df()
+
+            # Delete child rows referencing this document
+            self.engine.execute(
+                "DELETE FROM citations WHERE document_id = ?",
+                [document.doi],
+            )
+            self.engine.execute(
+                "DELETE FROM chunks WHERE document_id = ?",
+                [document.doi],
+            )
+            self.engine.execute(
+                "DELETE FROM datasets WHERE document_id = ?",
+                [document.doi],
+            )
+
+            # Update the document text fields
+            doc_row = document.to_duckdb_row()
+            self.engine.execute(
+                """
+                UPDATE documents
+                SET full_text = ?,
+                    total_char_length = ?,
+                    parsed_timestamp = ?,
+                    file_hash = ?,
+                    file_path = ?,
+                    n_pages = ?,
+                    total_tokens = ?
+                WHERE doi = ?
+                """,
+                (
+                    doc_row["full_text"],
+                    doc_row["total_char_length"],
+                    doc_row["parsed_timestamp"],
+                    doc_row["file_hash"],
+                    doc_row["file_path"],
+                    doc_row["n_pages"],
+                    doc_row["total_tokens"],
+                    doc_row["doi"],
+                ),
+            )
+
+            # Restore child rows
+            if not df_chunks.empty:
+                self.engine.register("chunks_restore_buffer", df_chunks)
+                self.engine.execute(
+                    """
+                    INSERT INTO chunks (chunk_id, document_id, chunk_text, score, chunk_metadata, created_at)
+                    SELECT chunk_id, document_id, chunk_text, score, chunk_metadata, created_at FROM chunks_restore_buffer
+                    """
+                )
+                self.engine.unregister("chunks_restore_buffer")
+
+            if not df_datasets.empty:
+                self.engine.register("datasets_restore_buffer", df_datasets)
+                self.engine.execute(
+                    """
+                    INSERT INTO datasets (
+                        dataset_id, document_id, total_tokens, avg_tokens_per_chunk,
+                        total_char_length, clean_text_length, cluster, dataset_type, text,
+                        created_at, updated_at
+                    )
+                    SELECT 
+                        dataset_id, document_id, total_tokens, avg_tokens_per_chunk,
+                        total_char_length, clean_text_length, cluster, dataset_type, text,
+                        created_at, updated_at
+                    FROM datasets_restore_buffer
+                    """
+                )
+                self.engine.unregister("datasets_restore_buffer")
+
+            if not df_cit.empty:
+                self.engine.register("cit_restore_buffer", df_cit)
+                self.engine.execute(
+                    """
+                    INSERT INTO citations (data_citation, document_id, pages, evidence, created_at)
+                    SELECT data_citation, document_id, pages, evidence, created_at FROM cit_restore_buffer
+                    """
+                )
+                self.engine.unregister("cit_restore_buffer")
+
+            # Commit
+            self.engine.execute("COMMIT")
+            logger.info(
+                f"Updated text for document {document.doi}; restored {len(df_chunks)} chunks, {len(df_datasets)} datasets, {len(df_cit)} citations."
+            )
+            return True
+        except Exception as e:
             try:
-                self.engine.execute("PRAGMA foreign_keys=ON")
+                self.engine.execute("ROLLBACK")
             except Exception:
                 pass
+            logger.error(
+                f"Preserving update failed for document {document.doi}: {e}"
+            )
+            return False
 
     def batch_upsert_documents(self, documents: List[Document]) -> Dict[str, Any]:
         """

@@ -23,11 +23,11 @@ services:
     container_name: mdc-parse
     environment:
       <<: *common-env
-      # OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
       # GEMINI_API_KEY: ${GEMINI_API_KEY}
     volumes:
       - uv-cache:/tmp/uv-cache
-      - offline_models:/app/offline_models
+      - ./offline_models:/app/offline_models
       - ./Data:/app/Data
       - ./src:/app/src
       - ./artifacts:/app/artifacts
@@ -56,7 +56,7 @@ services:
       <<: *common-env
     volumes:
       - uv-cache:/tmp/uv-cache
-      - offline_models:/app/offline_models
+      - ./offline_models:/app/offline_models
       - ./artifacts:/app/artifacts
       - ./configs:/app/configs
       - ./src:/app/src

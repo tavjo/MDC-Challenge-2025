@@ -1,8 +1,10 @@
 import logging
 import os, sys, time, hashlib, json
+from functools import lru_cache
 from functools import wraps
 import inspect
-from typing import List, Any
+from typing import List, Any, Optional
+import regex as re
 from pydantic import BaseModel
 from typing_extensions import get_type_hints
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -407,5 +409,189 @@ def sliding_window_chunks(text: str, window_size: int = 300, overlap: int = 30) 
     chunks = refined_chunks
     logger.info(f"Successfully created {len(chunks)} chunks after merging small fragments")
     return chunks
+    
+# -----------------------------------------------------------------------------
+# Citation matching helper (parity with src/get_citation_entities.py)
+# -----------------------------------------------------------------------------
+
+def _alnum_collapse(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+@lru_cache(maxsize=8192)
+def _generate_id_variants(dataset_id: str) -> List[str]:
+    variants = set()
+    raw = dataset_id.strip()
+    variants.add(raw)
+    cleaned = clean_text_for_urls(raw)
+    variants.add(cleaned)
+    host_stripped = re.sub(r"(?i)^https?://(?:dx\.)?doi\.org/", "", cleaned)
+    variants.add(host_stripped)
+    no_ver = re.sub(r"(?i)\.v\d+$", "", host_stripped)
+    variants.add(no_ver)
+    no_tbl = re.sub(r"(?i)/t\d+$", "", no_ver)
+    variants.add(no_tbl)
+    no_trailing_dotnum = re.sub(r"(?i)\.(\d+)$", "", no_tbl)
+    variants.add(no_trailing_dotnum)
+    # E-GEOD ↔ GSE synonym
+    if re.match(r"(?i)^E-GEOD-\d+$", raw):
+        variants.add(re.sub(r"(?i)^E-GEOD-", "GSE", raw))
+
+    # Accession-style split variants
+    m = re.match(r"(?i)^(PXD|SRR|ERR)(\d+)$", raw)
+    if m:
+        prefix, digits = m.group(1).upper(), m.group(2)
+        variants.add(f"{prefix}-{digits}")
+        variants.add(f"{prefix} {digits}")
+
+    m = re.match(r"(?i)^E-?PROT-?(\d+)$", raw)
+    if m:
+        digits = m.group(1)
+        variants.add(f"E-PROT-{digits}")
+        variants.add(f"E PROT {digits}")
+        variants.add(f"EPROT{digits}")
+
+    m = re.match(r"(?i)^(ENS)([A-Z]+)(\d+)$", raw)
+    if m:
+        prefix, letters, digits = m.group(1).upper(), m.group(2).upper(), m.group(3)
+        variants.add(f"{prefix}-{letters}-{digits}")
+        variants.add(f"{prefix} {letters} {digits}")
+
+    # Generic short accession split
+    g = re.match(r"(?i)^([A-Z0-9]{2,6})(\d{3,})$", raw)
+    if g:
+        head, tail = g.groups()
+        variants.add(f"{head}-{tail}")
+        variants.add(f"{head} {tail}")
+
+    return [v for v in variants if v]
+
+
+def _join_chars_with_seps(text: str) -> str:
+    pieces = [re.escape(c) for c in text]
+    return r"[\s\u00A0\-\u2010-\u2015_,.]*".join(pieces)
+
+
+@lru_cache(maxsize=16384)
+def _build_accession_pattern(ds_id: str) -> Optional[re.Pattern]:
+    s = ds_id.strip()
+    flags = re.IGNORECASE
+
+    # PXD / SRR / ERR
+    m = re.match(r"(?i)^(PXD|SRR|ERR)(\d+)$", s)
+    if m:
+        prefix, digits = m.group(1).upper(), m.group(2)
+        prefix_pat = _join_chars_with_seps(prefix)
+        digit_pat = rf"(?:\d[\s\u00A0\-\u2010-\u2015_,.]*){{{len(digits)}}}"
+        pat = rf"\b{prefix_pat}[\s\u00A0\-\u2010-\u2015]*{digit_pat}\b"
+        return re.compile(pat, flags=flags)
+
+    # E-PROT-#
+    m = re.match(r"(?i)^E-?PROT-?(\d+)$", s)
+    if m:
+        digits = m.group(1)
+        e_pat = _join_chars_with_seps("E")
+        prot_pat = _join_chars_with_seps("PROT")
+        digit_pat = rf"(?:\d[\s\u00A0\-\u2010-\u2015_,.]*){{{len(digits)}}}"
+        seps = r"[\s\u00A0\-\u2010-\u2015]*"
+        pat = rf"\b{e_pat}{seps}{prot_pat}{seps}-?{seps}{digit_pat}\b"
+        return re.compile(pat, flags=flags)
+
+    # ENS[A-Z]+#
+    m = re.match(r"(?i)^(ENS)([A-Z]+)(\d+)$", s)
+    if m:
+        prefix, letters, digits = m.group(1).upper(), m.group(2).upper(), m.group(3)
+        prefix_pat = _join_chars_with_seps(prefix)
+        letters_pat = r"[\s\u00A0\-\u2010-\u2015_,.]*".join(re.escape(ch) for ch in letters)
+        digit_pat = rf"(?:\d[\s\u00A0\-\u2010-\u2015_,.]*){{{len(digits)}}}"
+        pat = rf"\b{prefix_pat}[\s\u00A0\-\u2010-\u2015]*{letters_pat}[\s\u00A0\-\u2010-\u2015]*{digit_pat}\b"
+        return re.compile(pat, flags=flags)
+
+    # UniProt 6 or 10 chars
+    uniprot_re = re.compile(
+        r"(?ix)^(?: (?:[OPQ][0-9][A-Z0-9]{3}[0-9]) | (?:[A-NR-Z][0-9][A-Z][A-Z0-9]{2}[0-9]) )(?:[A-Z0-9]{3}[0-9])?$"
+    )
+    if uniprot_re.match(s):
+        per_char = _join_chars_with_seps(s)
+        pat = rf"\b{per_char}\b"
+        return re.compile(pat, flags=flags)
+
+    # Generic accession: short head + digits
+    if re.match(r"(?i)^[A-Z0-9]{2,6}\d{3,}$", s):
+        per_char = _join_chars_with_seps(s)
+        pat = rf"\b{per_char}\b"
+        return re.compile(pat, flags=flags)
+
+    return None
+
+
+@lru_cache(maxsize=16384)
+def _make_pattern(ds_id: str) -> re.Pattern:
+    acc = _build_accession_pattern(ds_id)
+    if acc is not None:
+        return acc
+    ds_id_norm = clean_text_for_urls(ds_id).strip()
+    tokens = [t for t in re.split(r"[-_/:.\s]+", ds_id_norm) if t]
+    if not tokens:
+        tokens = [ds_id_norm]
+    sep = r"[\s\u00A0\-\u2010-\u2015_/:.,]*"
+    pat = sep.join(re.escape(t) for t in tokens)
+    if re.fullmatch(r"[A-Z]{1,6}\d+[A-Z0-9]*", ds_id, re.I):
+        pat = rf"\b{pat}\b"
+    return re.compile(pat, flags=re.IGNORECASE)
+
+
+def _build_text_views(text: str) -> dict:
+    raw = text
+    norm = normalise(text)
+    prep = preprocess_text(text)
+    prep_norm = preprocess_text(norm)
+    alnum = _alnum_collapse(text)
+    return {"raw": raw, "norm": norm, "prep": prep, "prep_norm": prep_norm, "alnum": alnum}
+
+
+def _find_direct_string_matches(citation: str, text_views: dict) -> List[str]:
+    cit_norm = clean_text_for_urls(citation).lower()
+    lower_cit = re.escape(cit_norm)
+    matches: List[str] = []
+    matches.extend(re.findall(lower_cit, text_views["raw"].lower()))
+    matches.extend(re.findall(lower_cit, text_views["norm"].lower()))
+    matches.extend(re.findall(lower_cit, text_views["prep"]))
+    return matches
+
+
+def find_citation_matches(citation: str, text: str) -> List[str]:
+    """Return list of matches for a citation within text using tolerant logic.
+
+    Attempts, in order:
+    - Accession/variant-aware regex over raw, normalised, preprocessed, prep(norm)
+    - Direct substring over raw/normalised/preprocessed
+    - Collapsed alphanumeric substring fallback (returns synthetic single match)
+    """
+    text_views = _build_text_views(text)
+
+    # 1) regex over variants and views
+    for variant in _generate_id_variants(citation):
+        pattern = _make_pattern(variant)
+        for key in ("raw", "norm", "prep", "prep_norm"):
+            found = pattern.findall(text_views[key])
+            if found:
+                return found
+
+    # 2) direct substring fallback (robust text normalisation)
+    direct = _find_direct_string_matches(citation, text_views)
+    if direct:
+        return direct
+
+    # 3) collapsed alnum fallback for long IDs/DOIs
+    id_alnum = _alnum_collapse(citation)
+    id_alnum_host_stripped = _alnum_collapse(re.sub(r"(?i)^https?://(?:dx\.)?doi\.org/", "", citation))
+    if citation.startswith("10.") or len(id_alnum) >= 12 or id_alnum_host_stripped:
+        page_alnum = text_views["alnum"]
+        if id_alnum and id_alnum in page_alnum:
+            return [citation]
+        if id_alnum_host_stripped and id_alnum_host_stripped in page_alnum:
+            return [citation]
+
+    return []
     
     

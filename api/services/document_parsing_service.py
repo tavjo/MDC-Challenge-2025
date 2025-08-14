@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 from typing import List
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm.auto import tqdm
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-print(f"Project root: {project_root}")
 sys.path.append(project_root)
 
 from src.helpers import timer_wrap, initialize_logging, compute_file_hash, num_tokens
@@ -30,7 +30,7 @@ logger = initialize_logging(filename)
 @timer_wrap
 def build_document_object(pdf_path: str, strategy: str = "hi_res"):
     if os.path.exists(pdf_path):
-        logger.info(f"Building document object for {pdf_path}")
+        logger.debug(f"Building document object for {pdf_path}")
     else:
         logger.error(f"PDF file does not exist: {pdf_path}")
         return None
@@ -107,7 +107,14 @@ def build_document_object(pdf_path: str, strategy: str = "hi_res"):
     return document
 
 @timer_wrap
-def build_document_objects(pdf_paths: List[str], subset: bool = False, subset_size: int = 20, max_workers: int = 8, strategy: str = "hi_res") -> List[Document]:
+def build_document_objects(
+    pdf_paths: List[str],
+    subset: bool = False,
+    subset_size: int = 20,
+    max_workers: int = 8,
+    strategy: str = "hi_res",
+    progress: bool = True,
+) -> List[Document]:
     # Suppress pdfminer warnings about CropBox/MediaBox
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="CropBox missing from /Page, defaulting to MediaBox")
@@ -127,8 +134,20 @@ def build_document_objects(pdf_paths: List[str], subset: bool = False, subset_si
             exe.submit(build_document_object, pdf_path, strategy=strategy): pdf_path
             for pdf_path in pdf_paths
         }
-        documents = []
-        for future in as_completed(futures):
+        documents: List[Document] = []
+
+        iterator = as_completed(futures)
+        if progress:
+            iterator = tqdm(
+                as_completed(futures),
+                total=len(futures),
+                desc="Parsing documents",
+                unit="doc",
+                dynamic_ncols=True,
+                leave=True,
+            )
+
+        for future in iterator:
             try:
                 document = future.result()
                 if document is not None:

@@ -126,16 +126,16 @@ DEFAULT_CACHE_DIR = Path(
     os.path.join(project_root, "offline_models")
 )
 # Lazy-load embedder to avoid repeated heavy loads
-_embedder_lock = threading.Lock()
-_EMBEDDER: Optional[SentenceTransformer] = None
+# _embedder_lock = threading.Lock()
+# _EMBEDDER: Optional[SentenceTransformer] = None
 
 def _get_embedder(model_path: str) -> SentenceTransformer:
-    global _EMBEDDER
-    if _EMBEDDER is None:
-        with _embedder_lock:
-            if _EMBEDDER is None:
-                _EMBEDDER = SentenceTransformer(model_path)
-    return _EMBEDDER
+    # global _EMBEDDER
+    # if _EMBEDDER is None:
+        # with _embedder_lock:
+            # if _EMBEDDER is None:
+    embedder = SentenceTransformer(model_path)
+    return embedder
 
 @timer_wrap
 def _load_cfg(cfg_path: os.PathLike | None = None) -> Dict[str, Any]:
@@ -175,7 +175,7 @@ def _load_cfg(cfg_path: os.PathLike | None = None) -> Dict[str, Any]:
 
 @timer_wrap
 def _embed_text(texts: List[str], model_name: Optional[str] = None, batch_size: int = 100) -> np.ndarray:
-    embedder = _get_embedder(str(model_name or DEFAULT_CACHE_DIR))
+    embedder = _get_embedder(str(DEFAULT_CACHE_DIR or model_name))
     embeddings = embedder.encode(texts, convert_to_numpy=True, batch_size=batch_size)
     # Ensure embeddings array is not empty
     if embeddings is None or (isinstance(embeddings, np.ndarray) and embeddings.size == 0):

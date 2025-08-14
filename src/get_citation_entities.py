@@ -258,8 +258,8 @@ class CitationEntityExtractor:
     def find_citation_in_text(self, citation: str, text: str) -> List[str]:
         """Robust dual matching: raw substring or preprocessed substring."""
         # Normalise citation id and page text consistently
-        # citation_norm = clean_text_for_urls(citation).lower()
-        citation_norm = citation.lower()
+        citation_norm = clean_text_for_urls(citation).lower()
+        # citation_norm = citation.lower()
         lower_cit = re.escape(citation_norm)
         # find all occurrences in raw and cleaned/normalised variants
         raw_matches = re.findall(lower_cit, text.lower())
@@ -299,6 +299,8 @@ class CitationEntityExtractor:
                         matches = regex.findall(preprocess_text(page))
                     if not matches:
                         matches = regex.findall(preprocess_text(normalise(page)))
+                    if not matches:
+                        matches = self.find_citation_in_text(variant, page)
                     if matches:
                         dataset_pages.setdefault(dataset_id, set()).add(page_num)
                         found = True
@@ -316,11 +318,11 @@ class CitationEntityExtractor:
                         elif id_alnum_host_stripped and id_alnum_host_stripped in page_alnum:
                             dataset_pages.setdefault(dataset_id, set()).add(page_num)
                             found = True
-                if not found:
-                    matches = self.find_citation_in_text(dataset_id, page)
-                    if matches:
-                        dataset_pages.setdefault(dataset_id, set()).add(page_num)
-                        logger.info(f"Found {len(matches)} matches for {dataset_id} on page {page_num}")
+                # if not found:
+                #     matches = self.find_citation_in_text(dataset_id, page)
+                #     if matches:
+                #         dataset_pages.setdefault(dataset_id, set()).add(page_num)
+                #         logger.info(f"Found {len(matches)} matches for {dataset_id} on page {page_num}")
 
         # Create one CitationEntity per unique dataset_id found (after processing all pages)
         for dataset_id, pages_set in dataset_pages.items():

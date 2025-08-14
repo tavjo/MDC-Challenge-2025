@@ -266,59 +266,59 @@ async def run_pipeline(
         logger.error(f"Pipeline failed with error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Pipeline failed: {str(e)}")
 
-# Parse a single document
-@app.get("/parse_doc")
-async def parse_doc(pdf_path: str):
-    helper = DuckDBHelper(DEFAULT_DUCKDB_PATH)
-    try:
-        document = build_document_object(pdf_path=pdf_path)
-        helper.store_document(document)
-        return {"message": "Document parsed and stored successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        helper.close()
+# # Parse a single document
+# @app.get("/parse_doc")
+# async def parse_doc(pdf_path: str):
+#     helper = DuckDBHelper(DEFAULT_DUCKDB_PATH)
+#     try:
+#         document = build_document_object(pdf_path=pdf_path)
+#         helper.store_document(document)
+#         return {"message": "Document parsed and stored successfully"}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+#     finally:
+#         helper.close()
 
 # Parse multiple documents at once
-@app.post("/bulk_parse_docs")
-async def parse_docs(payload: BulkParseRequest):
-    pdf_paths = payload.pdf_paths
-    export_file = payload.export_file
-    export_path = payload.export_path
-    subset = payload.subset
-    subset_size = payload.subset_size
-    max_workers = payload.max_workers
-    params = {
-        "pdf_paths": pdf_paths,
-        "subset": subset,
-        "subset_size": subset_size,
-        "max_workers": max_workers
-    }
-    helper = DuckDBHelper(DEFAULT_DUCKDB_PATH)
-    try:
-        documents = build_document_objects(**params)
-        if not documents:
-            logger.error(f"No document objects built: {pdf_paths}")
-            raise HTTPException(status_code=400, detail="No document objects built")
-        success = helper.batch_upsert_documents(documents)
-        if not success:
-            logger.error(f"Failed to store documents: {documents}")
-            raise HTTPException(status_code=500, detail="Failed to store documents")
-        # also export as a json file
-        if export_file:
-            export_docs(documents, output_file=export_file, output_dir=export_path)
-        elif export_path:
-            export_docs(documents, output_dir=export_path)
-        elif export_file and export_path:
-            export_docs(documents, output_file=export_file, output_dir=export_path)
-        else:
-            export_docs(documents)
-        return {"message": f"{len(documents)} Documents parsed and stored successfully"}
-    except Exception as e:
-        logger.error(f"Error parsing documents: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        helper.close()
+# @app.post("/bulk_parse_docs")
+# async def parse_docs(payload: BulkParseRequest):
+#     pdf_paths = payload.pdf_paths
+#     export_file = payload.export_file
+#     export_path = payload.export_path
+#     subset = payload.subset
+#     subset_size = payload.subset_size
+#     max_workers = payload.max_workers
+#     params = {
+#         "pdf_paths": pdf_paths,
+#         "subset": subset,
+#         "subset_size": subset_size,
+#         "max_workers": max_workers
+#     }
+#     helper = DuckDBHelper(DEFAULT_DUCKDB_PATH)
+#     try:
+#         documents = build_document_objects(**params)
+#         if not documents:
+#             logger.error(f"No document objects built: {pdf_paths}")
+#             raise HTTPException(status_code=400, detail="No document objects built")
+#         success = helper.batch_upsert_documents(documents)
+#         if not success:
+#             logger.error(f"Failed to store documents: {documents}")
+#             raise HTTPException(status_code=500, detail="Failed to store documents")
+#         # also export as a json file
+#         if export_file:
+#             export_docs(documents, output_file=export_file, output_dir=export_path)
+#         elif export_path:
+#             export_docs(documents, output_dir=export_path)
+#         elif export_file and export_path:
+#             export_docs(documents, output_file=export_file, output_dir=export_path)
+#         else:
+#             export_docs(documents)
+#         return {"message": f"{len(documents)} Documents parsed and stored successfully"}
+#     except Exception as e:
+#         logger.error(f"Error parsing documents: {str(e)}")
+#         raise HTTPException(status_code=500, detail=str(e))
+#     finally:
+#         helper.close()
 
 
 @app.get("/health")

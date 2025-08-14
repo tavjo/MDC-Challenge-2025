@@ -12,6 +12,7 @@ function ExtractCitation(document: string[]) -> CitationEntity[] {
   prompt #"
     You are a research assistant tasked with extracting dataset citations from a text. Extract ALL unique dataset citations from the text.
     The evidence should be the snippet of text that contains the dataset citation.
+
     Dataset citations usually appear as:
       1. Accession numbers in formats like:
         - E-GEOD-48278
@@ -21,12 +22,15 @@ function ExtractCitation(document: string[]) -> CitationEntity[] {
         - https://doi.org/10.5061/dryad.4dj6042
         - 10.5061/dryad.4dj6042
         - doi:10.5061/dryad.4dj6042
+        - https://doi.org/10.6084/m9.figshare.29901470.v1
     
     Report dataset citations EXACTLY as they appear in the text but do not include the surrounding text itself. Don't add the reporsitory name unless it already a part of the data citation. 
     
-    Provide each unique accession number and DOI separately. 
+    Do not return article/preprint/journal DOIs (e.g., bioRxiv/medRxiv, publisher DOIs). Return only dataset repository DOIs (Dryad, Zenodo, Figshare, PANGAEA, etc.) and accession IDs (GEO/SRA/ENA/GenBank/PRJNA/PRJEB/PXD/E-*). If uncertain, omit.
 
     Never make up a data citation. If you cannot find a data citation, return an empty list.
+
+    IMPORTANT: Return each accession number or DOI separately.
 
     {{ ctx.output_format }}
 

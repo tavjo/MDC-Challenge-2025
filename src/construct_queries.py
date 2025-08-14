@@ -12,15 +12,15 @@ These queries will be constructed thusly:
 import argparse
 import requests
 import json, os, sys
-from api.utils.duckdb_utils import get_duckdb_helper
-from src.models import RetrievalPayload
+
 
 # Add project root to path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 print(project_root)
 
 # Local imports
+from api.utils.duckdb_utils import get_duckdb_helper
 from src.models import RetrievalPayload, BatchRetrievalResult, CitationEntity
 from src.helpers import initialize_logging, timer_wrap
 import requests
@@ -121,6 +121,9 @@ def main():
         dataset_target_chunk_ids[ce.data_citation] = query_chunk_ids
     
     db_helper.close()
+    if len(query_texts) != len(citations):
+        logger.error(f"Query text length mismatch: expected {len(citations)}, got {len(query_texts)}")
+        raise ValueError(f"Query text length mismatch: expected {len(citations)}, got {len(query_texts)}")
 
     if len(document_ids) != 95:
         logger.error(f"Expected 95 document IDs, got {len(document_ids)}")

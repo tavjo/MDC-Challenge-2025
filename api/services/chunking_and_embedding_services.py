@@ -22,7 +22,7 @@ sys.path.append(project_root)
 
 # Local imports
 from src.models import Document, CitationEntity, Chunk, ChunkMetadata, ChunkingResult, DocumentChunkingResult
-from src.helpers import initialize_logging, timer_wrap, load_docs, preprocess_text, sliding_window_chunks
+from src.helpers import initialize_logging, timer_wrap, load_docs, preprocess_text, sliding_window_chunks, normalise, find_citation_matches
 from src.semantic_chunking import sliding_window_chunk_text, save_chunk_objs_to_chroma
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 # from src.get_citation_entities import CitationEntityExtractor
@@ -119,17 +119,21 @@ def load_input_data_from_duckdb(db_path: str = "artifacts/mdc_challenge.db") -> 
 # ---------------------------------------------------------------------------
 
 def make_pattern(dataset_id: str) -> re.Pattern:
-    """Create pattern for dataset citation: substring match anywhere, case-insensitive."""
+    """Deprecated simple pattern; retained for compatibility in repair step."""
     pat = re.escape(dataset_id)
     return re.compile(pat, flags=re.IGNORECASE)
 
+# def find_citation_in_text(citation: str, text: str) -> List[str]:
+#     """Robust dual matching: raw substring or preprocessed substring."""
+#     lower_cit = re.escape(citation.lower())
+#     # find all occurences of citation in the raw chunk text
+#     raw_matches = re.findall(lower_cit, text.lower())
+#     preprocessed_matches = re.findall(lower_cit, preprocess_text(text))
+#     return raw_matches + preprocessed_matches
+
 def find_citation_in_text(citation: str, text: str) -> List[str]:
-    """Robust dual matching: raw substring or preprocessed substring."""
-    lower_cit = re.escape(citation.lower())
-    # find all occurences of citation in the raw chunk text
-    raw_matches = re.findall(lower_cit, text.lower())
-    preprocessed_matches = re.findall(lower_cit, preprocess_text(text))
-    return raw_matches + preprocessed_matches
+    """Compatibility wrapper; delegate to helpers.find_citation_matches."""
+    return find_citation_matches(citation, text)
 
 @timer_wrap
 def create_pre_chunk_entity_inventory(document: Document, citation_entities: List[CitationEntity]) -> pd.DataFrame:
@@ -160,19 +164,10 @@ def create_pre_chunk_entity_inventory(document: Document, citation_entities: Lis
     else:
         text = document.full_text
     
-    # Cache compiled patterns
-    pattern_cache = {}
     rows = []
     
     for citation in doc_citations:
-        # Cache pattern compilation
-        if citation.data_citation not in pattern_cache:
-            pattern_cache[citation.data_citation] = make_pattern(citation.data_citation)
-        pattern = pattern_cache[citation.data_citation]
-        # preprocess text before matching
-        matches = pattern.findall(preprocess_text(text))
-        if not matches:
-            matches = find_citation_in_text(citation.data_citation, text)
+        matches = find_citation_matches(citation.data_citation, text)
 
         rows.append({
             'document_id': document.doi,
@@ -256,14 +251,10 @@ def create_chunks_from_document(document: Document, citation_entities: List[Cita
         # Find which citations appear in this chunk
         chunk_citations = []
         for citation in doc_citations:
-            pattern = make_pattern(citation.data_citation)
-            # match against preprocessed chunk text
-            if pattern.search(preprocess_text(chunk_text)):
-                chunk_citations.append(citation)
-            elif find_citation_in_text(citation.data_citation, chunk_text):
+            if find_citation_matches(citation.data_citation, chunk_text):
                 chunk_citations.append(citation)
             else:
-                logger.debug(f"No match found for citation {citation.data_citation} in chunk {chunk_id}. Returning empty list.")
+                logger.info(f"No match found for citation {citation.data_citation} in chunk {chunk_id}. Returning empty list.")
         
         # Use tiktoken for accurate token counting
         # import tiktoken
@@ -382,11 +373,7 @@ def validate_chunk_integrity(chunks: List[Chunk], pre_chunk_inventory: pd.DataFr
         doc_citations = [citation for citation in citation_entities if citation.document_id == doc_id]
         
         for citation in doc_citations:
-            pattern = make_pattern(citation.data_citation)
-            # match against preprocessed chunk text
-            matches = pattern.findall(preprocess_text(text))
-            if not matches:
-                matches = find_citation_in_text(citation.data_citation, text)
+            matches = find_citation_matches(citation.data_citation, text)
             
             post_chunk_rows.append({
                 'document_id': doc_id,
@@ -606,7 +593,7 @@ def create_chunks_summary_csv(chunks: List[Chunk], export: bool = True, output_p
     Returns:
         Path to the exported CSV file
     """
-    logger.info(f"Exporting chunk summary to CSV: {output_path}")
+    logger.info(f"Generating chunk summary dataframe.")
     
     summary_rows = []
     for chunk in chunks:
@@ -638,6 +625,7 @@ def prepare_document(
     Phase 1: CPU/I-O-light work for one document.
     Returns a dict with document, chunks, stats, and params.
     """
+    logger.info(f"Preparing document {document.doi}")
     start = datetime.now().isoformat()
 
     # 1) Pre-chunk inventory
@@ -645,13 +633,24 @@ def prepare_document(
     pre_total = pre_df['count'].sum()
 
     # 2) Create & link chunks
+    logger.info(f"Creating chunks from document {document.doi}")
     chunks = create_chunks_from_document(document, citation_entities, chunk_size, chunk_overlap)
+    logger.info(f"Finished creating chunks: {len(chunks)} chunks (doc={document.doi})")
+    logger.info(f"Preparing to link adjacent chunks for {len(chunks)} chunks (doc={document.doi})")
     chunks = link_adjacent_chunks(chunks)
+    logger.info(f"Finished linking adjacent chunks: {len(chunks)} chunks (doc={document.doi})")
 
     # 3) Validate & repair
     post_passed, lost_df = validate_chunk_integrity(chunks, pre_df, citation_entities)
     if not post_passed:
-        chunks, _ = repair_lost_citations_strict(document, chunks, lost_df)
+        logger.info(f"Validation failed; repairing lost citations")
+        chunks, stats = repair_lost_citations_strict(document, chunks, lost_df)
+        if stats['inserted'] > 0:
+            logger.info(f"Repaired {stats['inserted']} lost citations")
+        if stats['merged'] > 0:
+            logger.info(f"Merged {stats['merged']} chunks")
+        logger.info(f"Validating chunks after repair")
+        post_passed, lost_df = validate_chunk_integrity(chunks, pre_df, citation_entities)
 
     # recalc post stats across all citations
     if 'citation_id' in pre_df.columns:
@@ -659,7 +658,7 @@ def prepare_document(
     else:
         citation_ids = [ce.data_citation for ce in citation_entities] if citation_entities else []
     post_total = sum(
-        len(make_pattern(cid).findall(preprocess_text(ck.text)))
+        len(find_citation_matches(cid, ck.text))
         for ck in chunks
         for cid in citation_ids
     )
@@ -689,6 +688,7 @@ def build_document_result(prep: dict, db_path: str) -> Tuple[DocumentChunkingRes
     Rolls back on DuckDB errors; cleans up on ChromaDB errors.
     """
     doc: Document = prep["document"]
+    logger.info(f"Building document result for {doc.doi}")
     chunks: List[Chunk] = prep["chunks"]
     start = prep["pipeline_started_at"]
     now = datetime.now().isoformat()
@@ -701,11 +701,7 @@ def build_document_result(prep: dict, db_path: str) -> Tuple[DocumentChunkingRes
         lost_entities = None
     
     # calculate entity retention
-    if lost_entities and doc.doi in lost_entities:
-        diff = prep["pre_total_citations"] - len(lost_entities[doc.doi])
-        entity_retention = diff / prep["pre_total_citations"] * 100
-    else:
-        entity_retention = 100.0
+    entity_retention = prep["post_total_citations"] / prep["pre_total_citations"] * 100
 
     base = dict(
         document_id=doc.doi,
@@ -929,6 +925,44 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
             doc_to_commit, summary_df = build_document_result(prep, db_path)
             doc_results.append(doc_to_commit)
             summary_dfs.append(summary_df)
+    valid_chunks: List[Chunk] = []
+    for prep in prepped:
+        if prep.get("validation_passed"):
+            valid_chunks.extend(prep["chunks"])
+    if len(valid_chunks) == 0:
+        logger.error("No valid chunks created.")
+        return ChunkingResult(
+            success=False,
+            error="No valid chunks found in the pipeline.",
+            total_documents=len(docs),
+            total_unique_datasets=0,
+            total_chunks=0,
+            entity_retention=0.0,
+            pipeline_completed_at=datetime.now().isoformat()
+        )
+    else:
+        logger.info(f"{len(valid_chunks)} valid chunks created.")     
+    # TODO: final validation: get list of citation entities from chunks and compare to number of unique datasets in pre-chunk inventory (NOT matches, but dataset IDs) --> can do groupby dataset ID and the filter for only those that have a non-zero count
+    total_unique_datasets = []
+    for valid_chunk in valid_chunks:
+        total_unique_datasets.extend(valid_chunk.chunk_metadata.citation_entities)
+    ds_ids = [ds.data_citation for ds in total_unique_datasets]
+    total_unique_datasets = len(set(ds_ids))
+    # make sure it matches the total number citation entities loaded from the database:
+    initial_total_citations = len(cites)
+    entity_retention = total_unique_datasets / initial_total_citations * 100
+    if total_unique_datasets != initial_total_citations:
+        logger.error(f"Total unique datasets {total_unique_datasets} found in validated chunks does not match initial total citations {initial_total_citations}")
+        return ChunkingResult(
+            success=False,
+            error=f"Total unique datasets {total_unique_datasets} found in validated chunks does not match initial total citations {initial_total_citations}",
+            total_documents=len(docs),
+            total_unique_datasets=total_unique_datasets,
+            total_chunks=len(valid_chunks),
+            entity_retention=entity_retention,
+            pipeline_completed_at=datetime.now().isoformat()
+        )
+
     logger.info(f"Phase 2 complete in {time.time() - phase2_start:.2f}s")
     if len(summary_dfs) > 0:
         summary = pd.concat(summary_dfs)
@@ -939,30 +973,34 @@ def run_semantic_chunking_pipeline(documents_path: str = "Data/train/documents_w
     # 4) Phase 3: batch persistence of validated chunks
     phase3_start = time.time()
     logger.info("Phase 3: batch persistence starting")
-    valid_chunks: List[Chunk] = []
-    for prep in prepped:
-        if prep.get("validation_passed"):
-            valid_chunks.extend(prep["chunks"])
     logger.info(f"Batch storing {len(valid_chunks)} validated chunks to DuckDB")
     save_chunks_to_duckdb(valid_chunks, db_path)
     logger.info(f"Batch storing {len(valid_chunks)} validated chunks to ChromaDB")
     if collection_name is None:
         collection_name = "mdc_training_data"
-    save_chunk_objs_to_chroma(valid_chunks, collection_name=collection_name, cfg_path=cfg_path)
+    # ChromaDB enforces a maximum add size (saw failure at 7736 > 5461)
+    # Safely batch large upserts to stay under service limits
+    total_chunks = len(valid_chunks)
+    max_upsert_batch = 4000  # keep comfortably under 5000 to avoid limits
+    if total_chunks > 5000:
+        num_batches = (total_chunks + max_upsert_batch - 1) // max_upsert_batch
+        logger.info(
+            f"Upserting in {num_batches} batches of up to {max_upsert_batch} chunks to ChromaDB"
+        )
+        for batch_start in range(0, total_chunks, max_upsert_batch):
+            batch_end = min(batch_start + max_upsert_batch, total_chunks)
+            batch = valid_chunks[batch_start:batch_end]
+            batch_index = (batch_start // max_upsert_batch) + 1
+            logger.info(
+                f"Upserting batch {batch_index}/{num_batches} (size={len(batch)}) to collection '{collection_name}'"
+            )
+            save_chunk_objs_to_chroma(batch, collection_name=collection_name, cfg_path=cfg_path)
+    else:
+        save_chunk_objs_to_chroma(valid_chunks, collection_name=collection_name, cfg_path=cfg_path)
     logger.info(f"Phase 3 complete in {time.time() - phase3_start:.2f}s")
-    # TODO: final validation: get list of citation entities from chunks and compare to number of unique datasets in pre-chunk inventory (NOT matches, but dataset IDs) --> can do groupby dataset ID and the filter for only those that have a non-zero count
-    total_unique_datasets = 0
-    for valid_chunk in valid_chunks:
-        total_unique_datasets += len(valid_chunk.chunk_metadata.citation_entities)
-    
-    # make sure it matches the total number citation entities loaded from the database:
-    initial_total_citations = len(cites)
-    
     final_res = summarize_run(doc_results, total_unique_datasets)
-    if total_unique_datasets != initial_total_citations:
-        logger.warning(f"Total unique datasets {total_unique_datasets} found in validated chunks does not match initial total citations {initial_total_citations}")
-        final_res.success = False
-    final_res.entity_retention = total_unique_datasets / initial_total_citations * 100
+    # final_res.success = False
+    final_res.entity_retention = entity_retention
 
     # 5) Summarize into one ChunkingResult
     return final_res

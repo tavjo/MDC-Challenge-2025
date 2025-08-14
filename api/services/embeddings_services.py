@@ -49,7 +49,7 @@ def _get_embedder(model_path: str) -> SentenceTransformer:
 
 @timer_wrap
 def embed_text(texts: List[str], model_name: Optional[str] = None, batch_size: int = 100) -> np.ndarray:
-    embedder = _get_embedder(str(model_name or DEFAULT_CACHE_DIR))
+    embedder = _get_embedder(str(DEFAULT_CACHE_DIR or model_name))
     embeddings = embedder.encode(texts, convert_to_numpy=True, batch_size=batch_size)
     # Ensure embeddings array is not empty
     if embeddings is None or (isinstance(embeddings, np.ndarray) and embeddings.size == 0):

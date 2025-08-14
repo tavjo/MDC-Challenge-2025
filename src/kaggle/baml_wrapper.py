@@ -1,7 +1,13 @@
 from typing import List, Any
 
 import sys
-sys.path.append("/kaggle/input/baml-folders/src")
+from pathlib import Path
+
+# sys.path.append("/kaggle/input/baml-citation-extractor/src")
+# Allow importing sibling kaggle helpers/models when used as a standalone script
+THIS_DIR = Path(__file__).parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.append(str(THIS_DIR))
 
 from baml_client import b as baml
 
