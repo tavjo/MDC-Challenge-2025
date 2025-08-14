@@ -27,7 +27,7 @@ services:
       # GEMINI_API_KEY: ${GEMINI_API_KEY}
     volumes:
       - uv-cache:/tmp/uv-cache
-      - ./offline_models:/app/offline_models
+      # - ./offline_models:/app/offline_models
       - ./Data:/app/Data
       - ./src:/app/src
       - ./artifacts:/app/artifacts
@@ -62,6 +62,7 @@ services:
       - ./src:/app/src
       - ./api:/app/api
       - ./logs:/app/logs
+      - ./reports:/app/reports
     ports:
       - "8000:8000"
     restart: unless-stopped

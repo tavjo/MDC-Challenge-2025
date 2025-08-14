@@ -125,11 +125,11 @@ def main():
         logger.error(f"Query text length mismatch: expected {len(citations)}, got {len(query_texts)}")
         raise ValueError(f"Query text length mismatch: expected {len(citations)}, got {len(query_texts)}")
 
-    if len(document_ids) != 95:
-        logger.error(f"Expected 95 document IDs, got {len(document_ids)}")
-        raise ValueError(f"Expected 95 document IDs, got {len(document_ids)}")
-    else:
-        logger.info(f"Found {len(document_ids)} document IDs with dataset citations.")
+    # if len(document_ids) != 95:
+    #     logger.error(f"Expected 95 document IDs, got {len(document_ids)}")
+    #     raise ValueError(f"Expected 95 document IDs, got {len(document_ids)}")
+    # else:
+    logger.info(f"Found {len(document_ids)} document IDs with dataset citations.")
     
     # build map of document IDs to dataset IDs
     doc_id_map = {}

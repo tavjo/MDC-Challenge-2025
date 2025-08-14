@@ -35,7 +35,7 @@ DEFAULT_CHROMA_CONFIG = "configs/chunking.yaml"
 DEFAULT_COLLECTION_NAME = "dataset-aggregates-train"
 
 # Clustering parameters
-DEFAULT_K_NEIGHBORS = 5
+DEFAULT_K_NEIGHBORS = 3
 DEFAULT_SIMILARITY_THRESHOLD = None
 DEFAULT_THRESHOLD_METHOD = "degree_target"
 DEFAULT_RESOLUTION = 1
@@ -43,7 +43,7 @@ DEFAULT_MIN_CLUSTER_SIZE = 3
 DEFAULT_MAX_CLUSTER_SIZE = 9999
 DEFAULT_SPLIT_FACTOR = 1.3
 DEFAULT_RANDOM_SEED = 42
-DEFAULT_TARGET_N = 50
+DEFAULT_TARGET_N = 60
 DEFAULT_TOL = 2
 
 
@@ -89,7 +89,7 @@ class ClusteringPipeline:
             include=["embeddings"]  # Only need embeddings for clustering
         )
 
-    def load_embeddings_from_api(self) -> Optional[Dict[str, np.ndarray]]:
+    def load_embeddings_from_api(self) -> Optional[np.ndarray]:
         """Load embeddings from ChromaDB via API call."""
         payload = self._construct_load_embeddings_payload()
         full_url = self._get_api_url("load_embeddings")
@@ -178,6 +178,12 @@ class ClusteringPipeline:
         if dataset_embeddings is None:
             logger.error("❌ Failed to load embeddings, skipping clustering step")
             return results
+        
+        # # Prepare embeddings matrix
+        # dataset_ids = list(dataset_embeddings.keys())
+        # embedding_matrix = np.array([dataset_embeddings[dataset_id] for dataset_id in dataset_ids])
+        
+        logger.info(f"Embedding matrix shape: {dataset_embeddings.shape}")
         
         # Step 2: Run clustering pipeline
         logger.info("🔄 Running clustering on loaded embeddings...")

@@ -396,5 +396,16 @@ class GlobalFeatures:
         with open(output_path, 'rb') as f:
             return pickle.load(f)
 
+def main():
+    global_features = GlobalFeatures()
+    logger.info("Generating feature prototypes for retrieval...")
+    global_features.run_feature_decomposition(output_path="feature_decomposition.pkl")
+    logger.info("Running sample UMAP and PCA...")
+    global_features.run_sample_umap_and_pca()
+    logger.info("Done!")
+    
+if __name__ == "__main__":
+    main()
+
 
     

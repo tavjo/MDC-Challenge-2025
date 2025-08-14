@@ -341,53 +341,53 @@ def find_resolution_for_target(
     return assignments, res_mid
 
 
-@timer_wrap
-def update_dataset_clusters_in_duckdb(
-    cluster_assignments: Dict[str, str],
-    db_helper: DuckDBHelper
-) -> bool:
-    """
-    Update Dataset objects in DuckDB by adding cluster values.
+# @timer_wrap
+# def update_dataset_clusters_in_duckdb(
+#     cluster_assignments: Dict[str, str],
+#     db_helper: DuckDBHelper
+# ) -> bool:
+#     """
+#     Update Dataset objects in DuckDB by adding cluster values.
     
-    Args:
-        cluster_assignments: Dictionary mapping dataset_id to cluster_label
-        db_helper: DuckDBHelper instance
+#     Args:
+#         cluster_assignments: Dictionary mapping dataset_id to cluster_label
+#         db_helper: DuckDBHelper instance
         
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        logger.info(f"Updating {len(cluster_assignments)} dataset cluster assignments")
+#     Returns:
+#         True if successful, False otherwise
+#     """
+#     try:
+#         logger.info(f"Updating {len(cluster_assignments)} dataset cluster assignments")
         
-        # Get all datasets
-        datasets = db_helper.get_all_datasets()
+#         # Get all datasets
+#         datasets = db_helper.get_all_datasets()
         
-        # Update cluster assignments
-        updated_datasets = []
-        updated_count = 0
+#         # Update cluster assignments
+#         updated_datasets = []
+#         updated_count = 0
         
-        for dataset in datasets:
-            if dataset.dataset_id in cluster_assignments:
-                dataset.cluster = cluster_assignments[dataset.dataset_id]
-                dataset = Dataset.model_validate(dataset.model_dump())
-                updated_datasets.append(dataset)
-                updated_count += 1
+#         for dataset in datasets:
+#             if dataset.dataset_id in cluster_assignments:
+#                 dataset.cluster = cluster_assignments[dataset.dataset_id]
+#                 dataset = Dataset.model_validate(dataset.model_dump())
+#                 updated_datasets.append(dataset)
+#                 updated_count += 1
         
-        if updated_datasets:
-            success = db_helper.update_datasets(updated_datasets)
-            if success:
-                logger.info(f"Successfully updated {updated_count} dataset cluster assignments")
-                return True
-            else:
-                logger.error("Failed to update dataset cluster assignments")
-                return False
-        else:
-            logger.warning("No datasets found to update with cluster assignments")
-            return False
+#         if updated_datasets:
+#             success = db_helper.update_datasets(updated_datasets)
+#             if success:
+#                 logger.info(f"Successfully updated {updated_count} dataset cluster assignments")
+#                 return True
+#             else:
+#                 logger.error("Failed to update dataset cluster assignments")
+#                 return False
+#         else:
+#             logger.warning("No datasets found to update with cluster assignments")
+#             return False
             
-    except Exception as e:
-        logger.error(f"Error updating dataset clusters: {e}")
-        return False
+#     except Exception as e:
+#         logger.error(f"Error updating dataset clusters: {e}")
+#         return False
 
 
 @timer_wrap
