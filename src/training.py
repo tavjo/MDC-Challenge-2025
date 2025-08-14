@@ -33,7 +33,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import joblib
 import numpy as np
@@ -277,6 +277,7 @@ def load_data(
         X, y, X_val, y_val, groups_train = _split_train_val(
         df, target_col, group_col, 0 if disable_holdout else val_frac, seed
     )
+        
             
         # Split features and target
         # X = df.drop(columns=[target_col])
@@ -319,7 +320,13 @@ def load_data(
             "Data loaded successfully: %d samples, %d features, target distribution: %s",
             X.shape[0], X.shape[1], y.value_counts().to_dict()
         )
-        
+        # Final sanity check
+        if not disable_holdout:
+            #keep only numeric columns in X_val
+            X_val = X_val[numeric_cols]
+            #check that X_val has the same number of columns as X
+            if X_val.shape[1] != X.shape[1]:
+                raise ValueError(f"X_val has {X_val.shape[1]} columns, but X has {X.shape[1]} columns")
         return X, y, X_val, y_val, groups_train
         
     except Exception as e:
