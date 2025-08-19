@@ -35,6 +35,7 @@ services:
       - ./configs:/app/configs
       - ./api:/app/api
       - ./logs:/app/logs
+      - ./local_chroma:/app/local_chroma
     ports:
       - "3000:3000"
     restart: unless-stopped
@@ -63,6 +64,7 @@ services:
       - ./api:/app/api
       - ./logs:/app/logs
       - ./reports:/app/reports
+      - ./local_chroma:/app/local_chroma
     ports:
       - "8000:8000"
     restart: unless-stopped

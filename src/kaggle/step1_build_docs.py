@@ -6,6 +6,8 @@ import warnings
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Dict, Tuple, Union, Optional
+import re
+import unicodedata
 
 # Allow importing sibling kaggle helpers/models when used as a standalone script
 THIS_DIR = Path(__file__).parent
@@ -35,8 +37,6 @@ if not logger.handlers:
 # ----------------------------------------------------------------------------
 # Text cleaning utilities (ported from unstructured-based extractor)
 # ----------------------------------------------------------------------------
-import re
-import unicodedata
 
 # 1) Break-point hyphens followed by a line-break and another word char
 _HYPHEN_LINEBREAK_RE = re.compile(r"(?<=\w)-\s*(?:\r?\n|\r)+\s*(?=\w)")

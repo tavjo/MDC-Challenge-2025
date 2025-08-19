@@ -40,6 +40,7 @@ logger = logging.getLogger("mdc_integration_demo")
 # Ensure the path containing mdc_retrieval_module.py is on sys.path
 # sys.path.append("/path/to/your/module")  # if needed
 from src.kaggle.retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON
+from src.kaggle.models import BoostConfig
 from src.kaggle.helpers import load_bge_model, embed_texts
 from src.kaggle.duckdb import get_duckdb_helper
 
@@ -51,8 +52,8 @@ def build_query_text() -> str:
     For BGE v1.5, instruction is optional; add for short queries if you like.
     """
     accession_terms = [
-        "DOI", "doi.org", "accession", "GSE", "SRA", "SRR",
-        "ArrayExpress", "ENA", "BioProject", "PDB", "GISAID", "Zenodo", "Dryad", "Figshare"
+        "accession", "GSE", "SRA", "SRR",
+        "ArrayExpress", "ENA", "BioProject", "PDB", "GISAID", "Zenodo", "Dryad", "Figshare", "GEO", "Deposition number", "SRA"
     ]
     return " ".join(sorted(set(DAS_LEXICON + accession_terms)))
 
@@ -66,57 +67,103 @@ def maybe_add_bge_instruction(query: str, use_instruction: bool = True) -> str:
     return instruction + query
 
 # --- Run retrieval on a single new document ---
+# --- Run retrieval on a single new document ---
 def run_hybrid_retrieval_on_document(
     doc_id: str,
-    model_dir: str | Path,
+    # model_dir: str | Path,
+    model,
     top_k: int = 15,
     use_instruction: bool = True,
     prototypes: Optional[np.ndarray] = None,
     db_path: str | None = None,
-) -> List[Tuple[str, str]]:
+    prototype_top_m: int = 3,
+) -> Optional[List[Tuple[str, str]]]:
     """
     Returns a list of (chunk_id, chunk_preview) for top_k hits.
     """
+    print(f"Initializing DB Helper")
     db_helper = get_duckdb_helper(db_path)
+    print(f"Retrieving chunks for document {doc_id}")
     chunks = db_helper.get_chunks_by_document_id(doc_id)
+    if len(chunks) == 0:
+        print(f"Retrieved no chunks for {doc_id}. Returning None.")
+        return None
+    print(f"Retrieved {len(chunks)} chunks for {doc_id}")
     db_helper.close()
-    id_to_text: Dict[str, str] = {f"chunk_{i}": ch.text for i, ch in enumerate(chunks)}
+    id_to_text: Dict[str, str] = {ch.chunk_id: ch.text for ch in chunks}
+    id_to_chunk = {ch.chunk_id: ch for ch in chunks}
 
     # 2) Load local BGE-small and embed chunks
-    model = load_bge_model(model_dir)
+    print("Loading BGE small embeddings model...")
+    # model = load_bge_model(model_dir)
     chunk_ids = list(id_to_text.keys())
     chunk_texts = [id_to_text[cid] for cid in chunk_ids]
     chunk_vecs = embed_texts(model, chunk_texts)
     id_to_dense: Dict[str, np.ndarray] = {cid: vec for cid, vec in zip(chunk_ids, chunk_vecs)}
 
     # 3) Build the (short) semantic query and embed it
+    print("Build and embed short semantic query")
     query_text = build_query_text()
     query_for_embedding = maybe_add_bge_instruction(query_text, use_instruction=use_instruction)
     query_vec = embed_texts(model, [query_for_embedding])[0]
 
     # 4) Run hybrid retrieval: sparse (BM25/TF-IDF) + dense -> RRF -> MMR
-    ranked_ids = hybrid_retrieve_with_boost( # TODO: Fix to include the prototype ranker
-        query_text=query_text,               # sparse side uses raw query text
-        dense_query_vec=query_vec,           # dense side uses BGE embedding
-        id_to_dense=id_to_dense,             # {chunk_id: 384-d vec}
-        id_to_text=id_to_text,               # {chunk_id: raw text}
-        sparse_k=30, dense_k=30, rrf_k=60,   # tweak as you like
-        mmr_lambda=0.7, mmr_top_k=top_k,
+    print("🔄 Starting hybrid retrieval...")
+    ranked_ids = hybrid_retrieve_with_boost(  # TODO: Fix to include the prototype ranker
+        query_text=query_text,                # sparse side uses raw query text
+        dense_query_vec=query_vec,            # dense side uses BGE embedding
+        id_to_dense=id_to_dense,              # {chunk_id: 384-d vec}
+        id_to_text=id_to_text,                # {chunk_id: raw text}
+        boost_cfg=BoostConfig(prototype_top_m=int(max(1, prototype_top_m))),
         prototypes=prototypes,
     )
+    if ranked_ids:
+        print(f"Retrieved {len(ranked_ids)} for document: {doc_id}")
+    else:
+        print(f"Retrieved no ranked IDs for document: {doc_id}")
+        return None
 
-    # 5) Return top_k chunks with a short preview
+    # 5) Expand hits with neighbors (prev/next) while respecting top_k and deduplicating
+    final_ids: List[str] = []
+    seen_ids: set[str] = set()
+
+    def try_add(chunk_id: Optional[str]) -> None:
+        if chunk_id and (chunk_id in id_to_text) and (chunk_id not in seen_ids):
+            final_ids.append(chunk_id)
+            seen_ids.add(chunk_id)
+
+    i = 0
+    while len(final_ids) < top_k and i < len(ranked_ids):
+        current_id = ranked_ids[i]
+        # Add the primary ranked chunk
+        try_add(current_id)
+        if len(final_ids) >= top_k:
+            break
+        # Add up to two neighbors for the current chunk
+        ch = id_to_chunk.get(current_id)
+        if ch is not None:
+            prev_id = ch.chunk_metadata.previous_chunk_id
+            next_id = ch.chunk_metadata.next_chunk_id
+            try_add(prev_id)
+            if len(final_ids) >= top_k:
+                break
+            try_add(next_id)
+        i += 1
+
+    # Build previews for the deduped, ordered selection
     results: List[Tuple[str, str]] = []
-    for cid in ranked_ids[:top_k]:
+    for cid in final_ids:
         text = id_to_text[cid]
         preview = (text[:240] + "…") if len(text) > 240 else text
         results.append((cid, preview))
+    print(f"✅ Done with Hybrid Retrieval for {doc_id}.")
     return results
 
 # --- Example usage ---
 if __name__ == "__main__":
     # Point this to your already-downloaded BGE-small v1.5 directory
     LOCAL_BGE_DIR = "offline_models/BAAI/bge-small-en-v1.5"
+    model = load_bge_model(LOCAL_BGE_DIR)
 
     # New document text (replace with your actual content)
     doc_text = """
@@ -127,11 +174,11 @@ if __name__ == "__main__":
 
     hits = run_hybrid_retrieval_on_document(
         doc_text=doc_text,
-        model_dir=LOCAL_BGE_DIR,
+        model=model,
         top_k=10,
-        window_size=300,
-        overlap=30,
         use_instruction=True,  # set False if you prefer no instruction
+        prototypes=None,
+        db_path=None,
     )
 
     print("\nTop hits (chunk_id, preview):")

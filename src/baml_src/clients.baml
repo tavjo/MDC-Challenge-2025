@@ -20,15 +20,15 @@ client<llm> QwenLocal {
   }
 }
 
-client<llm> MyClient {
-  provider "openai"
-  retry_policy Constant
-  options {
-    api_key env.OPENAI_API_KEY
-    model "gpt-4.1-nano-2025-04-14"
-    temperature 0.0
-  }
-}
+// client<llm> MyClient {
+//   provider "openai"
+//   retry_policy Constant
+//   options {
+//     api_key env.OPENAI_API_KEY
+//     model "gpt-4.1-nano-2025-04-14"
+//     temperature 0.0
+//   }
+// }
 
 
 // https://docs.boundaryml.com/docs/snippets/clients/fallback
@@ -36,7 +36,7 @@ client<llm> OpenaiFallback {
   provider fallback
   options {
     // This will try the clients in order until one succeeds
-    strategy [QwenLocal, MyClient]
+    strategy [QwenLocal, QwenLocal]
   }
 }
 

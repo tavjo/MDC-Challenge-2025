@@ -105,7 +105,7 @@ def create_chunks_summary_csv(chunks: List[Chunk], export: bool = True, output_p
     return summary_df 
 
 @timer_wrap
-def chunk_documents(chunk_size: int = 300, overlap: int = 30, db_path: str | None = None, output_dir: str = None) -> List[Chunk]:
+def chunk_documents(chunk_size: int = 300, overlap: int = 30, db_path: str | None = None, output_dir: str = "kaggle/temp") -> List[Chunk]:
     db_helper = get_duckdb_helper(db_path)
     documents = db_helper.get_all_documents()
     chunks = []

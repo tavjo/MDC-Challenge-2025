@@ -29,7 +29,7 @@ from src.kaggle.models import CitationEntity, Document, Chunk
 from src.kaggle.duckdb import get_duckdb_helper
 from src.kaggle.get_citation_context import run_hybrid_retrieval_on_document
 
-DEFAULT_DUCKDB_PATH = "/kaggle/tmp/mdc.duckdb"
+DEFAULT_DUCKDB_PATH = "/kaggle/temp/mdc.duckdb"
 
 filename = os.path.basename(__file__)
 logger = initialize_logging(filename)

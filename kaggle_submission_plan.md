@@ -4,15 +4,15 @@
 Prepare Kaggle-friendly, siloed Python modules under `src/kaggle/` that:
 - Only import from standard libraries and `src/kaggle/*` (no cross-package imports).
 - Reuse existing project logic where specified, inlined where necessary.
-- Persist intermediate state in a DuckDB file under `/kaggle/tmp/`.
+- Persist intermediate state in a DuckDB file under `/kaggle/temp/`.
 - Prefer simplicity and reproducibility over avoiding duplication.
 
 ### Environment and paths (Kaggle)
 - Trained RF model: `/kaggle/input/rf_model.pkl`
 - Offline model cache (already in Kaggle): `/kaggle/input/baaibge-small-en-v1.5/transformers/default/1/offline_models/`
 - Embedding model name: `BAAI/bge-small-en-v1.5` (384 dims)
- - DuckDB path: `/kaggle/tmp/mdc.duckdb` (created on first use; ephemeral)
- - Intermediate Outputs (CSVs/Parquet): `/kaggle/tmp/` (ephemeral)
+ - DuckDB path: `/kaggle/temp/mdc.duckdb` (created on first use; ephemeral)
+ - Intermediate Outputs (CSVs/Parquet): `/kaggle/temp/` (ephemeral)
  - Persistent Outputs (CSVs/Parquet): `/kaggle/working/` (preserved in versioned output)
 - Test PDFs directory (already in Kaggle): `/kaggle/input/make-data-count-finding-data-references/test/PDF/`
 - Test XML directory (already in Kaggle): `/kaggle/input/make-data-count-finding-data-references/test/XML/` --> (only if there are some documents that are only provided as XML but not pdf)
@@ -50,7 +50,7 @@ In this plan, an idempotent function can be safely re-run without causing duplic
 - Implementation notes:
    - Reuse/port the schema definitions from `api/database/duckdb_schema.py` and utilities from `api/utils/duckdb_utils.py` where applicable.
   - Functions:
-    - `get_conn(db_path: str | None = None)` → default to `/kaggle/tmp/mdc.duckdb`.
+    - `get_conn(db_path: str | None = None)` → default to `/kaggle/temp/mdc.duckdb`.
     - `init_schema(conn)` → idempotent table/index creation for: `documents`, `chunks`, `datasets`, `engineered_feature_values` (+ any needed helper tables). No embeddings table.
     - `upsert_documents(conn, docs: list[Document])`.
     - `bulk_insert_chunks(conn, chunks: list[Chunk])`.
@@ -90,7 +90,7 @@ In this plan, an idempotent function can be safely re-run without causing duplic
   6. Apply `mask_dataset_ids_in_text` and `construct_datasets_from_retrieval_results` to produce dataset texts.
   7. Construct `Dataset` objects and bulk upsert into DuckDB.
   8. Embed dataset texts (bulk) with `BAAI/bge-small-en-v1.5` using the embedding function in `src/kaggle/helpers.py`.
-   9. Create a DataFrame: rows = `dataset_id`, columns = 384 embedding dims; save to `/kaggle/tmp/dataset_embeddings.parquet` (or `.csv` if preferred).
+   9. Create a DataFrame: rows = `dataset_id`, columns = 384 embedding dims; save to `/kaggle/temp/dataset_embeddings.parquet` (or `.csv` if preferred).
 - Notes:
   - Use batched embedding to control memory.
   - Keep the per-document constraint on retrieval strict to avoid cross-document leakage.
@@ -123,9 +123,9 @@ In this plan, an idempotent function can be safely re-run without causing duplic
 ---
 
 ## Exports and artifacts
-- `/kaggle/tmp/mdc.duckdb` (DuckDB file with documents/chunks/datasets/EAV)
+- `/kaggle/temp/mdc.duckdb` (DuckDB file with documents/chunks/datasets/EAV)
 - `/kaggle/working/chunks_summary.csv` (from `create_chunks_summary_csv`)
-- `/kaggle/tmp/dataset_embeddings.parquet` (384-dim BGE-small v1.5 vectors)
+- `/kaggle/temp/dataset_embeddings.parquet` (384-dim BGE-small v1.5 vectors)
 - `/kaggle/working/training_features.parquet` (joined Dataset+features for classifier)
 - `/kaggle/working/submission.csv` (final output)
 

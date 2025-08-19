@@ -4,7 +4,7 @@ Kaggle version of clustering utilities, mirroring src/clustering.py.
 - Builds k-NN similarity graph over feature (column) space
 - Runs Leiden (igraph + leidenalg) with the same logic
 - Optionally searches resolution to hit a target number of clusters
-- Writes small reports to /kaggle/tmp/reports/clustering
+- Writes small reports to /kaggle/temp/reports/clustering
 
 NOTE: This module is intentionally siloed for Kaggle; it does not depend on
 api/utils or non-kaggle code paths.
@@ -235,7 +235,7 @@ def export_feature_clusters(feat2cluster: Dict[str, str], out_dir: str) -> Path:
 def export_clustering_report(
     cluster_assignments: Dict[str, str],
     graph_stats: Dict[str, Any],
-    output_dir: str = "/kaggle/tmp/reports/clustering",
+    output_dir: str = "/kaggle/temp/reports/clustering",
 ) -> Path:
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -277,7 +277,7 @@ def run_clustering_pipeline(
     max_cluster_size: Optional[int] = DEFAULT_MAX_CLUSTER_SIZE,
     split_factor: float = DEFAULT_SPLIT_FACTOR,
     random_seed: int = DEFAULT_RANDOM_SEED,
-    report_dir: str = "/kaggle/tmp/reports/clustering",
+    report_dir: str = "/kaggle/temp/reports/clustering",
 ) -> Dict[str, str]:
     graph = build_knn_similarity_graph(
         dataset_embeddings=dataset_embeddings,

@@ -2,6 +2,54 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Literal, Any, Union
 from datetime import datetime
 
+class BoostConfig(BaseModel):
+    """Configuration for hybrid retrieval flow (prototype-first + RRF + bounded priors + MMR).
+
+    - TOPK_PER_SIGNAL = mmr_top_k * signal_k_multiplier
+    - Prototypes (if provided) drive primary candidates; RRF (BM25+dense) is secondary
+    - Small, bounded priors (DAS terms, specific accession regex, repository DOIs) are added
+    """
+
+    # RRF rank fusion constant
+    rrf_k: int = Field(
+        60,
+        description=(
+            "RRF constant k; controls contribution of lower-ranked items across rankers."
+        ),
+    )
+
+    # New: control candidate pool multiplier for signal pools
+    signal_k_multiplier: int = Field(
+        3,
+        ge=1,
+        description=(
+            "Multiplier used to derive TOPK_PER_SIGNAL from mmr_top_k (TOPK_PER_SIGNAL = mmr_top_k * signal_k_multiplier)."
+        ),
+    )
+
+    # Final diversification
+    mmr_lambda: float = Field(
+        0.70,
+        description=(
+            "MMR diversity-control parameter λ in [0,1]; higher favors relevance, lower favors diversity."
+        ),
+    )
+    mmr_top_k: int = Field(
+        15,
+        description=(
+            "Final number of items to select using MMR re-ranking from the boosted candidate pool."
+        ),
+    )
+
+    # New: aggregation over prototypes when computing per-chunk prototype affinity
+    prototype_top_m: int = Field(
+        1,
+        ge=1,
+        description=(
+            "Number of top prototype similarities to average per chunk (1 reduces to max)."
+        ),
+    )
+
 class CitationEntity(BaseModel):
     data_citation: str = Field(..., description="Data citation from text")
     document_id: str = Field(..., description="DOI of the document where the data citation is found")
@@ -176,55 +224,6 @@ class Document(BaseModel):
             citation_entities=citation_entities,
             n_pages=row["n_pages"]
         )
-
-
-class ChunkingResult(BaseModel):
-    """Result of the chunking pipeline"""
-    success: bool = Field(..., description="Whether the chunking pipeline completed successfully.")
-    total_documents: int = Field(..., description="Total number of documents processed.")
-    total_unique_datasets: int = Field(..., description="Total number of unique entities (dataset citations) found.")
-    total_chunks: int = Field(..., description="Total number of chunks created.")
-    total_tokens: int = Field(..., description="Total number of tokens in all chunks.")
-    avg_tokens_per_chunk: float = Field(..., description="Average number of tokens per chunk.")
-    validation_passed: Optional[bool] = Field(None, description="Whether the chunking pipeline passed validation.")
-    pipeline_completed_at: str = Field(..., description="Timestamp of when the pipeline completed or failed.")
-    entity_retention: Optional[float] = Field(None, description="Percentage of dataset IDs retained after chunking; aim is 100%.")
-    output_path: Optional[str] = Field(None, description="Path to the output files.")
-    output_files: Optional[List[str]] = Field(None, description="List of output file paths.")
-    lost_entities: Optional[Dict[str, Any]] = Field(None, description="List of dataset IDs that were lost; aim is 0.")
-    error: Optional[str] = Field(None, description="Error message if pipeline failed.")
-
-# New: per-document result model
-class DocumentChunkingResult(BaseModel):
-    document_id: str
-    success: bool
-    error: Optional[str] = None
-
-    # pipeline parameters
-    chunk_size: int
-    chunk_overlap: int
-    cfg_path: str
-    collection_name: str
-
-    # citation stats
-    pre_chunk_total_citations: Optional[int] = None
-    post_chunk_total_citations: Optional[int] = None
-    validation_passed: Optional[bool] = None
-    entity_retention: Optional[float] = None
-    lost_entities: Optional[Dict[str, Any]] = None
-
-    # chunk stats
-    total_chunks: int
-    total_tokens: int
-    avg_tokens_per_chunk: float
-
-    # outputs
-    output_path: Optional[str] = None
-    output_files: Optional[List[str]] = None
-
-    # timing
-    pipeline_started_at: str
-    pipeline_completed_at: str
 
 class Dataset(BaseModel):
     """Dataset Citation Extracted from Document text"""

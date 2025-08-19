@@ -52,20 +52,34 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional, Iterable
+from typing import Dict, List, Tuple, Optional
 from collections import defaultdict, Counter
 
 from pathlib import Path
 import sys
 
 # Allow importing sibling kaggle helpers/models when used as a standalone script
-THIS_DIR = Path(__file__).parent
-if str(THIS_DIR) not in sys.path:
-    sys.path.append(str(THIS_DIR))
+# THIS_DIR = Path(__file__).parent
+# if str(THIS_DIR) not in sys.path:
+#     sys.path.append(str(THIS_DIR))
 
 import numpy as np
 
 from .helpers import cosine_sim_matrix
+from .models import BoostConfig as PydBoostConfig
+
+# --- Retrieval weights (normalized-ish; tuned to avoid dominance) ---
+RETRIEVAL_WEIGHTS: Dict[str, float] = {
+    "prototype": 0.70,
+    "das": 0.10,
+    "rrf": 0.10,
+    "regex": 0.05,
+    "doi_repo": 0.05,
+    "ref_penalty": 0.12,  # kept for completeness; unused since no section titles available
+}
+
+NEIGHBOR_BOOST_CAP: float = 0.05
+REGEX_MAX_HITS_FOR_SCORE: int = 3
 
 # ================================
 # DAS miner (lexicon + heuristics)
@@ -134,8 +148,7 @@ def guess_section(text: str) -> Optional[str]:
 # ==================================
 
 ACCESSION_REGEXES: Dict[str, str] = {
-    "doi_url": r"https?://doi\.org/\S+",
-    "doi_numeric": r"\b[0-9]{2}\.[0-9]{4,9}/\S+\b",
+    # Generic DOI patterns removed from scoring per plan; repository-specific DOIs handled separately
     "geo_gse": r"\bGSE\d+\b",
     "sra_run": r"\bSRR\d+\b",
     "sra_generic": r"\bSRA\d+\b",
@@ -282,17 +295,6 @@ def mmr_rerank(candidate_ids: List[str],
 # Hybrid retrieval + boosting (DAS/Methods/regex)
 # ==============================================
 
-@dataclass
-class BoostConfig:
-    das_methods_boost: float = 0.20
-    regex_hit_boost: float = 0.50
-    regex_neighbor_boost: float = 0.25
-    rrf_k: int = 60
-    sparse_k: int = 60
-    dense_k: int = 60
-    mmr_lambda: float = 0.7
-    mmr_top_k: int = 25
-
 
 def _dense_topk(dense_query_vec: np.ndarray,
                 id_to_dense: Dict[str, np.ndarray],
@@ -327,98 +329,134 @@ def _is_methods_or_das(section: Optional[str], text: str) -> bool:
     return sec_guess in {"methods", "data availability"}
 
 
-def _normalize_scores(d: Dict[str, float]) -> Dict[str, float]:
-    if not d:
-        return d
-    vals = np.array(list(d.values()), dtype=float)
-    lo, hi = float(np.min(vals)), float(np.max(vals))
-    if hi - lo < 1e-12:
-        return d
-    return {k: (v - lo) / (hi - lo) for k, v in d.items()}
+def _minmax_norm(arr: np.ndarray) -> np.ndarray:
+    if arr.size == 0:
+        return arr
+    lo = float(np.min(arr))
+    hi = float(np.max(arr))
+    if hi <= lo:
+        return np.zeros_like(arr, dtype=float)
+    return (arr - lo) / (hi - lo)
+
+
+def _clip01(x: np.ndarray) -> np.ndarray:
+    return np.clip(x, 0.0, 1.0)
 
 
 # ------------------------------
-# Boost configuration (updated)
+# Boost configuration (moved to models.BoostConfig)
 # ------------------------------
-@dataclass
-class BoostConfig:
-    # Retrieval pools
-    sparse_k: int = 30
-    dense_k: int = 30
-    rrf_k: int = 60
-
-    # Section / regex boosts
-    regex_hit_boost: float = 0.25
-    regex_neighbor_boost: float = 0.10
-    das_methods_boost: float = 0.20
-
-    # Prototype priors (NEW)
-    # 1) Add a prototype-based ranked list as another "ranker" in RRF
-    proto_add_to_rrf: bool = True
-    proto_rrf_k: int = 50         # how many items from the prototype rank list to feed into RRF
-    # 2) Add an additive prototype boost post-RRF
-    proto_weight: float = 0.20    # weight of prototype affinity boost
-    proto_mode: str = "max"       # "max" or "mean_top_m"
-    proto_top_m: int = 3          # if mode == "mean_top_m"
-    proto_min_sim: float = 0.00   # floor to ignore tiny affinities (on normalized [0,1] scale)
-
-    # Final diversification
-    mmr_lambda: float = 0.70
-    mmr_top_k: int = 15
 
 
 # ------------------------------
 # Prototype affinity helpers
 # ------------------------------
+def _prototype_topk(proto_mat: np.ndarray, chunk_mat: np.ndarray, k: int, top_m: int = 1):
+    """Return (per_chunk_scores, top_indices[:k]) using mean of top_m sims per chunk.
 
-
-def _prototype_affinity(
-    id_to_dense: Dict[str, np.ndarray],
-    prototypes,  # Prototypes | np.ndarray of centroids [P, D]
-    mode: str = "max",
-    top_m: int = 3,
-) -> Dict[str, float]:
+    When top_m == 1, this reduces to max-sim over prototypes.
     """
-    Compute a per-chunk prototype affinity in [0,1] via min-max normalization.
-    Affinity = max over centroids, or mean of top-M sims to centroids.
-    """
-    if prototypes is None:
-        return {cid: 0.0 for cid in id_to_dense.keys()}
-
-    # Accept either Prototypes dataclass or raw centroids
-    C = getattr(prototypes, "centroids", prototypes)
-    if C is None or len(C) == 0:
-        return {cid: 0.0 for cid in id_to_dense.keys()}
-
-    ids = list(id_to_dense.keys())
-    V = np.vstack([id_to_dense[cid] for cid in ids])  # [N, D]
-    S = cosine_sim_matrix(V, C)                      # [N, P]
-
-    if mode == "mean_top_m":
-        m = max(1, min(top_m, S.shape[1]))
-        # Take mean of top-m per row (no full sort: partial partition is faster)
-        part = np.partition(S, -m, axis=1)[:, -m:]
-        raw = part.mean(axis=1)
-    else:  # "max"
-        raw = S.max(axis=1)
-
-    # Min-max normalize across all chunks so boosts are comparable to other signals
-    lo, hi = float(raw.min()), float(raw.max())
-    if hi - lo < 1e-8:
-        norm = np.zeros_like(raw, dtype=np.float32)
+    def _l2norm(m: np.ndarray) -> np.ndarray:
+        denom = np.linalg.norm(m, axis=1, keepdims=True) + 1e-12
+        return m / denom
+    if proto_mat.size == 0 or chunk_mat.size == 0:
+        return np.zeros((chunk_mat.shape[0],), dtype=float), np.array([], dtype=int)
+    Pn = _l2norm(proto_mat)
+    Cn = _l2norm(chunk_mat)
+    sims = Pn @ Cn.T  # [P, N]
+    m = int(max(1, min(top_m, sims.shape[0])))
+    if m == 1:
+        per_chunk = np.max(sims, axis=0)
     else:
-        norm = (raw - lo) / (hi - lo)
-    return dict(zip(ids, norm))
+        # take mean of top-m similarities per column (per chunk)
+        # use argpartition for efficiency
+        top_m_vals = np.partition(sims, -m, axis=0)[-m:, :]
+        per_chunk = np.mean(top_m_vals, axis=0)
+    k_eff = min(int(k), per_chunk.shape[0]) if per_chunk.shape[0] > 0 else 0
+    if k_eff <= 0:
+        return per_chunk, np.array([], dtype=int)
+    top_idx = np.argpartition(per_chunk, -k_eff)[-k_eff:]
+    top_sorted = top_idx[np.argsort(per_chunk[top_idx])[::-1]]
+    return per_chunk, top_sorted
 
-def _rank_by_prototype_affinity(
-    id_to_dense: Dict[str, np.ndarray],
-    prototypes,
-    mode: str = "max",
-    top_m: int = 3,
-) -> List[str]:
-    """Return chunk_ids ranked by descending prototype affinity (no truncation here)."""
-    aff = _prototype_affinity(id_to_dense, prototypes, mode=mode, top_m=top_m)
-    return [cid for cid, _ in sorted(aff.items(), key=lambda x: -x[1])]
+
+# Specific accession-style patterns (tight)
+REGEX_SPECIFIC: Dict[str, str] = {
+    "gisaid": r"\bEPI(?:_ISL)?_?\d+\b",
+    "geo_gse": r"\bGSE\d+\b",
+    "sra_run": r"\bSRR\d+\b",
+    "sra_experiment": r"\bSRX\d+\b",
+    "sra_study": r"\bSRP\d+\b",
+    "sra_sample": r"\bSRS\d+\b",
+    "ena_bioproject": r"\bPRJ[A-Z]+\d+\b",
+    "ena_run": r"\b[ED]RR\d+\b",
+    "ena_experiment": r"\b[ED]RX\d+\b",
+    "ena_sample": r"\b[ED]RS\d+\b",
+    "ena_biosample": r"\bSAM[A-Z]?\d+\b",
+    "arrayexpress": r"\bE-\w+-\d+\b",
+    "pdb": r"\b[0-9][A-Za-z0-9]{3}\b",
+    "uniprot": r"\b(?:[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9][A-Z0-9]{3}[0-9])\b",
+    "interpro": r"\bIPR\d{6}\b",
+    "pfam": r"\bPF\d{5}\b",
+    "pfam_clan": r"\bCL\d{4}\b",
+    "chembl": r"\bCHEMBL\d+\b",
+    "kegg_ko": r"\bK\d{5}\b",
+    "ensembl_gene": r"\bENS\w*\d+\b",
+    "cellosaurus": r"\bCVCL_\w{4}\b",
+    "empiar": r"\bEMPIAR-\d+\b",
+    "pride_pxd": r"\bPXD\d+\b",
+    "pride_prd": r"\bPRD\d+\b",
+    "ncbi_refseq": r"\b[A-Z]{2}_\d+(?:\.\d+)?\b",
+    "dbsnp": r"\brs\d+\b",
+    "hgnc": r"\bHGNC:\d+\b",
+    "kegg_pathway": r"\bmap\d{5}\b",
+}
+_REGEX_SPECIFIC_COMPILED: Dict[str, re.Pattern] = {k: re.compile(v, flags=re.IGNORECASE) for k, v in REGEX_SPECIFIC.items()}
+
+
+# Repository DOI patterns (context-gated via DAS language and repo keywords in text)
+REGEX_REPO_DOI: Dict[str, str] = {
+    "figshare_doi": r"https?://doi\.org/10\.6084/(?:m9\.figshare\.|figshare\.)\S+",
+    "dryad_doi": r"https?://doi\.org/10\.5061/dryad\.\S+",
+    "zenodo_doi": r"https?://doi\.org/10\.5281/zenodo\.\S+",
+    "pangaea_doi": r"https?://doi\.org/10\.1594/pangaea\.\S+",
+    "mendeley_doi": r"https?://doi\.org/10\.(?:17632|18150)/\S+",
+    "ccdc_doi": r"https?://doi\.org/10\.5517/\S+",
+    "tcia_doi": r"https?://doi\.org/10\.7937/tcia\.\S+",
+    "pasta_doi": r"https?://doi\.org/10\.6073/pasta-\S+",
+}
+_REPO_DOI_COMPILED: Dict[str, re.Pattern] = {k: re.compile(v, flags=re.IGNORECASE) for k, v in REGEX_REPO_DOI.items()}
+_REPO_KEYWORDS = {"figshare", "dryad", "zenodo", "pangaea", "mendeley", "ccdc", "tcia", "pasta"}
+
+
+def _das_prior(text: str) -> float:
+    t = text.lower()
+    hits = 0
+    for w in DAS_LEXICON:
+        if w in t:
+            hits += 1
+    return min(1.0, hits / 4.0)
+
+
+def _regex_specific_score(text: str) -> float:
+    n = 0
+    for pat in _REGEX_SPECIFIC_COMPILED.values():
+        if pat.search(text):
+            n += 1
+            if n >= REGEX_MAX_HITS_FOR_SCORE:
+                break
+    return float(n) / float(REGEX_MAX_HITS_FOR_SCORE)
+
+
+def _doi_repo_prior(text: str) -> float:
+    t = text.lower()
+    doi_hit = any(pat.search(t) for pat in _REPO_DOI_COMPILED.values())
+    if not doi_hit:
+        return 0.0
+    has_repo_word = any(w in t for w in _REPO_KEYWORDS)
+    has_das_lang = _das_prior(text) > 0.0
+    base = 0.6
+    return 1.0 if has_das_lang or has_repo_word else base
 
 
 # ----------------------------------------
@@ -430,92 +468,106 @@ def hybrid_retrieve_with_boost(
     dense_query_vec: np.ndarray,
     id_to_dense: Dict[str, np.ndarray],
     id_to_text: Dict[str, str],
-    id_to_section: Optional[Dict[str, Optional[str]]] = None,
-    id_to_neighbors: Optional[Dict[str, List[str]]] = None,
-    regex_index: Optional[Dict[str, Dict[str, int]]] = None,
-    boost_cfg: BoostConfig = BoostConfig(),
+    boost_cfg: PydBoostConfig = PydBoostConfig(),
     prototypes=None,  # Prototypes | np.ndarray of centroids [P, D] | None
 ) -> List[str]:
-    """Run sparse+dense → (optionally + prototype rank) → RRF → boosts (regex/section/prototype) → MMR.
+    """Prototype-first hybrid retrieval with bounded priors and RRF/MMR fusion.
 
     Returns: final ranked list of chunk_ids.
     """
-    # ----------------
-    # 1) Retrieve
-    # ----------------
-    sparse_ids = _sparse_topk(query_text, id_to_text, k=boost_cfg.sparse_k)
-    dense_ids  = _dense_topk(dense_query_vec, id_to_dense, k=boost_cfg.dense_k)
+    # Dynamic caps based on requested output size
+    sig_mult = getattr(boost_cfg, "signal_k_multiplier", 3)
+    try:
+        sig_mult = int(sig_mult)
+    except Exception:
+        sig_mult = 3
+    TOPK_PER_SIGNAL = max(1, int(boost_cfg.mmr_top_k) * sig_mult)
 
-    rank_lists = [sparse_ids, dense_ids]
+    # -----------------------------
+    # 1) Prototype-first candidates (primary when provided)
+    # -----------------------------
+    proto_candidates: List[str] = []
+    proto_score_map: Dict[str, float] = {}
+    if prototypes is not None and isinstance(prototypes, np.ndarray) and prototypes.size > 0:
+        ordered_ids = list(id_to_dense.keys())
+        if ordered_ids:
+            chunk_mat = np.vstack([id_to_dense[cid] for cid in ordered_ids])
+            per_chunk_scores, top_idx = _prototype_topk(prototypes, chunk_mat, k=TOPK_PER_SIGNAL, top_m=getattr(boost_cfg, "prototype_top_m", 1) if isinstance(getattr(boost_cfg, "prototype_top_m", 1), (int, float)) else 1)
+            per_chunk_scores = _minmax_norm(per_chunk_scores)
+            proto_candidates = [ordered_ids[i] for i in top_idx.tolist()] if top_idx.size > 0 else []
+            proto_score_map = {cid: float(per_chunk_scores[i]) for i, cid in enumerate(ordered_ids)}
 
-    # Optional: include prototype-based ranking as another signal into RRF
-    if boost_cfg.proto_add_to_rrf and prototypes is not None:
-        proto_rank = _rank_by_prototype_affinity(
-            id_to_dense=id_to_dense,
-            prototypes=prototypes,
-            mode=boost_cfg.proto_mode,
-            top_m=boost_cfg.proto_top_m,
-        )
-        # Limit how many from this source we feed into RRF to avoid overpowering
-        proto_rank = proto_rank[:boost_cfg.proto_rrf_k]
-        rank_lists.append(proto_rank)
+    # -----------------------------
+    # 2) Secondary candidate generation (RRF over sparse + dense)
+    # -----------------------------
+    # Use prototype-centered query vector for dense if prototypes provided; otherwise fallback to provided dense_query_vec
+    if prototypes is not None and isinstance(prototypes, np.ndarray) and prototypes.size > 0:
+        dense_query_for_dense = np.mean(prototypes, axis=0)
+    else:
+        dense_query_for_dense = dense_query_vec
 
-    rrf = reciprocal_rank_fusion(rank_lists, k=boost_cfg.rrf_k)
-    base_scores = rrf.scores  # id -> RRF score (assumes your implementation exposes .scores)
+    sparse_ids = _sparse_topk(query_text, id_to_text, k=TOPK_PER_SIGNAL)
+    dense_ids = _dense_topk(dense_query_for_dense, id_to_dense, k=TOPK_PER_SIGNAL)
+    rrf = reciprocal_rank_fusion([sparse_ids, dense_ids], k=boost_cfg.rrf_k)
+    rrf_ranking: List[str] = rrf.ranking
+    # Normalize RRF scores across its pool for blending
+    rrf_pool = rrf_ranking
+    rrf_vals_pool = np.array([float(rrf.scores.get(cid, 0.0)) for cid in rrf_pool], dtype=float)
+    rrf_vals_pool = _minmax_norm(rrf_vals_pool)
+    rrf_norm_map: Dict[str, float] = {cid: float(rrf_vals_pool[i]) for i, cid in enumerate(rrf_pool)}
 
-    # ----------------
-    # 2) Prep indices
-    # ----------------
-    if regex_index is None:
-        regex_index = build_regex_index(id_to_text)
-    id_to_neighbors = id_to_neighbors or {}
+    # Union candidates (prototype-first dominance) and deduplicate preserving order
+    candidate_ids: List[str] = list(dict.fromkeys(proto_candidates + rrf_ranking))
+    if not candidate_ids:
+        candidate_ids = rrf_ranking[:TOPK_PER_SIGNAL]
 
-    # ----------------
-    # 3) Apply boosts
-    # ----------------
-    boosted: Dict[str, float] = dict(base_scores)
+    # -----------------------------
+    # 2) Feature computation
+    # -----------------------------
+    # RRF scores aligned to union
+    score_rrf = np.array([rrf_norm_map.get(cid, 0.0) for cid in candidate_ids], dtype=float)
+    # Prototype scores aligned to union
+    score_proto = np.array([proto_score_map.get(cid, 0.0) for cid in candidate_ids], dtype=float)
 
-    # (a) Regex hits on the chunk itself
-    regex_positive_ids = {cid for cid, c in regex_index.items() if c.get("_total", 0) > 0}
-    for cid in list(boosted.keys()):
-        if cid in regex_positive_ids:
-            n = regex_index[cid].get("_total", 0)
-            boosted[cid] = boosted[cid] + boost_cfg.regex_hit_boost * min(3.0, float(n))
+    # Priors per candidate
+    texts = [id_to_text.get(cid, "") for cid in candidate_ids]
+    das_prior = np.array([_das_prior(t) for t in texts], dtype=float)
+    regex_specific = np.array([_regex_specific_score(t) for t in texts], dtype=float)
+    doi_repo = np.array([_doi_repo_prior(t) for t in texts], dtype=float)
 
-    # (b) Neighbor regex proximity
-    if id_to_neighbors:
-        for cid, neighbors in id_to_neighbors.items():
-            if cid not in boosted:
+    # Neighbor boost from adjacency in the RRF ranking (window=1), tiny and capped
+    id_to_pos = {cid: i for i, cid in enumerate(rrf_ranking)}
+    neighbor = np.zeros_like(regex_specific)
+    for j, cid in enumerate(candidate_ids):
+        pos = id_to_pos.get(cid, None)
+        if pos is None:
+            neighbor[j] = 0.0
+            continue
+        s = 0.0
+        for off in (-1, 1):
+            nb_pos = pos + off
+            if nb_pos < 0 or nb_pos >= len(rrf_ranking):
                 continue
-            if any(nid in regex_positive_ids for nid in neighbors):
-                boosted[cid] = boosted[cid] + boost_cfg.regex_neighbor_boost
+            nb_id = rrf_ranking[nb_pos]
+            s += _regex_specific_score(id_to_text.get(nb_id, ""))
+        neighbor[j] = min(s * 0.02, NEIGHBOR_BOOST_CAP)
 
-    # (c) Section prior (Methods / Data Availability)
-    for cid in list(boosted.keys()):
-        sec = id_to_section[cid] if id_to_section and cid in id_to_section else None
-        txt = id_to_text.get(cid, "")
-        if _is_methods_or_das(sec, txt):
-            boosted[cid] = boosted[cid] + boost_cfg.das_methods_boost
+    # -----------------------------
+    # 3) Final weighted score and MMR
+    # -----------------------------
+    W = RETRIEVAL_WEIGHTS
+    final_score = (
+        W["prototype"]  * _clip01(score_proto) +
+        W["rrf"]        * _clip01(score_rrf) +
+        W["das"]        * _clip01(das_prior) +
+        W["regex"]      * _clip01(regex_specific) +
+        W["doi_repo"]   * _clip01(doi_repo) +
+        neighbor
+    )
 
-    # (d) Prototype affinity boost (NEW)
-    if prototypes is not None and boost_cfg.proto_weight > 0:
-        aff = _prototype_affinity(
-            id_to_dense=id_to_dense,
-            prototypes=prototypes,
-            mode=boost_cfg.proto_mode,
-            top_m=boost_cfg.proto_top_m,
-        )  # normalized [0,1]
-        for cid in list(boosted.keys()):
-            a = aff.get(cid, 0.0)
-            if a > boost_cfg.proto_min_sim:
-                boosted[cid] = boosted[cid] + boost_cfg.proto_weight * (a - boost_cfg.proto_min_sim)
-
-    # ----------------
-    # 4) Re-rank & MMR
-    # ----------------
-    boosted = _normalize_scores(boosted)
-    pool_rank = [cid for cid, _ in sorted(boosted.items(), key=lambda x: -x[1])]
-    pool_rank = [cid for cid in pool_rank if cid in id_to_dense]  # ensure we can MMR with dense vecs
+    order = np.argsort(final_score)[::-1]
+    pool_rank = [candidate_ids[i] for i in order]
+    pool_rank = [cid for cid in pool_rank if cid in id_to_dense]
 
     final_ids = mmr_rerank(
         candidate_ids=pool_rank,

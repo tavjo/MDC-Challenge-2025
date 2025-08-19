@@ -6,7 +6,7 @@ What this adds (without redoing per-cluster PCA):
 - Optional global UMAP (UMAP_1, UMAP_2)
 - Optional neighborhood statistics from local kNN on embeddings
 
-All reports are saved under /kaggle/tmp/reports/global_features/.
+All reports are saved under /kaggle/temp/reports/global_features/.
 Engineered features are stored in DuckDB via KaggleDuckDBHelper.
 """
 
@@ -47,9 +47,9 @@ from src.kaggle.duckdb import get_duckdb_helper
 from src.kaggle.models import EngineeredFeatures
 
 
-REPORT_DIR = Path("/kaggle/tmp/reports/global_features")
-DEFAULT_DB_PATH = "/kaggle/tmp/mdc.duckdb"
-DEFAULT_EMB_PATH = "/kaggle/tmp/dataset_embeddings.parquet"
+REPORT_DIR = Path("/kaggle/temp/reports/global_features")
+DEFAULT_DB_PATH = "/kaggle/temp/mdc.duckdb"
+DEFAULT_EMB_PATH = "/kaggle/temp/dataset_embeddings.parquet"
 
 
 def _ensure_report_dir() -> Path:

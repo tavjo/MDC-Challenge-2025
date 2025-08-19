@@ -53,7 +53,7 @@ def run_per_cluster_pca(
     dataset_embeddings: np.ndarray,
     feature_cluster_map: Dict[str, str],  # {feature_name: cluster_label}
     dataset_ids: List[str],
-    db_path: str = "/kaggle/tmp/mdc.duckdb",
+    db_path: str = "/kaggle/temp/mdc.duckdb",
     random_seed: int = 42,
 ) -> bool:
     # Group features by cluster

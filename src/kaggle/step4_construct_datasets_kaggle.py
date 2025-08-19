@@ -8,7 +8,7 @@ Flow:
 4) Call hybrid_retrieve_with_boost to get relevant chunk_ids (ensure target+neighbors)
 5) Apply mask_dataset_ids_in_text and construct_datasets_from_retrieval_results
 6) Upsert Dataset rows into DuckDB
-7) Bulk-embed dataset texts and export /kaggle/tmp/dataset_embeddings.parquet
+7) Bulk-embed dataset texts and export /kaggle/temp/dataset_embeddings.parquet
 """
 
 from __future__ import annotations
@@ -29,8 +29,9 @@ from src.kaggle.models import CitationEntity, Dataset
 from src.kaggle.helpers import load_bge_model, embed_texts
 from src.kaggle.duckdb import get_duckdb_helper
 from src.kaggle.retrieval_module import hybrid_retrieve_with_boost
+from src.kaggle.models import BoostConfig
 
-DEFAULT_DUCKDB_PATH = "/kaggle/tmp/mdc.duckdb"
+DEFAULT_DUCKDB_PATH = "/kaggle/temp/mdc.duckdb"
 
 
 def add_target_and_neighbors_union(ranked_ids: List[str], target_and_neighbors: List[str], top_k: int) -> List[str]:
@@ -85,7 +86,7 @@ def construct_dataset_from_retrieval_results(
     )
 
 
-def build_dataset_embeddings(datasets: List[Dataset], model_dir: str, out_path: str = "/kaggle/tmp/dataset_embeddings.parquet") -> Path:
+def build_dataset_embeddings(datasets: List[Dataset], model_dir: str, out_path: str = "/kaggle/temp/dataset_embeddings.parquet") -> Path:
     model = load_bge_model(model_dir)
     texts = [ds.text for ds in datasets]
     embs = embed_texts(model, texts)
@@ -173,11 +174,13 @@ def construct_datasets_pipeline(
                 dense_query_vec=qvec,
                 id_to_dense=id_to_dense,
                 id_to_text=id_to_text,
-                sparse_k=top_k,
-                dense_k=top_k,
-                rrf_k=2 * top_k,
-                mmr_lambda=0.7,
-                mmr_top_k=top_k,
+                boost_cfg=BoostConfig(
+                    sparse_k=top_k,
+                    dense_k=top_k,
+                    rrf_k=2 * top_k,
+                    mmr_lambda=0.7,
+                    mmr_top_k=top_k,
+                ),
                 prototypes=None,
             )
 

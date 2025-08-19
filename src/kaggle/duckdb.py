@@ -26,7 +26,7 @@ except Exception:
     from .models import Document, Chunk, Dataset, EngineeredFeatures, CitationEntity  # type: ignore
 
 
-DEFAULT_DB_PATH = "/kaggle/tmp/mdc.duckdb"
+DEFAULT_DB_PATH = "/kaggle/temp/mdc.duckdb"
 
 
 class KaggleDuckDBHelper:
