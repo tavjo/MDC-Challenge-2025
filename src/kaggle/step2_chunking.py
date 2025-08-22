@@ -8,7 +8,7 @@ dataset construction pipeline.
 from __future__ import annotations
 
 from typing import List
-import logging, os
+import os
 import pandas as pd
 from pathlib import Path
 import sys
@@ -20,14 +20,14 @@ if str(THIS_DIR) not in sys.path:
 
 try:
     from src.kaggle.models import Document, Chunk, ChunkMetadata
-    from src.kaggle.helpers import sliding_window_chunks, num_tokens
-    from src.kaggle.duckdb import get_duckdb_helper
+    from src.kaggle.helpers import sliding_window_chunks, num_tokens, initialize_logging
+    from src.kaggle.duckdb_utils import get_duckdb_helper
 except Exception:
     from .models import Document, Chunk, ChunkMetadata  # type: ignore
-    from .helpers import sliding_window_chunks, num_tokens, timer_wrap  # type: ignore
-    from .duckdb import get_duckdb_helper  # type: ignore
+    from .helpers import sliding_window_chunks, num_tokens, timer_wrap, initialize_logging  # type: ignore
+    from .duckdb_utils import get_duckdb_helper  # type: ignore
 
-logger = logging.getLogger(__name__)
+logger = initialize_logging()
 
 @timer_wrap
 def create_chunks_from_document(

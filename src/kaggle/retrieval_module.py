@@ -59,13 +59,12 @@ from pathlib import Path
 import sys
 
 # Allow importing sibling kaggle helpers/models when used as a standalone script
-# THIS_DIR = Path(__file__).parent
-# if str(THIS_DIR) not in sys.path:
-#     sys.path.append(str(THIS_DIR))
+THIS_DIR = Path(__file__).parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.append(str(THIS_DIR))
 
 import numpy as np
 
-from .helpers import cosine_sim_matrix
 from .models import BoostConfig as PydBoostConfig
 
 # --- Retrieval weights (normalized-ish; tuned to avoid dominance) ---
@@ -482,7 +481,6 @@ def hybrid_retrieve_with_boost(
     except Exception:
         sig_mult = 3
     TOPK_PER_SIGNAL = max(1, int(boost_cfg.mmr_top_k) * sig_mult)
-
     # -----------------------------
     # 1) Prototype-first candidates (primary when provided)
     # -----------------------------
@@ -508,6 +506,7 @@ def hybrid_retrieve_with_boost(
 
     sparse_ids = _sparse_topk(query_text, id_to_text, k=TOPK_PER_SIGNAL)
     dense_ids = _dense_topk(dense_query_for_dense, id_to_dense, k=TOPK_PER_SIGNAL)
+    boost_cfg.rrf_k = max(5, int(0.5 * min(len(sparse_ids), len(dense_ids), len(id_to_dense))))
     rrf = reciprocal_rank_fusion([sparse_ids, dense_ids], k=boost_cfg.rrf_k)
     rrf_ranking: List[str] = rrf.ranking
     # Normalize RRF scores across its pool for blending

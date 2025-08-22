@@ -1,6 +1,8 @@
+# pydantic models
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Literal, Any, Union
 from datetime import datetime
+
 
 class BoostConfig(BaseModel):
     """Configuration for hybrid retrieval flow (prototype-first + RRF + bounded priors + MMR).
@@ -40,7 +42,6 @@ class BoostConfig(BaseModel):
             "Final number of items to select using MMR re-ranking from the boosted candidate pool."
         ),
     )
-
     # New: aggregation over prototypes when computing per-chunk prototype affinity
     prototype_top_m: int = Field(
         1,
@@ -224,7 +225,6 @@ class Document(BaseModel):
             citation_entities=citation_entities,
             n_pages=row["n_pages"]
         )
-
 class Dataset(BaseModel):
     """Dataset Citation Extracted from Document text"""
     dataset_id: str = Field(..., description="Dataset ID")
@@ -309,4 +309,3 @@ class EngineeredFeatures(BaseModel):
             merged.setdefault("document_id", r["document_id"])
             merged[r["feature_name"]] = r["feature_value"]
         return cls.model_validate(merged)
-

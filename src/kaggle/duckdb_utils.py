@@ -1,3 +1,4 @@
+# DuckDB Helpers
 """
 Siloed DuckDB helper for Kaggle (class-based).
 
@@ -12,7 +13,7 @@ from typing import List, Dict, Any, Optional, Union, Iterable
 
 import duckdb
 from pathlib import Path
-import sys
+import sys, os
 
 # Allow importing sibling kaggle helpers/models when used as a standalone script
 THIS_DIR = Path(__file__).parent
@@ -25,16 +26,20 @@ try:
 except Exception:
     from .models import Document, Chunk, Dataset, EngineeredFeatures, CitationEntity  # type: ignore
 
+# temporary directories
+base_tmp = "/kaggle/temp/"
 
-DEFAULT_DB_PATH = "/kaggle/temp/mdc.duckdb"
+artifacts = os.path.join(base_tmp, "artifacts")
 
+DEFAULT_DUCKDB = os.path.join(artifacts, "mdc_challenge.db")
 
 class KaggleDuckDBHelper:
     def __init__(self, db_path: Optional[str] = None) -> None:
-        self.db_path = db_path or DEFAULT_DB_PATH
+        self.db_path = db_path or DEFAULT_DUCKDB
         path = Path(self.db_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         self.engine: duckdb.DuckDBPyConnection = duckdb.connect(str(path))
+        self.init_schema()
 
     # --------------------------- Schema ---------------------------
     def init_schema(self) -> None:
@@ -321,6 +326,25 @@ class KaggleDuckDBHelper:
         cols = [d[0] for d in res.description]
         return [CitationEntity.from_duckdb_row(dict(zip(cols, r))) for r in rows]
 
+    def get_all_datasets(self) -> List[Dataset]:
+        """Get all datasets from the database."""
+        try:
+            result = self.engine.execute("SELECT * FROM datasets")
+            rows = result.fetchall()
+            datasets = []
+            
+            for row in rows:
+                row_dict = dict(zip([desc[0] for desc in result.description], row))
+                datasets.append(Dataset.from_duckdb_row(row_dict))
+            
+            logger.info(f"Retrieved {len(datasets)} datasets from database")
+            return datasets
+            
+        except Exception as e:
+            logger.error(f"Failed to retrieve datasets: {str(e)}")
+            raise ValueError(f"Database query failed: {str(e)}")
+    
+
     def store_citations_batch(self, citation_entities: List[Any]) -> None:
         if not citation_entities:
             return
@@ -399,7 +423,7 @@ class KaggleDuckDBHelper:
             pass
 
 
-def get_duckdb_helper(db_path: str = DEFAULT_DB_PATH) -> KaggleDuckDBHelper:
+def get_duckdb_helper(db_path: str = DEFAULT_DUCKDB) -> KaggleDuckDBHelper:
     return KaggleDuckDBHelper(db_path)
 
 
@@ -407,5 +431,3 @@ __all__ = [
     "KaggleDuckDBHelper",
     "get_duckdb_helper",
 ]
-
-

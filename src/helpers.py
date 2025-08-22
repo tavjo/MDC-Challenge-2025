@@ -63,6 +63,7 @@ def initialize_logging(log_file: str, project_root: str = project_root):
 
     logger = logging.getLogger(__name__)
     logger.info(f"Logging initialized for {log_file}")
+    logger.propagate = False
     return logger
 
 def timer_wrap(func):

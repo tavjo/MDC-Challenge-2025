@@ -19,7 +19,7 @@ Notes:
 """
 
 from __future__ import annotations
-import os, sys, logging
+import os, sys
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import numpy as np
@@ -32,20 +32,31 @@ THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
-# --- Logging ---
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("mdc_integration_demo")
-
 # --- Import your module utilities ---
 # Ensure the path containing mdc_retrieval_module.py is on sys.path
 # sys.path.append("/path/to/your/module")  # if needed
-from src.kaggle.retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON
-from src.kaggle.models import BoostConfig
-from src.kaggle.helpers import load_bge_model, embed_texts
-from src.kaggle.duckdb import get_duckdb_helper
+try:
+    from src.kaggle.retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON
+    from src.kaggle.models import BoostConfig
+    from src.kaggle.helpers import load_bge_model, embed_texts, timer_wrap, initialize_logging
+    from src.kaggle.duckdb_utils import get_duckdb_helper
+except Exception:
+    from .retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON
+    from .models import BoostConfig
+    from .helpers import load_bge_model, embed_texts, timer_wrap, initialize_logging
+    from .duckdb_utils import get_duckdb_helper
+
+logger = initialize_logging()
+
+base_tmp = "/kaggle/temp/"
+
+
+artifacts = os.path.join(base_tmp, "artifacts")
+DEFAULT_DUCKDB = os.path.join(artifacts, "mdc_challenge.db")
 
 
 # --- Simple query builder for dataset-citation hunting ---
+@timer_wrap
 def build_query_text() -> str:
     """
     A compact query string: DAS cues + accession keywords.
@@ -57,6 +68,7 @@ def build_query_text() -> str:
     ]
     return " ".join(sorted(set(DAS_LEXICON + accession_terms)))
 
+@timer_wrap
 def maybe_add_bge_instruction(query: str, use_instruction: bool = True) -> str:
     """
     For short queries, BGE suggests prefixing an instruction.
@@ -68,6 +80,7 @@ def maybe_add_bge_instruction(query: str, use_instruction: bool = True) -> str:
 
 # --- Run retrieval on a single new document ---
 # --- Run retrieval on a single new document ---
+@timer_wrap
 def run_hybrid_retrieval_on_document(
     doc_id: str,
     # model_dir: str | Path,

@@ -1,3 +1,4 @@
+# General Helpers
 # src/kaggle/helpers.py
 
 """
@@ -16,27 +17,41 @@ import hashlib
 import re
 from functools import lru_cache
 
-# root_dir = Path(__file__).parent
-# print(root_dir)
-# sys.path.append(str(root_dir))
-# for now hardcode the path to the baml_wrapper.py file but in future we should use a config file
-baml_wrapper = '/kaggle/input/baml-components/src/baml_wrapper.py' # this only works when working in kaggle
+
+baml_wrapper = '/kaggle/input/baml-components/src/baml_wrapper'
 sys.path.append(str(Path(baml_wrapper).parent))
-
-from models import CitationEntity
 from baml_wrapper import extract_cites
+THIS_DIR = Path(__file__).parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.append(str(THIS_DIR))
+from models import CitationEntity
 
-logger = logging.getLogger(__name__)
 
-def initialize_logging(filename: Optional[str] = None) -> logging.Logger:
+# logger = logging.getLogger(__name__)
+
+def initialize_logging(filename:str= "kaggle-mdc") -> logging.Logger:
     """
     Initialize logging for a given filename.
     """
-    if filename:
-        logger = logging.getLogger(filename)
-    else:
-        logger = logging.getLogger()
+    logger = logging.getLogger(filename)
     logger.setLevel(logging.INFO)
+    # Remove any file handlers to ensure no log files are created
+    for handler in list(logger.handlers):
+        if isinstance(handler, logging.FileHandler):
+            logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+    # Add a stdout stream handler if not already present
+    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+        stream_handler = logging.StreamHandler(stream=sys.stdout)
+        stream_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S")
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
+    # Avoid double logging when root logger is configured in notebooks
+    logger.propagate = False
     return logger
 
 def ensure_dir(path) -> Path:
