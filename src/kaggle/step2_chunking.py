@@ -18,14 +18,14 @@ THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
-try:
-    from src.kaggle.models import Document, Chunk, ChunkMetadata
-    from src.kaggle.helpers import sliding_window_chunks, num_tokens, initialize_logging
-    from src.kaggle.duckdb_utils import get_duckdb_helper
-except Exception:
-    from .models import Document, Chunk, ChunkMetadata  # type: ignore
-    from .helpers import sliding_window_chunks, num_tokens, timer_wrap, initialize_logging  # type: ignore
-    from .duckdb_utils import get_duckdb_helper  # type: ignore
+# try:
+#     from src.kaggle.models import Document, Chunk, ChunkMetadata
+#     from src.kaggle.helpers import sliding_window_chunks, num_tokens, initialize_logging
+#     from src.kaggle.duckdb_utils import get_duckdb_helper
+# except Exception:
+from models import Document, Chunk, ChunkMetadata  # type: ignore
+from helpers import sliding_window_chunks, num_tokens, timer_wrap, initialize_logging  # type: ignore
+from duckdb_utils import get_duckdb_helper  # type: ignore
 
 logger = initialize_logging()
 

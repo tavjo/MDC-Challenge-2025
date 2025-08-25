@@ -23,16 +23,16 @@ THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
-try:
-    from src.kaggle.helpers import timer_wrap, initialize_logging, extract_entities_baml
-    from src.kaggle.models import CitationEntity, Document, Chunk
-    from src.kaggle.duckdb_utils import get_duckdb_helper
-    from src.kaggle.get_citation_context import run_hybrid_retrieval_on_document
-except Exception:
-    from .helpers import timer_wrap, initialize_logging, extract_entities_baml
-    from .models import CitationEntity, Document, Chunk
-    from .duckdb_utils import get_duckdb_helper
-    from .get_citation_context import run_hybrid_retrieval_on_document
+# try:
+#     from src.kaggle.helpers import timer_wrap, initialize_logging, extract_entities_baml
+#     from src.kaggle.models import CitationEntity, Document, Chunk
+#     from src.kaggle.duckdb_utils import get_duckdb_helper
+#     from src.kaggle.get_citation_context import run_hybrid_retrieval_on_document
+# except Exception:
+from helpers import timer_wrap, initialize_logging, extract_entities_baml
+from models import CitationEntity, Document, Chunk
+from duckdb_utils import get_duckdb_helper
+from get_citation_context import run_hybrid_retrieval_on_document
 
 
 logger = initialize_logging()

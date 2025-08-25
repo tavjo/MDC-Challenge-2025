@@ -4,6 +4,20 @@ from typing import List, Optional, Dict, Literal, Any, Union
 from datetime import datetime
 
 
+class RetrievalWeights(BaseModel):
+    """Weights for combining retrieval signals in hybrid scoring.
+
+    Defaults mirror the previous hard-coded constants used in retrieval_module.
+    """
+
+    prototype: float = Field(0.70, description="Weight for prototype affinity scores")
+    das: float = Field(0.10, description="Weight for DAS prior (lexical cues)")
+    rrf: float = Field(0.10, description="Weight for RRF fused sparse+dense scores")
+    regex: float = Field(0.05, description="Weight for specific accession-style regex matches")
+    doi_repo: float = Field(0.05, description="Weight for repository DOI prior gated by context")
+    ref_penalty: float = Field(0.12, description="Reserved/unused; kept for completeness")
+
+
 class BoostConfig(BaseModel):
     """Configuration for hybrid retrieval flow (prototype-first + RRF + bounded priors + MMR).
 
@@ -49,6 +63,12 @@ class BoostConfig(BaseModel):
         description=(
             "Number of top prototype similarities to average per chunk (1 reduces to max)."
         ),
+    )
+
+    # Retrieval weights previously hard-coded in retrieval_module
+    retrieval_weights: RetrievalWeights = Field(
+        default_factory=RetrievalWeights,
+        description="Weights for combining retrieval signals in hybrid scoring.",
     )
 
 class CitationEntity(BaseModel):

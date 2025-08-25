@@ -21,10 +21,10 @@ if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
 # Local models
-try:
-    from src.kaggle.models import Document, Chunk, Dataset, EngineeredFeatures, CitationEntity
-except Exception:
-    from .models import Document, Chunk, Dataset, EngineeredFeatures, CitationEntity  # type: ignore
+# try:
+#     from src.kaggle.models import Document, Chunk, Dataset, EngineeredFeatures, CitationEntity
+# except Exception:
+from models import Document, Chunk, Dataset, EngineeredFeatures, CitationEntity  # type: ignore
 
 # temporary directories
 base_tmp = "/kaggle/temp/"

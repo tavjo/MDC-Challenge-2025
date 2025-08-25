@@ -26,14 +26,14 @@ try:
     from sklearn.decomposition import PCA
 except Exception:  # pragma: no cover
     PCA = None  # type: ignore
-try:
-    from src.kaggle.models import EngineeredFeatures
-    from src.kaggle.duckdb_utils import get_duckdb_helper
-    from src.kaggle.helpers import timer_wrap, initialize_logging
-except Exception:
-    from .models import EngineeredFeatures
-    from .duckdb_utils import get_duckdb_helper
-    from .helpers import timer_wrap, initialize_logging
+# try:
+#     from src.kaggle.models import EngineeredFeatures
+#     from src.kaggle.duckdb_utils import get_duckdb_helper
+#     from src.kaggle.helpers import timer_wrap, initialize_logging
+# except Exception:
+from models import EngineeredFeatures
+from duckdb_utils import get_duckdb_helper
+from helpers import timer_wrap, initialize_logging
 
 logger = initialize_logging()
 

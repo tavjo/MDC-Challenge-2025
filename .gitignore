@@ -156,3 +156,4 @@ local_chroma/
 *.db
 *.db.wal
 reports/
+deprecated/

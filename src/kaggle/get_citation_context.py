@@ -35,16 +35,16 @@ if str(THIS_DIR) not in sys.path:
 # --- Import your module utilities ---
 # Ensure the path containing mdc_retrieval_module.py is on sys.path
 # sys.path.append("/path/to/your/module")  # if needed
-try:
-    from src.kaggle.retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON
-    from src.kaggle.models import BoostConfig
-    from src.kaggle.helpers import load_bge_model, embed_texts, timer_wrap, initialize_logging
-    from src.kaggle.duckdb_utils import get_duckdb_helper
-except Exception:
-    from .retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON
-    from .models import BoostConfig
-    from .helpers import load_bge_model, embed_texts, timer_wrap, initialize_logging
-    from .duckdb_utils import get_duckdb_helper
+# try:
+#     from src.kaggle.retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON
+#     from src.kaggle.models import BoostConfig
+#     from src.kaggle.helpers import load_bge_model, embed_texts, timer_wrap, initialize_logging
+#     from src.kaggle.duckdb_utils import get_duckdb_helper
+# except Exception:
+from retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON
+from models import BoostConfig
+from helpers import load_bge_model, embed_texts, timer_wrap, initialize_logging
+from duckdb_utils import get_duckdb_helper
 
 logger = initialize_logging()
 

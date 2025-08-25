@@ -25,18 +25,17 @@ THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
-try:
-    from src.kaggle.models import CitationEntity, Dataset
-    from src.kaggle.helpers import embed_texts, timer_wrap, initialize_logging
-    from src.kaggle.duckdb_utils import get_duckdb_helper
-    from src.kaggle.retrieval_module import hybrid_retrieve_with_boost
-    from src.kaggle.models import BoostConfig
-except Exception:
-    from .models import CitationEntity, Dataset
-    from .helpers import embed_texts, timer_wrap, initialize_logging
-    from .duckdb_utils import get_duckdb_helper
-    from .retrieval_module import hybrid_retrieve_with_boost
-    from .models import BoostConfig
+# try:
+#     from src.kaggle.models import CitationEntity, Dataset
+#     from src.kaggle.helpers import embed_texts, timer_wrap, initialize_logging
+#     from src.kaggle.duckdb_utils import get_duckdb_helper
+#     from src.kaggle.retrieval_module import hybrid_retrieve_with_boost
+#     from src.kaggle.models import BoostConfig
+# except Exception:
+from models import CitationEntity, Dataset, BoostConfig
+from helpers import embed_texts, timer_wrap, initialize_logging
+from duckdb_utils import get_duckdb_helper
+from retrieval_module import hybrid_retrieve_with_boost
 
 logger = initialize_logging()
 

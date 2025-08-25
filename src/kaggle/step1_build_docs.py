@@ -14,24 +14,25 @@ THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
-try:
-    from src.kaggle.helpers import timer_wrap, compute_file_hash, num_tokens  # type: ignore
-    from src.kaggle.models import Document  # type: ignore
-except Exception:
+# try:
+#     from src.kaggle.helpers import timer_wrap, compute_file_hash, num_tokens  # type: ignore
+#     from src.kaggle.models import Document  # type: ignore
+# except Exception:
     # Fallback when running from within the `src/kaggle` directory as a loose script
-    from helpers import timer_wrap, compute_file_hash, num_tokens  # type: ignore
-    from models import Document  # type: ignore
+from helpers import timer_wrap, compute_file_hash, num_tokens, initialize_logging  # type: ignore
+from models import Document  # type: ignore
 
+logger = initialize_logging()
 
 # ----------------------------------------------------------------------------
 # Logging
 # ----------------------------------------------------------------------------
-logger = logging.getLogger("build_docs")
-if not logger.handlers:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-    )
+# logger = logging.getLogger("build_docs")
+# if not logger.handlers:
+#     logging.basicConfig(
+#         level=logging.INFO,
+#         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+#     )
 
 
 # ----------------------------------------------------------------------------

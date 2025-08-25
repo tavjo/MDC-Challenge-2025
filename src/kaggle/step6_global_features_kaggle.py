@@ -45,17 +45,17 @@ except Exception:
     NearestNeighbors = None
     NEIGHBORS_AVAILABLE = False
 
-try:
-    from src.kaggle.duckdb_utils import get_duckdb_helper
-    from src.kaggle.models import EngineeredFeatures
-    from src.kaggle.helpers import timer_wrap, initialize_logging
-    from src.kaggle.step4_construct_datasets_kaggle import load_embeddings_parquet
-except Exception:
-    from sklearn.neighbors import NearestNeighbors  # type: ignore
-    from .duckdb_utils import get_duckdb_helper
-    from .models import EngineeredFeatures
-    from .helpers import timer_wrap, initialize_logging
-    from .step4_construct_datasets_kaggle import load_embeddings_parquet
+# try:
+#     from src.kaggle.duckdb_utils import get_duckdb_helper
+#     from src.kaggle.models import EngineeredFeatures
+#     from src.kaggle.helpers import timer_wrap, initialize_logging
+#     from src.kaggle.step4_construct_datasets_kaggle import load_embeddings_parquet
+# except Exception:
+from sklearn.neighbors import NearestNeighbors  # type: ignore
+from duckdb_utils import get_duckdb_helper
+from models import EngineeredFeatures
+from helpers import timer_wrap, initialize_logging
+from step4_construct_datasets_kaggle import load_embeddings_parquet
 
 logger = initialize_logging()
 

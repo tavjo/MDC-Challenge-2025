@@ -65,17 +65,9 @@ if str(THIS_DIR) not in sys.path:
 
 import numpy as np
 
-from .models import BoostConfig as PydBoostConfig
+from models import BoostConfig as PydBoostConfig
 
-# --- Retrieval weights (normalized-ish; tuned to avoid dominance) ---
-RETRIEVAL_WEIGHTS: Dict[str, float] = {
-    "prototype": 0.70,
-    "das": 0.10,
-    "rrf": 0.10,
-    "regex": 0.05,
-    "doi_repo": 0.05,
-    "ref_penalty": 0.12,  # kept for completeness; unused since no section titles available
-}
+# Retrieval weights moved into BoostConfig.retrieval_weights (see models.BoostConfig)
 
 NEIGHBOR_BOOST_CAP: float = 0.05
 REGEX_MAX_HITS_FOR_SCORE: int = 3
@@ -554,7 +546,8 @@ def hybrid_retrieve_with_boost(
     # -----------------------------
     # 3) Final weighted score and MMR
     # -----------------------------
-    W = RETRIEVAL_WEIGHTS
+    # Use retrieval weights supplied via BoostConfig (has sensible defaults)
+    W = boost_cfg.retrieval_weights.model_dump()
     final_score = (
         W["prototype"]  * _clip01(score_proto) +
         W["rrf"]        * _clip01(score_rrf) +
