@@ -157,3 +157,4 @@ local_chroma/
 *.db.wal
 reports/
 deprecated/
+.whlvenv/

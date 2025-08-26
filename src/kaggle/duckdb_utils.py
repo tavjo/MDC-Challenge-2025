@@ -20,11 +20,11 @@ THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
-# Local models
-# try:
-#     from src.kaggle.models import Document, Chunk, Dataset, EngineeredFeatures, CitationEntity
-# except Exception:
+# import pydantic models
 from models import Document, Chunk, Dataset, EngineeredFeatures, CitationEntity  # type: ignore
+from helpers import initialize_logging, timer_wrap
+
+logger = initialize_logging()
 
 # temporary directories
 base_tmp = "/kaggle/temp/"
@@ -138,6 +138,7 @@ class KaggleDuckDBHelper:
         e.execute("CREATE INDEX IF NOT EXISTS idx_feature_name ON engineered_feature_values(feature_name);")
 
     # ------------------------- Documents -------------------------
+    @timer_wrap
     def upsert_documents(self, documents: List[Document]) -> None:
         if not documents:
             return
@@ -172,6 +173,7 @@ class KaggleDuckDBHelper:
         return [Document.from_duckdb_row(dict(zip(cols, r))) for r in rows]
 
     # --------------------------- Chunks --------------------------
+    @timer_wrap
     def bulk_insert_chunks(self, chunks: List[Chunk]) -> None:
         if not chunks:
             return
@@ -271,6 +273,7 @@ class KaggleDuckDBHelper:
             raise ValueError(str(exc)) from exc    
 
     # --------------------------- Datasets ------------------------
+    @timer_wrap
     def bulk_upsert_datasets(self, datasets: List[Dataset]) -> None:
         if not datasets:
             return
@@ -344,7 +347,7 @@ class KaggleDuckDBHelper:
             logger.error(f"Failed to retrieve datasets: {str(e)}")
             raise ValueError(f"Database query failed: {str(e)}")
     
-
+    @timer_wrap
     def store_citations_batch(self, citation_entities: List[Any]) -> None:
         if not citation_entities:
             return
@@ -422,7 +425,7 @@ class KaggleDuckDBHelper:
         except Exception:
             pass
 
-
+@timer_wrap
 def get_duckdb_helper(db_path: str = DEFAULT_DUCKDB) -> KaggleDuckDBHelper:
     return KaggleDuckDBHelper(db_path)
 

@@ -27,8 +27,6 @@ if str(THIS_DIR) not in sys.path:
 from models import CitationEntity
 
 
-# logger = logging.getLogger(__name__)
-
 def initialize_logging(filename:str= "kaggle-mdc") -> logging.Logger:
     """
     Initialize logging for a given filename.
@@ -53,6 +51,8 @@ def initialize_logging(filename:str= "kaggle-mdc") -> logging.Logger:
     # Avoid double logging when root logger is configured in notebooks
     logger.propagate = False
     return logger
+
+logger = initialize_logging()
 
 def ensure_dir(path) -> Path:
     """
