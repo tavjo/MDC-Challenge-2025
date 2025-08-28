@@ -142,8 +142,9 @@ class KaggleDuckDBHelper:
     def upsert_documents(self, documents: List[Document]) -> None:
         if not documents:
             return
-        import pandas as pd
-        df = pd.DataFrame.from_records([d.to_duckdb_row() for d in documents])
+        import pyarrow as pa
+        rows = [d.to_duckdb_row() for d in documents]
+        df = pa.Table.from_pylist(rows)
         e = self.engine
         e.execute("BEGIN TRANSACTION")
         try:
@@ -177,8 +178,9 @@ class KaggleDuckDBHelper:
     def bulk_insert_chunks(self, chunks: List[Chunk]) -> None:
         if not chunks:
             return
-        import pandas as pd
-        df = pd.DataFrame.from_records([c.to_duckdb_row() for c in chunks])
+        import pyarrow as pa
+        rows = [c.to_duckdb_row() for c in chunks]
+        df = pa.Table.from_pylist(rows)
         e = self.engine
         e.register("chunks_buffer", df)
         try:
@@ -277,8 +279,9 @@ class KaggleDuckDBHelper:
     def bulk_upsert_datasets(self, datasets: List[Dataset]) -> None:
         if not datasets:
             return
-        import pandas as pd
-        df = pd.DataFrame.from_records([d.to_duckdb_row() for d in datasets])
+        import pyarrow as pa
+        rows = [d.to_duckdb_row() for d in datasets]
+        df = pa.Table.from_pylist(rows)
         e = self.engine
         e.execute("BEGIN TRANSACTION")
         try:
@@ -306,8 +309,8 @@ class KaggleDuckDBHelper:
         rows = features.to_eav_rows()
         if not rows:
             return
-        import pandas as pd
-        df = pd.DataFrame.from_records(rows)
+        import pyarrow as pa
+        df = pa.Table.from_pylist(rows)
         e = self.engine
         e.register("feat_buffer", df)
         try:
@@ -351,7 +354,7 @@ class KaggleDuckDBHelper:
     def store_citations_batch(self, citation_entities: List[Any]) -> None:
         if not citation_entities:
             return
-        import pandas as pd
+        import pyarrow as pa
         records: List[Dict[str, Any]] = []
         for ce in citation_entities:
             if hasattr(ce, "to_duckdb_row"):
@@ -364,7 +367,7 @@ class KaggleDuckDBHelper:
                     "evidence": ce.get("evidence"),
                 }
             records.append(row)
-        df = pd.DataFrame.from_records(records)
+        df = pa.Table.from_pylist(records)
         e = self.engine
         e.register("citations_buffer", df)
         try:

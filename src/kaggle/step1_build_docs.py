@@ -1,5 +1,5 @@
 # Parse PDFs & XML files into pydantic `Document` objects and store into DuckDB for downstream steps
-import os, sys, logging, importlib.util, warnings, re, unicodedata
+import os, sys, importlib.util, warnings, re, unicodedata
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Dict, Tuple, Union, Optional
@@ -9,14 +9,14 @@ THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
-from helpers import timer_wrap, compute_file_hash, num_tokens, ensure_dir  # type: ignore
+from helpers import timer_wrap, compute_file_hash, num_tokens, ensure_dir, initialize_logging  # type: ignore
 from models import Document  # type: ignore
 
 # --- GPU-capable Unstructured + EasyOCR + spawn-based multi-GPU executor -----
-logger = logging.getLogger("build_docs")
-if not logger.handlers:
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+logger = initialize_logging()
+
+# Easy ocr model dir
+EASYOCR_MODEL_DIR= "/kaggle/input/easy-ocr-models/easyocr_models"
 
 # ----------------------------- text cleaning ---------------------------------
 _HYPHEN_LINEBREAK_RE = re.compile(r"(?<=\w)-\s*(?:\r?\n|\r)+\s*(?=\w)")
@@ -34,21 +34,22 @@ def clean_page(text: str) -> str:
     return unicodedata.normalize("NFKD", text)
 
 # ------------------------ optional deps discovery ----------------------------
-_HAVE_UNSTRUCTURED = importlib.util.find_spec("unstructured.partition.pdf") is not None
+# Unstructured disabled (compat stub only)
+_HAVE_UNSTRUCTURED = False
+
 _HAVE_TESSERACT    = importlib.util.find_spec("pytesseract") is not None
 _HAVE_PYMUPDF      = importlib.util.find_spec("fitz") is not None
-_HAVE_PDFMINER     = (importlib.util.find_spec("pdfminer.high_level") is not None and
-                      importlib.util.find_spec("pdfminer.layout") is not None)
-_HAVE_PDF2IMAGE    = importlib.util.find_spec("pdf2image") is not None
+_HAVE_PDFMINER = None
+# _HAVE_PDFMINER     = (importlib.util.find_spec("pdfminer.high_level") is not None and
+                    #   importlib.util.find_spec("pdfminer.layout") is not None)
+_HAVE_PDF2IMAGE = None
+# _HAVE_PDF2IMAGE    = importlib.util.find_spec("pdf2image") is not None
 _HAVE_EASYOCR      = importlib.util.find_spec("easyocr") is not None
 _HAVE_TORCH        = importlib.util.find_spec("torch") is not None
 _HAVE_ORT          = importlib.util.find_spec("onnxruntime") is not None
 
-if _HAVE_UNSTRUCTURED:
-    from unstructured.partition.pdf import partition_pdf  # type: ignore
-    from unstructured.documents.elements import Element   # type: ignore
-else:
-    class Element: pass  # stub
+class Element:  # compatibility stub for legacy return type
+    pass
 
 # ----------------------------- diagnostics -----------------------------------
 def _log_gpu_preflight():
@@ -139,50 +140,37 @@ def extract_pdf_text_light(pdf_path: str) -> List[str]:
 
     return []
 
-# --------------------------- Unstructured parse ------------------------------
+# --------------------------- Unstructured compatibility shim ------------------
 def extract_pdf_text(
     pdf_path: str,
     *,
-    include_page_breaks: bool = True,
-    return_elements: bool = False,
+    include_page_breaks: bool = True,   # kept for signature compatibility
+    return_elements: bool = False,      # kept for signature compatibility
     strategy: str = "fast",
 ) -> Union[List[Dict[str, str]], Tuple[List[Dict[str, str]], List[Element]]]:
-    """Parse a PDF with unstructured and return page-wise text (optionally elements)."""
-    if not _HAVE_UNSTRUCTURED:
-        raise RuntimeError("unstructured is not available in this environment.")
+    """
+    Compatibility shim for legacy unstructured-based API.
+    Now uses: light extract (PyMuPDF → pdfminer) → OCR fallback (EasyOCR/Tesseract).
+    Returns a list of {"page_number", "text"} dicts; if return_elements=True, returns (pages, []).
+    """
     path = Path(pdf_path)
     if not path.exists():
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-    # Force GPU providers to be visible before model init
-    _log_gpu_preflight()
+    # 1) Light parse first
+    pages_txt: List[str] = extract_pdf_text_light(pdf_path)
 
-    logger.info("Parsing %s with partition_pdf(strategy=%s)", path.name, strategy)
+    # If caller requested hi_res/ocr/ocr_only, or light text looks empty, escalate to OCR
+    force_ocr = strategy.lower() in {"hi_res", "ocr", "ocr_only"}
+    if not any(p.strip() for p in pages_txt) or force_ocr:
+        pages_txt = ocr_pdf_pages(pdf_path)
 
-    # hi_res uses an ONNX layout model; make sure to ask for table structure.
-    # You can pick a model via UNSTRUCTURED_HI_RES_MODEL_NAME env var.
-    elements: List[Element] = partition_pdf(
-        filename=str(path),
-        strategy=strategy,
-        include_page_breaks=include_page_breaks,
-        infer_table_structure=True if strategy.lower() == "hi_res" else False,
-        # Accept env override; default stays with Unstructured's layout model.
-        hi_res_model_name=os.environ.get("UNSTRUCTURED_HI_RES_MODEL_NAME", None),
-    )
+    # Convert to legacy shape: [{"page_number", "text"}]
+    pages: List[Dict[str, str]] = [{"page_number": i + 1, "text": t or ""} for i, t in enumerate(pages_txt)]
 
-    pages_acc: Dict[int, List[str]] = {}
-    for el in elements:
-        pn = getattr(el.metadata, "page_number", None) or 1
-        txt = clean_page(getattr(el, "text", "") or "")
-        if txt:
-            pages_acc.setdefault(pn, []).append(txt)
-
-    pages: List[Dict[str, str]] = [
-        {"page_number": pn, "text": "\n\n".join(blocks)}
-        for pn, blocks in sorted(pages_acc.items())
-    ]
+    # Keep return signature compatible
     if return_elements:
-        return pages, elements
+        return pages, []  # no element objects in this implementation
     return pages
 
 # ------------------------------ XML extract ----------------------------------
@@ -217,14 +205,34 @@ def _render_pages_with_pdf2image(pdf_path: Path, dpi: int = 250):
     from pdf2image import convert_from_path  # type: ignore
     return convert_from_path(str(pdf_path), dpi=dpi)
 
+# EasyOCR cached reader + offline model dir (set EASYOCR_MODEL_DIR to your Kaggle input path)
+from functools import lru_cache
+
+# def _easyocr_model_dir() -> Optional[str]:
+#     return os.environ.get("EASYOCR_MODEL_DIR")  # e.g., "/kaggle/input/easyocr-models"
+
+@lru_cache(maxsize=4)
+def _get_easyocr_reader(lang_code: str = "eng"):
+    if not (_HAVE_EASYOCR and _HAVE_TORCH):
+        raise RuntimeError("EasyOCR + torch are required for GPU OCR")
+    import torch  # type: ignore
+    import easyocr  # type: ignore
+
+    # GPU if available; do NOT download at runtime (fully offline).
+    kwargs = dict(gpu=torch.cuda.is_available(), download_enabled=False)
+    model_dir = EASYOCR_MODEL_DIR #_easyocr_model_dir()
+    if model_dir:
+        kwargs["model_storage_directory"] = model_dir
+
+    return easyocr.Reader([lang_code[:2]], **kwargs)
+
 def _ocr_pages_from_images(images, lang: str = "eng") -> List[str]:
     """Prefer GPU EasyOCR; fallback to pytesseract if unavailable."""
     pages: List[str] = []
     if _HAVE_EASYOCR and _HAVE_TORCH:
-        import numpy as np, torch  # type: ignore
-        import easyocr              # type: ignore
+        import numpy as np  # type: ignore
         try:
-            reader = easyocr.Reader([lang[:2]], gpu=torch.cuda.is_available())
+            reader = _get_easyocr_reader(lang)
             for img in images:
                 lines = reader.readtext(np.array(img), detail=0, paragraph=True)
                 pages.append(clean_page(" ".join(lines)))
@@ -254,10 +262,8 @@ def load_pdf_pages(pdf_path: str, strategy: str = "fast") -> List[str]:
     """
     Gradual fallback order:
       1) Light parsers (PyMuPDF → pdfminer)  [always attempted first]
-      2) Unstructured 'fast'
-      3) Unstructured 'hi_res'  (GPU-capable; ONNX/EasyOCR path)
-      4) OCR fallback
-    If strategy == 'ocr' or 'ocr_only', jump straight to OCR.
+      2) OCR fallback (EasyOCR GPU if available → Tesseract)
+    If strategy in {'hi_res','ocr','ocr_only'}: jump to OCR early.
     """
     logger.info("Loading PDF file: %s", pdf_path)
     with warnings.catch_warnings():
@@ -279,35 +285,6 @@ def load_pdf_pages(pdf_path: str, strategy: str = "fast") -> List[str]:
             logger.warning("Light extraction returned no usable text; escalating.")
     except Exception as e:
         logger.warning("Light extraction failed (%s); escalating.", e)
-
-    # 2) UNSTRUCTURED FAST
-    if _HAVE_UNSTRUCTURED:
-        try:
-            pages_json_fast = extract_pdf_text(pdf_path, return_elements=False, strategy="fast")
-            pages = [p["text"] for p in pages_json_fast]
-            if _nonempty(pages):
-                logger.info("Unstructured fast succeeded (%d pages).", len(pages))
-                return pages
-            else:
-                logger.warning("Unstructured fast empty; escalating to hi_res.")
-        except Exception as e:
-            logger.warning("Unstructured fast failed (%s); escalating to hi_res.", e)
-    else:
-        logger.info("Unstructured not available; skipping to OCR if hi_res not possible.")
-
-    # 3) UNSTRUCTURED HI_RES (GPU-capable)
-    if _HAVE_UNSTRUCTURED:
-        try:
-            _log_gpu_preflight()
-            pages_json_hi = extract_pdf_text(pdf_path, return_elements=False, strategy="hi_res")
-            pages = [p["text"] for p in pages_json_hi]
-            if _nonempty(pages):
-                logger.info("Unstructured hi_res succeeded (%d pages).", len(pages))
-                return pages
-            else:
-                logger.warning("Unstructured hi_res empty; falling back to OCR.")
-        except Exception as e:
-            logger.warning("Unstructured hi_res failed (%s); falling back to OCR.", e)
 
     # 4) OCR (EasyOCR GPU if available → pytesseract)
     logger.warning("Falling back to OCR for %s", pdf_path)
@@ -396,7 +373,7 @@ def build_document_objects(
     # - If not set and strategy is hi_res, try to use all visible GPUs.
     gpu_ids_env = os.environ.get("PDF_GPU_IDS")
     gpu_ids = None
-    if strategy.lower() == "hi_res":
+    if strategy.lower() in {"hi_res", "ocr", "ocr_only"}:
         if gpu_ids_env:
             gpu_ids = [int(x) for x in gpu_ids_env.split(",") if x.strip().isdigit()]
         elif _HAVE_TORCH:

@@ -46,7 +46,11 @@ def create_chunks_from_document(
     processed_chunks = []
     for part in parts:
         # TODO: This messes somewhat with the ordering of chunks since the ones added to the list if they are too large will not be in order.
-        if num_tokens(part) <= 1500:
+        try:
+            _tok_count = num_tokens(part)
+        except Exception:
+            _tok_count = len(part.split())
+        if _tok_count <= 1500:
             processed_chunks.append(part)
         else:
             processed_chunks.extend(sliding_window_chunks(part, chunk_size, overlap))
@@ -55,11 +59,15 @@ def create_chunks_from_document(
     previous_id = None
     for idx, part in enumerate(parts):
         chunk_id = f"{doc.doi}_chunk_{idx:05d}"
+        try:
+            _tok_count = num_tokens(part)
+        except Exception:
+            _tok_count = len(part.split())
         metadata = ChunkMetadata(
             chunk_id=chunk_id,
             previous_chunk_id=previous_id,
             next_chunk_id=None,
-            token_count=num_tokens(part),
+            token_count=_tok_count,
             citation_entities=None,
         )
         chunk = Chunk(

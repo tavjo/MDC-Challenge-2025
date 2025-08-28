@@ -158,3 +158,4 @@ local_chroma/
 reports/
 deprecated/
 .whlvenv/
+wheels-extras/
