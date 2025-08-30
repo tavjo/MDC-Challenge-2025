@@ -90,16 +90,13 @@ class UnknownCitationEntityExtractor:
         """
         Load query embeddings from a pickle file
         """
-        import pickle
-        with open(self.globals_path, "rb") as f:
-            globals_df = pickle.load(f)
+        globals_df = pd.read_parquet(self.globals_path)
         if globals_df:
             globals_df = globals_df.T
         # also load the ds_prototypes
-        ds_prototypes_path = self.globals_path.replace("feature_decomposition.pkl", "prototypes.pkl")
+        ds_prototypes_path = self.globals_path.replace("feature_decomposition.parquet", "prototypes.parquet")
         if os.path.exists(ds_prototypes_path):
-            with open(ds_prototypes_path, "rb") as f:
-                ds_prototypes = pickle.load(f)
+            ds_prototypes = pd.read_parquet(ds_prototypes_path)
             if ds_prototypes:
                 ds_prototypes = ds_prototypes
         else:

@@ -123,9 +123,9 @@ def run_global_pca(
                 feature = EngineeredFeatures(
                     dataset_id=ds_id,
                     document_id=ds2doc[ds_id],
-                    UMAP_1=0.0,
-                    UMAP_2=0.0,
-                    LEIDEN_1=0.0,
+                    # UMAP_1=0.0,
+                    # UMAP_2=0.0,
+                    # LEIDEN_1=0.0,
                 )
                 # attach PCA_* keys by using model's extra allowance via model_dump/update
                 feature_dict = feature.model_dump()
@@ -203,7 +203,7 @@ def run_global_umap(
                     document_id=ds2doc[ds_id],
                     UMAP_1=float(coords[0]),
                     UMAP_2=float(coords[1]) if n_components > 1 and len(coords) > 1 else 0.0,
-                    LEIDEN_1=0.0,
+                    # LEIDEN_1=0.0,
                 )
                 db.insert_engineered_features(feature)
             except Exception as e:
@@ -288,10 +288,10 @@ def run_neighborhood_stats(
             try:
                 if ds_id not in ds2doc:
                     continue
-                feature = EngineeredFeatures(dataset_id=ds_id, document_id=ds2doc[ds_id], UMAP_1=0.0, UMAP_2=0.0, LEIDEN_1=0.0)
+                feature = EngineeredFeatures(dataset_id=ds_id, document_id=ds2doc[ds_id])
                 feature_dict = feature.model_dump()
                 feature_dict.update(s)
-                db.insert_engineered_features(EngineeredFeatures(**feature_dict))
+                db.insert_engineered_features(EngineeredFeatures.model_validate(feature_dict))
             except Exception as e:
                 logger.warning(f"Failed to insert neighborhood stats for dataset_id={ds_id}", exc_info=e)
     finally:

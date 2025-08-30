@@ -107,10 +107,69 @@ def timer_wrap(func):
             return result
         return sync_wrapper
 
-def num_tokens(text: str, model: str = "gpt-4o-mini") -> int:
-    import tiktoken
-    encoding = tiktoken.encoding_for_model(model)
-    return len(encoding.encode(text))
+# helpers.py
+
+# --- offline-safe token counting (no network attempts) ---
+# --- offline-safe token counting that RESPECTS `model` ---
+import os, hashlib, pathlib
+
+# Known base encodings we support offline
+_BASES = {
+    "cl100k_base": "https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken",
+    "o200k_base":  "https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken",
+}
+
+def _cache_has(enc_name: str) -> bool:
+    cache_dir = os.getenv("TIKTOKEN_CACHE_DIR")
+    if not cache_dir or enc_name not in _BASES:
+        return False
+    h = hashlib.sha1(_BASES[enc_name].encode()).hexdigest()
+    return pathlib.Path(cache_dir, h).exists()
+
+def _resolve_model_to_encoding(model: str) -> str:
+    """Pure-offline best effort: explicit base → use as-is; else map common models."""
+    # 1) If caller passed a base name, use it directly
+    if model in _BASES:
+        return model
+    # 2) Heuristics for modern models when tables lag:
+    if not enc:
+        # Most “o* / 4o / 4.1” models use o200k_base; classic chat/embeddings use cl100k_base
+        lower = model.lower()
+        if lower.startswith(("gpt-4o", "o4", "4.1", "o1")):
+            enc = "o200k_base"
+        else:
+            enc = "cl100k_base"
+    return enc
+
+def get_encoding_name_for_model(model: str = "cl100k_base") -> str:
+    """Helper: what we *intend* to use (even if cache missing)."""
+    return _resolve_model_to_encoding(model)
+
+_OFFLINE_ENC = {}  # cache of loaded encodings by name
+
+def _get_offline_encoding(enc_name: str):
+    """Return a tiktoken Encoding if the cache has the file; otherwise None."""
+    if enc_name in _OFFLINE_ENC:
+        return _OFFLINE_ENC[enc_name]
+    try:
+        import tiktoken
+        if _cache_has(enc_name):
+            _OFFLINE_ENC[enc_name] = tiktoken.get_encoding(enc_name)  # no network when cached
+            return _OFFLINE_ENC[enc_name]
+    except Exception:
+        pass
+    return None
+
+def num_tokens(text: str, model: str = "o200k_base") -> int:
+    enc_name = get_encoding_name_for_model(model)
+    enc = _get_offline_encoding(enc_name)
+    if enc:
+        try:
+            return len(enc.encode(text, disallowed_special=()))
+        except Exception:
+            pass
+    # Offline fallback (≈ bytes/4)
+    return max(1, (len(text.encode("utf-8")) + 3) // 4)
 
 def compute_file_hash(file_path: Path) -> str:
     """Compute MD5 hash of XML file for debugging reference."""

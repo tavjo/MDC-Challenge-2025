@@ -159,3 +159,5 @@ reports/
 deprecated/
 .whlvenv/
 wheels-extras/
+tiktoken_cache/
+*.skops

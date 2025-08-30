@@ -264,10 +264,53 @@ def compute_file_hash(file_path: Path) -> str:
         return ""
 
 
-def num_tokens(text: str, model: str = "gpt-4o-mini") -> int:
-    import tiktoken
-    encoding = tiktoken.encoding_for_model(model)
-    return len(encoding.encode(text))
+# def num_tokens(text: str, model: str = "gpt-4o-mini") -> int:
+#     import tiktoken
+#     encoding = tiktoken.encoding_for_model(model)
+#     return len(encoding.encode(text))
+
+# helpers.py
+
+_OFFLINE_ENC = None
+
+def _get_offline_encoding():
+    # Prefer fully offline, bundled encoding
+    global _OFFLINE_ENC
+    if _OFFLINE_ENC is not None:
+        return _OFFLINE_ENC
+    try:
+        import tiktoken
+        # cl100k_base is bundled; o200k_base may not be
+        for name in ("cl100k_base", "o200k_base"):
+            try:
+                _OFFLINE_ENC = tiktoken.get_encoding(name)
+                return _OFFLINE_ENC
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return None
+
+def num_tokens(text: str, model: str = "o200k_base") -> int:
+    # 1) Try bundled offline encoding immediately (no network)
+    enc = _get_offline_encoding()
+    if enc:
+        try:
+            return len(enc.encode(text))
+        except Exception:
+            pass
+    # 2) If caller insists on a specific model or o200k_base is pre-cached
+    try:
+        import tiktoken
+        if model in {"cl100k_base", "o200k_base"}:
+            enc = tiktoken.get_encoding(model)
+        else:
+            # May fetch if not cached; avoided by default
+            enc = tiktoken.encoding_for_model(model)
+        return len(enc.encode(text))
+    except Exception:
+        # 3) Fully offline fallback
+        return max(1, (len(text.encode("utf-8")) + 3) // 4)
 
 @timer_wrap
 def export_docs(documents: List[Document], output_file: str = "documents.json", output_dir: Path = Path(os.path.join(project_root, "Data/train/"))) -> None:

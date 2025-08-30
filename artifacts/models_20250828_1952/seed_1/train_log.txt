@@ -1,0 +1,35 @@
+2025-08-28 19:10:36,317 — INFO — Logger initialized. Log file: artifacts/models/seed_1/train_log.txt
+2025-08-28 19:10:36,317 — INFO — ✅ Phase 09 training started
+2025-08-28 19:10:36,318 — INFO — Input CSV: Data/train/train_data.csv
+2025-08-28 19:10:36,318 — INFO — Output directory: artifacts/models/seed_1
+2025-08-28 19:10:36,318 — INFO — Random seed: 1
+2025-08-28 19:10:36,361 — INFO — Hold‑out split: 553 train / 139 validation rows (20.0 %).
+2025-08-28 19:10:36,362 — WARNING — Data shape is (553, 68) (expected 487, 55). Continuing anyway.
+2025-08-28 19:10:36,362 — WARNING — Non-numeric feature columns detected: ['document_id']. Removing non-numeric columns.
+2025-08-28 19:10:36,364 — INFO — Data loaded successfully: 553 samples, 67 features, target distribution: {0: 346, 1: 207}
+2025-08-28 19:10:36,366 — INFO — Class distribution: {0: 0.6256781193490054, 1: 0.3743218806509946}
+2025-08-28 19:10:36,366 — INFO — Computed balanced class weights: {np.int64(0): np.float64(0.7991329479768786), np.int64(1): np.float64(1.3357487922705313)}
+2025-08-28 19:10:36,367 — INFO — Using StratifiedKFold
+2025-08-28 19:10:36,367 — INFO — Using standard RandomForestClassifier with balanced class weights
+2025-08-28 19:10:36,367 — INFO — Pipeline created successfully with steps: ['imputer', 'rf']
+2025-08-28 19:10:36,368 — INFO — Starting hyperparameter optimization with 200 iterations
+2025-08-28 19:19:43,039 — INFO — Best parameters: {'rf__max_depth': 10, 'rf__max_features': 'sqrt', 'rf__max_samples': 0.8, 'rf__min_samples_leaf': 2, 'rf__n_estimators': 708}
+2025-08-28 19:19:43,039 — INFO — Best CV F1: 0.8827
+2025-08-28 19:19:43,040 — INFO — Computing cross-validation metrics...
+2025-08-28 19:19:46,938 — INFO — Saved cv_results.csv
+2025-08-28 19:19:46,939 — INFO — test_f1: 0.8827 ± 0.0378
+2025-08-28 19:19:46,939 — INFO — test_precision: 0.8601 ± 0.0454
+2025-08-28 19:19:46,940 — INFO — test_recall: 0.9080 ± 0.0473
+2025-08-28 19:19:46,940 — INFO — test_accuracy: 0.9095 ± 0.0294
+2025-08-28 19:19:47,152 — INFO — Hold‑out metrics → {'f1': 0.8867924528301887, 'precision': 0.8703703703703703, 'recall': 0.9038461538461539, 'accuracy': 0.9136690647482014}
+2025-08-28 19:19:47,152 — INFO — Computing permutation importances (30 repeats)…
+2025-08-28 19:21:15,670 — INFO — Saved feature_importance_permutation.csv
+2025-08-28 19:21:15,670 — INFO — Top feature: LEIDEN_cluster_3 (importance: 0.0057 ± 0.0027)
+2025-08-28 19:21:15,671 — INFO — Top feature: LEIDEN_cluster_1 (importance: 0.0026 ± 0.0019)
+2025-08-28 19:21:15,671 — INFO — Top feature: LEIDEN_cluster_58 (importance: 0.0023 ± 0.0006)
+2025-08-28 19:21:15,672 — INFO — Top feature: LEIDEN_cluster_39 (importance: 0.0022 ± 0.0015)
+2025-08-28 19:21:15,672 — INFO — Top feature: LEIDEN_cluster_18 (importance: 0.0022 ± 0.0006)
+2025-08-28 19:21:16,207 — INFO — Model and artefacts persisted to artifacts/models/seed_1
+2025-08-28 19:21:16,207 — INFO — Model file size: 1.23 MB
+2025-08-28 19:21:16,578 — INFO — Model metadata registered in DuckDB (artifacts/mdc-challenge.db).
+2025-08-28 19:21:16,579 — INFO — 🏁 Training complete. Artefacts available in artifacts/models/seed_1

@@ -1,0 +1,7 @@
+{
+  "rf__max_depth": 10,
+  "rf__max_features": 0.7,
+  "rf__max_samples": 0.8,
+  "rf__min_samples_leaf": 1,
+  "rf__n_estimators": 644
+}

@@ -165,8 +165,8 @@ def run_per_cluster_pca(
             feature_dict = {
                 "dataset_id": ds_id,
                 "document_id": dataset_to_doc[ds_id],
-                "UMAP_1": 0.0,
-                "UMAP_2": 0.0,
+                # "UMAP_1": 0.0,
+                # "UMAP_2": 0.0,
             }
             for col_idx, cid in enumerate(labels):
                 feature_dict[f"LEIDEN_{cid}"] = float(X_reduced[row_idx, col_idx])

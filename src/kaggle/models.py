@@ -297,9 +297,9 @@ class EngineeredFeatures(BaseModel):
     """Engineered features for the dataset citation classification task"""
     dataset_id: str = Field(..., description="Dataset ID")
     document_id: str = Field(..., description="DOI of document in which the dataset citation was found")
-    UMAP_1: float = Field(..., description="UMAP 1 dimension")
-    UMAP_2: float = Field(..., description="UMAP 2 dimension")
-    LEIDEN_1: float = Field(..., description="LEIDEN 1 PC1 loadings")
+    UMAP_1: Optional[float] = Field(None, description="UMAP 1 dimension")
+    UMAP_2: Optional[float] = Field(None, description="UMAP 2 dimension")
+    LEIDEN_1: Optional[float] = Field(None, description="LEIDEN 1 PC1 loadings")
     # Allow arbitrary additional fields based on the number leiden clusters
     model_config = {"extra": "allow"}  # capture any other feature_*
     

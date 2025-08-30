@@ -85,18 +85,18 @@ def create_chunks_from_document(
     return chunks
 
 @timer_wrap
-def create_chunks_summary_csv(chunks: List[Chunk], export: bool = True, output_path: str = "chunks_for_embedding_summary.csv") -> str:
+def create_chunks_summary_df(chunks: List[Chunk], export: bool = True, output_path: str = "chunks_for_embedding_summary.parquet") -> str:
     """
-    Export chunk summary statistics to CSV.
+    Export chunk summary statistics to Parquet.
     
     Args:
         chunks: List of Chunk objects
-        output_path: Path for output CSV file
+        output_path: Path for output Parquet file
         
     Returns:
-        Path to the exported CSV file
+        Path to the exported Parquet file
     """
-    logger.info(f"Exporting chunk summary to CSV: {output_path}")
+    logger.info(f"Exporting chunk summary to Parquet: {output_path}")
     
     summary_rows = []
     for chunk in chunks:
@@ -107,9 +107,9 @@ def create_chunks_summary_csv(chunks: List[Chunk], export: bool = True, output_p
     
     summary_df = pd.DataFrame(summary_rows)
     if export:
-        summary_df.to_csv(output_path, index=False)
+        summary_df.to_parquet(output_path, index=False)
     
-    logger.info(f"✅ Exported chunk summary to CSV: {output_path}")
+    logger.info(f"✅ Exported chunk summary to Parquet: {output_path}")
     return summary_df 
 
 @timer_wrap
@@ -122,15 +122,15 @@ def chunk_documents(chunk_size: int = 300, overlap: int = 30, db_path: str | Non
     db_helper.bulk_insert_chunks(chunks)
     db_helper.close()
     # generate summary csv
-    filename = os.path.join(output_dir, "chunks_for_embedding_summary.csv")
-    create_chunks_summary_csv(chunks, export=True, output_path=filename)
+    filename = os.path.join(output_dir, "chunks_for_embedding_summary.parquet")
+    create_chunks_summary_df(chunks, export=True, output_path=filename)
     return chunks
 
 
 
 __all__ = [
     "create_chunks_from_document",
-    "create_chunks_summary_csv",
+    "create_chunks_summary_df",
     "chunk_documents"
 ]
 

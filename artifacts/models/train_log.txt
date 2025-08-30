@@ -1,0 +1,28 @@
+2025-08-28 20:19:12,753 — INFO — Logger initialized. Log file: /Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/artifacts/models/train_log.txt
+2025-08-28 20:19:12,753 — INFO — ✅ Phase 09 training started
+2025-08-28 20:19:12,753 — INFO — Input CSV: /Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/Data/train/train_data.csv
+2025-08-28 20:19:12,753 — INFO — Output directory: /Users/taishajoseph/Documents/Projects/MDC-Challenge-2025/artifacts/models
+2025-08-28 20:19:12,753 — INFO — Random seed: 42
+2025-08-28 20:19:12,792 — INFO — Hold‑out split: 553 train / 139 validation rows (20.0 %).
+2025-08-28 20:19:12,792 — WARNING — Data shape is (553, 68) (expected 487, 55). Continuing anyway.
+2025-08-28 20:19:12,793 — WARNING — Non-numeric feature columns detected: ['document_id']. Removing non-numeric columns.
+2025-08-28 20:19:12,795 — INFO — Data loaded successfully: 553 samples, 67 features, target distribution: {0: 346, 1: 207}
+2025-08-28 20:19:12,797 — INFO — Class distribution: {0: 0.6256781193490054, 1: 0.3743218806509946}
+2025-08-28 20:19:12,797 — INFO — Computed balanced class weights: {np.int64(0): np.float64(0.7991329479768786), np.int64(1): np.float64(1.3357487922705313)}
+2025-08-28 20:19:12,798 — INFO — Using StratifiedKFold
+2025-08-28 20:19:12,798 — ERROR — Failed to build pipeline: imblearn is not installed. Install with: pip install imbalanced-learn
+2025-08-28 20:19:12,798 — ERROR — Failed to build CV or pipeline: imblearn is not installed. Install with: pip install imbalanced-learn
+2025-08-28 20:22:05,436 — INFO — Logger initialized. Log file: artifacts/models/train_log.txt
+2025-08-28 20:22:05,436 — INFO — ✅ Phase 09 training started
+2025-08-28 20:22:05,437 — INFO — Input CSV: Data/train/train_data.csv
+2025-08-28 20:22:05,437 — INFO — Output directory: artifacts/models
+2025-08-28 20:22:05,437 — INFO — Random seed: 42
+2025-08-28 20:22:05,478 — INFO — Hold‑out split: 553 train / 139 validation rows (20.0 %).
+2025-08-28 20:22:05,479 — WARNING — Data shape is (553, 68) (expected 487, 55). Continuing anyway.
+2025-08-28 20:22:05,479 — WARNING — Non-numeric feature columns detected: ['document_id']. Removing non-numeric columns.
+2025-08-28 20:22:05,481 — INFO — Data loaded successfully: 553 samples, 67 features, target distribution: {0: 346, 1: 207}
+2025-08-28 20:22:05,484 — INFO — Class distribution: {0: 0.6256781193490054, 1: 0.3743218806509946}
+2025-08-28 20:22:05,484 — INFO — Computed balanced class weights: {np.int64(0): np.float64(0.7991329479768786), np.int64(1): np.float64(1.3357487922705313)}
+2025-08-28 20:22:05,485 — INFO — Using StratifiedKFold
+2025-08-28 20:22:05,485 — ERROR — Failed to build pipeline: imblearn is not installed. Install with: pip install imbalanced-learn
+2025-08-28 20:22:05,486 — ERROR — Failed to build CV or pipeline: imblearn is not installed. Install with: pip install imbalanced-learn

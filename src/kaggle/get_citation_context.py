@@ -90,9 +90,15 @@ def run_hybrid_retrieval_on_document(
     prototypes: Optional[np.ndarray] = None,
     db_path: str | None = None,
     prototype_top_m: int = 3,
+    max_tokens: int = 8000,
 ) -> Optional[List[Tuple[str, str]]]:
     """
-    Returns a list of (chunk_id, chunk_preview) for top_k hits.
+    Returns a list of (chunk_id, chunk_preview) for top_k hits, additionally
+    constrained by a cumulative token budget (max_tokens). Chunks are first
+    selected via ranked anchors with neighbor expansion; if the cumulative
+    token count exceeds max_tokens, items are pruned by repeatedly removing
+    neighbors of the lowest-ranked anchor, then the anchor itself, moving
+    upward through ranks until under budget.
     """
     print(f"Initializing DB Helper")
     db_helper = get_duckdb_helper(db_path)
@@ -139,31 +145,88 @@ def run_hybrid_retrieval_on_document(
     # 5) Expand hits with neighbors (prev/next) while respecting top_k and deduplicating
     final_ids: List[str] = []
     seen_ids: set[str] = set()
+    # Track selection groups per anchor to support neighbor-first pruning later
+    # Each group: {"anchor": str, "neighbors": List[str], "anchor_added": bool}
 
-    def try_add(chunk_id: Optional[str]) -> None:
+    def try_add(chunk_id: Optional[str]) -> bool:
         if chunk_id and (chunk_id in id_to_text) and (chunk_id not in seen_ids):
             final_ids.append(chunk_id)
             seen_ids.add(chunk_id)
+            return True
+        return False
 
     i = 0
+    selection_groups: List[Dict[str, object]] = []
+
     while len(final_ids) < top_k and i < len(ranked_ids):
         current_id = ranked_ids[i]
         # Add the primary ranked chunk
-        try_add(current_id)
+        anchor_added = try_add(current_id)
         if len(final_ids) >= top_k:
+            selection_groups.append({"anchor": current_id, "neighbors": [], "anchor_added": anchor_added})
             break
         # Add up to two neighbors for the current chunk
         ch = id_to_chunk.get(current_id)
+        neighbors_added: List[str] = []
         if ch is not None:
             prev_id = ch.chunk_metadata.previous_chunk_id
             next_id = ch.chunk_metadata.next_chunk_id
-            try_add(prev_id)
-            if len(final_ids) >= top_k:
-                break
-            try_add(next_id)
+            if len(final_ids) < top_k and try_add(prev_id):
+                neighbors_added.append(prev_id)  # drop prev before next
+            if len(final_ids) < top_k and try_add(next_id):
+                neighbors_added.append(next_id)
+        selection_groups.append({"anchor": current_id, "neighbors": neighbors_added, "anchor_added": anchor_added})
         i += 1
 
-    # Build previews for the deduped, ordered selection
+    # 6) Enforce token budget (max_tokens) with neighbor-first pruning from lowest rank upward
+    id_to_tokens: Dict[str, int] = {}
+    for cid in final_ids:
+        ch = id_to_chunk.get(cid)
+        tok = 0
+        if ch is not None and getattr(ch, "chunk_metadata", None) is not None:
+            # token_count is required, but be defensive
+            tok = int(getattr(ch.chunk_metadata, "token_count", 0) or 0)
+        id_to_tokens[cid] = tok
+
+    current_tokens = sum(id_to_tokens.get(cid, 0) for cid in final_ids)
+    print(f"Token budget check: selected {len(final_ids)} chunks totaling {current_tokens} tokens (max {max_tokens}).")
+
+    if current_tokens > max_tokens and len(final_ids) > 0:
+        selected_ids_set: set[str] = set(final_ids)
+
+        def remove_id(candidate_id: Optional[str]) -> bool:
+            nonlocal current_tokens
+            if candidate_id and candidate_id in selected_ids_set:
+                selected_ids_set.remove(candidate_id)
+                current_tokens -= id_to_tokens.get(candidate_id, 0)
+                return True
+            return False
+
+        # Iterate from lowest-ranked anchor group to highest
+        stop = False
+        for grp in reversed(selection_groups):
+            if stop:
+                break
+            neighbors_list: List[str] = grp.get("neighbors", [])  # type: ignore[arg-type]
+            # Drop neighbors first (in the order added: prev, then next)
+            for nid in neighbors_list:
+                if current_tokens <= max_tokens:
+                    stop = True
+                    break
+                if remove_id(nid):
+                    pass
+            if current_tokens <= max_tokens:
+                break
+            # Then drop the anchor itself
+            anchor_id: str = grp.get("anchor")  # type: ignore[assignment]
+            remove_id(anchor_id)
+            if current_tokens <= max_tokens:
+                break
+
+        final_ids = [cid for cid in final_ids if cid in selected_ids_set]
+        print(f"After pruning: {len(final_ids)} chunks totaling {current_tokens} tokens (max {max_tokens}).")
+
+    # 7) Build previews for the deduped, ordered (and pruned) selection
     results: List[Tuple[str, str]] = []
     for cid in final_ids:
         text = id_to_text[cid]

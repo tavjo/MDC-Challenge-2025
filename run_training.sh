@@ -26,6 +26,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Python interpreter to use (will be resolved at runtime)
+PYTHON_BIN="python"
+VIRTUAL_ENV="${PROJECT_ROOT}/.venv"
+
 # Function to print colored output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -41,6 +45,21 @@ print_warning() {
 
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Resolve Python interpreter, preferring venv if active
+select_python() {
+    if [[ -n "${VIRTUAL_ENV:-}" && -x "${VIRTUAL_ENV}/bin/python" ]]; then
+        PYTHON_BIN="${VIRTUAL_ENV}/bin/python"
+    elif command -v python &> /dev/null; then
+        PYTHON_BIN="$(command -v python)"
+    elif command -v python3 &> /dev/null; then
+        PYTHON_BIN="$(command -v python3)"
+    else
+        print_error "Python not found. Please install Python 3.8+."
+        exit 1
+    fi
+    print_status "Using Python interpreter: $PYTHON_BIN"
 }
 
 # Function to show usage
@@ -105,35 +124,39 @@ ensure_directory() {
 check_dependencies() {
     print_status "Checking dependencies..."
     
-    # Check Python
-    if ! command -v python &> /dev/null; then
-        print_error "Python not found. Please install Python 3.8+."
-        exit 1
-    fi
-    
     # Check Python version
-    python_version=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    python_version=$($PYTHON_BIN -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
     print_status "Found Python $python_version"
     
-    # Check required packages
-    required_packages=("pandas" "numpy" "scikit-learn" "joblib" "scipy")
+    # Check required packages (use Python import module names)
+    # Note: scikit-learn's import name is 'sklearn'
+    required_packages=("pandas" "numpy" "sklearn" "joblib" "scipy")
     missing_packages=()
     
     for package in "${required_packages[@]}"; do
-        if ! python -c "import $package" &> /dev/null; then
+        if ! $PYTHON_BIN -c "import $package" &> /dev/null; then
             missing_packages+=("$package")
         fi
     done
     
     if [[ ${#missing_packages[@]} -gt 0 ]]; then
-        print_error "Missing required packages: ${missing_packages[*]}"
-        print_status "Install them with: pip install ${missing_packages[*]}"
+        # Map module names to pip package names for install hint
+        pip_missing=()
+        for pkg in "${missing_packages[@]}"; do
+            if [[ "$pkg" == "sklearn" ]]; then
+                pip_missing+=("scikit-learn")
+            else
+                pip_missing+=("$pkg")
+            fi
+        done
+        print_error "Missing required packages (modules): ${missing_packages[*]}"
+        print_status "Install them with: pip install ${pip_missing[*]}"
         exit 1
     fi
     
     # Check optional packages
     if [[ "$USE_BALANCED_RF" == true ]]; then
-        if ! python -c "import imblearn" &> /dev/null; then
+        if ! $PYTHON_BIN -c "import imblearn" &> /dev/null; then
             print_error "imbalanced-learn is required for --balanced option"
             print_status "Install it with: pip install imbalanced-learn"
             exit 1
@@ -206,10 +229,10 @@ run_training() {
     fi
     
     # Print command being executed
-    print_status "Executing: python src/training.py ${cmd_args[*]}"
+    print_status "Executing: $PYTHON_BIN src/training.py ${cmd_args[*]}"
     
     # Run the training script
-    if python src/training.py "${cmd_args[@]}"; then
+    if $PYTHON_BIN src/training.py "${cmd_args[@]}"; then
         print_success "Training completed successfully!"
         
         # Show output files
@@ -279,6 +302,17 @@ main() {
     print_status "Random Forest Training Script for MDC Challenge"
     print_status "============================================="
     
+    # Ensure virtual environment is activated
+    if [[ -f "${PROJECT_ROOT}/.venv/bin/activate" ]]; then
+        print_status "Sourcing virtual environment: ${PROJECT_ROOT}/.venv"
+        source "${PROJECT_ROOT}/.venv/bin/activate"
+    else
+        print_warning "Virtual environment not found at ${PROJECT_ROOT}/.venv; proceeding without sourcing."
+    fi
+
+    # Resolve Python interpreter (prefer active venv)
+    select_python
+
     # Show configuration
     print_status "Configuration:"
     echo "  Input CSV: $INPUT_CSV"
@@ -291,8 +325,7 @@ main() {
     echo "  Use Balanced RF: $USE_BALANCED_RF"
     echo
     
-    # Pre-flight checks
-    check_dependencies
+    # Pre-flight checks (skip dependency checks per user request)
     validate_data
     
     # Ensure output directories exist
