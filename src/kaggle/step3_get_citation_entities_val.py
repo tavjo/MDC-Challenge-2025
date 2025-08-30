@@ -30,7 +30,7 @@ if str(THIS_DIR) not in sys.path:
 #     from src.kaggle.get_citation_context import run_hybrid_retrieval_on_document
 # except Exception:
 from helpers import timer_wrap, initialize_logging, extract_entities_baml
-from models import CitationEntity, Document, Chunk
+from models import CitationEntity, Document, Chunk, BoostConfig
 from duckdb_utils import get_duckdb_helper
 from get_citation_context import run_hybrid_retrieval_on_document
 
@@ -56,7 +56,8 @@ class UnknownCitationEntityExtractor:
                  globals_path: Optional[str] = global_prototypes,
                  prototypes: Optional[pd.DataFrame] = None,
                  k: int = 15,
-                 max_workers: int = 8
+                 max_workers: int = 8,
+                 boost_cfg: BoostConfig = BoostConfig()
                  ):  # Add this parameter
         logger.info(f"Initializing CitationEntityExtractor")
         self.db_path = db_path
@@ -75,6 +76,7 @@ class UnknownCitationEntityExtractor:
             self.subset_ids = np.random.choice(self.pdf_files, self.subset_size, replace=False)
             self.pdf_files = self.subset_ids
             self.docs = np.random.choice(self.docs, self.subset_size, replace=False)
+        self.boost_cfg = boost_cfg
     
 
     def _load_doc_pages(self) -> List[Document]:
@@ -124,7 +126,8 @@ class UnknownCitationEntityExtractor:
                                                 top_k = self.k,
                                                 prototypes=prototypes,
                                                 db_path=self.db_path,
-                                                prototype_top_m = 3
+                                                boost_cfg=self.boost_cfg,
+                                                # prototype_top_m = 3
                                                 )
         cids = [cid for cid,pre in myres]
         return self._get_top_chunks(cids)

@@ -45,7 +45,7 @@ class BoostConfig(BaseModel):
 
     # Final diversification
     mmr_lambda: float = Field(
-        0.70,
+        0.85,
         description=(
             "MMR diversity-control parameter λ in [0,1]; higher favors relevance, lower favors diversity."
         ),

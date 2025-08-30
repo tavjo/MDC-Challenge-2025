@@ -88,7 +88,6 @@ DAS_LEXICON: List[str] = [
     "upon reasonable request",
     "accession",
     "repository",
-    "doi",
     "zenodo",
     "figshare",
     "dryad",
@@ -99,6 +98,60 @@ DAS_LEXICON: List[str] = [
     "arrayexpress",
     "pdb",
     "uniprot",
+    # Added from DATA_CITATION_KEYWORDS.access_verbs
+    "deposited",
+    "downloaded",
+    "accessed",
+    "retrieved",
+    "obtained",
+    "collected",
+    "gathered",
+    "sourced",
+    "extracted",
+    "acquired",
+    # Added from DATA_CITATION_KEYWORDS.repositories
+    "database",
+    "databank",
+    "archive",
+    "portal",
+    "ncbi",
+    "ensembl",
+    "genbank",
+    "embl",
+    "ddbj",
+    "ena",
+    "pride",
+    "metabolights",
+    "mendeley",
+    "osf",
+    # Added from DATA_CITATION_KEYWORDS.identifiers
+    "identifier",
+    "pmid",
+    "pmcid",
+    "srp",
+    "srr",
+    "prj",
+    "sam",
+    "biosample",
+    "bioproject",
+    "accession number",
+    "dataset id",
+    "study id",
+    # Added from DATA_CITATION_KEYWORDS.data_terms
+    "dataset",
+    # "data",
+    "supplementary data",
+    "raw data",
+    "processed data",
+    # "transcriptome",
+    # "proteome",
+    # "genome",
+    # "metabolome",
+    # "microarray",
+    # "rna-seq",
+    # "chip-seq",
+    # "mass spectrometry",
+    # "sequencing data",
 ]
 
 SECTION_HEADERS_CUES: Dict[str, List[str]] = {
@@ -280,6 +333,62 @@ def mmr_rerank(candidate_ids: List[str],
         selected.append(best_id)
         remaining.remove(best_id)
     return selected
+
+# ==============================================
+# Boosting (keyword categories)
+# ==============================================
+
+# Mirror keyword categories and weights from api/services/retriever_services.py
+DATA_CITATION_KEYWORDS: Dict[str, List[str]] = {
+    "access_verbs": [
+        "deposited", "downloaded", "accessed", "retrieved", "obtained",
+        "collected", "gathered", "sourced", "extracted", "acquired"
+    ],
+    "repositories": [
+        "repository", "database", "databank", "archive", "portal",
+        "ncbi", "uniprot", "ensembl", "genbank", "embl", "ddbj",
+        "geo", "arrayexpress", "sra", "ena", "pride", "metabolights",
+        "figshare", "zenodo", "dryad", "mendeley", "osf"
+    ],
+    "identifiers": [
+        "accession", "identifier", "doi", "pmid", "pmcid", "gse",
+        "srp", "srr", "prj", "sam", "biosample", "bioproject",
+        "accession number", "dataset id", "study id"
+    ],
+    "data_terms": [
+        "dataset", "data", "supplementary data", "raw data", "processed data",
+        "transcriptome", "proteome", "genome", "metabolome", "microarray",
+        "rna-seq", "chip-seq", "mass spectrometry", "sequencing data"
+    ],
+}
+
+_CATEGORY_WEIGHTS: Dict[str, float] = {
+    "access_verbs": 0.15,
+    "repositories": 0.20,
+    "identifiers": 0.15,
+    "data_terms": 0.10,
+}
+
+_TEXT_BOOST_CAP: float = 0.50
+_PROTOTYPE_PRESENCE_BOOST: float = 0.10
+
+
+def _preprocess_text_basic(text: str) -> str:
+    return (text or "").lower()
+
+
+def _text_boost_score(text: str) -> float:
+    """Compute keyword-category boosts mirroring retriever_services._detect_data_citation_entities.
+
+    Note: We only apply text-based boosts here (no metadata-based citation_entities boost).
+    """
+    t = _preprocess_text_basic(text)
+    boost = 0.0
+    for category, keywords in DATA_CITATION_KEYWORDS.items():
+        found = any(kw in t for kw in keywords)
+        if found:
+            boost += _CATEGORY_WEIGHTS.get(category, 0.0)
+    return float(min(boost, _TEXT_BOOST_CAP))
 
 
 # ==============================================
@@ -557,6 +666,11 @@ def hybrid_retrieve_with_boost(
         neighbor
     )
 
+    # Apply keyword text boost (mirrors retriever_services) AFTER weighted score, BEFORE MMR
+    # Aligns with candidate_ids via the precomputed texts list
+    text_boost_vec = np.array([_text_boost_score(t) for t in texts], dtype=float)
+    final_score = final_score + text_boost_vec
+
     order = np.argsort(final_score)[::-1]
     pool_rank = [candidate_ids[i] for i in order]
     pool_rank = [cid for cid in pool_rank if cid in id_to_dense]
@@ -570,32 +684,67 @@ def hybrid_retrieve_with_boost(
     )
     return final_ids
 
+# ===============================================
+# Simple dense retrieval with keyword/prototype boosts
+# ===============================================
 
-# =====================
-# Convenience utilities
-# =====================
 
-def explain_scores(
-    ids: List[str],
+def retrieval_with_boost(
     *,
-    rrf_scores: Dict[str, float],
-    regex_index: Dict[str, Dict[str, int]],
-    id_to_section: Optional[Dict[str, Optional[str]]] = None,
-    id_to_text: Optional[Dict[str, str]] = None,
-) -> List[Dict[str, object]]:
-    """Return a small table (list of dicts) describing why each id scored well."""
-    rows: List[Dict[str, object]] = []
-    for cid in ids:
-        sec = id_to_section.get(cid) if id_to_section else None
-        txt = id_to_text.get(cid, "") if id_to_text else ""
-        guess = guess_section(txt)
-        rx = regex_index.get(cid, {})
-        rows.append({
-            "chunk_id": cid,
-            "rrf": round(float(rrf_scores.get(cid, 0.0)), 6),
-            "regex_total": int(rx.get("_total", 0)),
-            "section": sec,
-            "section_guess": guess,
-            "has_methods_or_das": bool(_is_methods_or_das(sec, txt)),
-        })
-    return rows
+    query_text: Optional[str],
+    dense_query_vec: np.ndarray,
+    id_to_dense: Dict[str, np.ndarray],
+    id_to_text: Dict[str, str],
+    boost_cfg: PydBoostConfig = PydBoostConfig(),
+    prototypes=None,  # Prototypes | np.ndarray of centroids [P, D] | None
+) -> List[str]:
+    """Simplified retrieval: dense similarity + keyword boosts (+ optional prototype presence boost).
+
+    - Computes cosine similarity of each chunk embedding to the query embedding
+    - Adds a text-based boost mirroring api/services/retriever_services.py categories
+    - If prototypes provided, any chunk in prototypes' top-k receives a small additive boost
+    - Ranks by the resulting score and returns top `boost_cfg.mmr_top_k` chunk_ids
+    """
+    if not id_to_dense:
+        return []
+
+    # Vectorized dense similarity over all chunks
+    ordered_ids: List[str] = list(id_to_dense.keys())
+    chunk_mat = np.vstack([id_to_dense[cid] for cid in ordered_ids])
+    q = dense_query_vec
+    qn = np.linalg.norm(q) + 1e-8
+    Mn = np.linalg.norm(chunk_mat, axis=1) + 1e-8
+    sims = (chunk_mat @ q) / (Mn * qn)  # cosine similarity per chunk
+
+    sims_norm = _minmax_norm(sims.astype(float)) if sims.size > 0 else sims
+
+    # Text-based boosts per chunk
+    text_boost = np.zeros_like(sims_norm, dtype=float)
+    for i, cid in enumerate(ordered_ids):
+        txt = id_to_text.get(cid, "")
+        text_boost[i] = _text_boost_score(txt)
+
+    # Optional prototype presence boost: mark top-k ids from prototype affinity
+    proto_boost = np.zeros_like(sims_norm, dtype=float)
+    if prototypes is not None and isinstance(prototypes, np.ndarray) and prototypes.size > 0:
+        sig_mult = getattr(boost_cfg, "signal_k_multiplier", 3)
+        try:
+            sig_mult = int(sig_mult)
+        except Exception:
+            sig_mult = 3
+        TOPK_PER_SIGNAL = max(1, int(boost_cfg.mmr_top_k) * sig_mult)
+        per_chunk_scores, top_idx = _prototype_topk(
+            prototypes,
+            chunk_mat,
+            k=TOPK_PER_SIGNAL,
+            top_m=getattr(boost_cfg, "prototype_top_m", 1) if isinstance(getattr(boost_cfg, "prototype_top_m", 1), (int, float)) else 1,
+        )
+        if top_idx.size > 0:
+            proto_boost[top_idx] = _PROTOTYPE_PRESENCE_BOOST
+
+    final_score = sims_norm + text_boost + proto_boost
+    order = np.argsort(final_score)[::-1]
+    k = int(getattr(boost_cfg, "mmr_top_k", 15))
+    k = max(1, min(k, len(ordered_ids)))
+    top_ids = [ordered_ids[i] for i in order[:k]]
+    return top_ids

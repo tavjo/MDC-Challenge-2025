@@ -64,7 +64,7 @@ def build_query_text() -> str:
     """
     accession_terms = [
         "accession", "GSE", "SRA", "SRR",
-        "ArrayExpress", "ENA", "BioProject", "PDB", "GISAID", "Zenodo", "Dryad", "Figshare", "GEO", "Deposition number", "SRA"
+        "ArrayExpress", "ENA", "BioProject", "PDB", "GISAID", "Zenodo", "Dryad", "Figshare", "GEO", "Deposition number", "SRA", 
     ]
     return " ".join(sorted(set(DAS_LEXICON + accession_terms)))
 
@@ -79,7 +79,6 @@ def maybe_add_bge_instruction(query: str, use_instruction: bool = True) -> str:
     return instruction + query
 
 # --- Run retrieval on a single new document ---
-# --- Run retrieval on a single new document ---
 @timer_wrap
 def run_hybrid_retrieval_on_document(
     doc_id: str,
@@ -89,8 +88,9 @@ def run_hybrid_retrieval_on_document(
     use_instruction: bool = True,
     prototypes: Optional[np.ndarray] = None,
     db_path: str | None = None,
-    prototype_top_m: int = 3,
-    max_tokens: int = 8000,
+    # prototype_top_m: int = 3,
+    max_tokens: int = 5000,
+    boost_cfg: BoostConfig = BoostConfig(),
 ) -> Optional[List[Tuple[str, str]]]:
     """
     Returns a list of (chunk_id, chunk_preview) for top_k hits, additionally
@@ -133,7 +133,7 @@ def run_hybrid_retrieval_on_document(
         dense_query_vec=query_vec,            # dense side uses BGE embedding
         id_to_dense=id_to_dense,              # {chunk_id: 384-d vec}
         id_to_text=id_to_text,                # {chunk_id: raw text}
-        boost_cfg=BoostConfig(prototype_top_m=int(max(1, prototype_top_m))),
+        boost_cfg=boost_cfg,
         prototypes=prototypes,
     )
     if ranked_ids:

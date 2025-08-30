@@ -35,7 +35,7 @@ if str(THIS_DIR) not in sys.path:
 from models import CitationEntity, Dataset, BoostConfig
 from helpers import embed_texts, timer_wrap, initialize_logging
 from duckdb_utils import get_duckdb_helper
-from retrieval_module import hybrid_retrieve_with_boost
+from retrieval_module import hybrid_retrieve_with_boost, retrieval_with_boost
 
 logger = initialize_logging()
 
@@ -218,10 +218,11 @@ def construct_datasets_pipeline(
     model,
     top_k: int = 5,
     db_path: str = DEFAULT_DUCKDB,
-    prototype_top_m: int = TOP_M,
+    # prototype_top_m: int = TOP_M,
+    boost_cfg: BoostConfig = BoostConfig(),
     prototypes: np.ndarray = None,
 ) -> Tuple[List[Dataset], Path]:
-    logger.info(f"Starting construct_datasets_pipeline(db_path={db_path}, top_k={top_k}, prototype_top_m={prototype_top_m})")
+    logger.info(f"Starting construct_datasets_pipeline(db_path={db_path}, top_k={top_k}, boost_cfg={boost_cfg})")
     db = get_duckdb_helper(db_path)
     try:
         try:
@@ -291,14 +292,14 @@ def construct_datasets_pipeline(
                 prototypes_input = None
 
             try:
-                ranked_ids = hybrid_retrieve_with_boost(
+                ranked_ids = retrieval_with_boost(
                     query_text=query_text,
                     dense_query_vec=qvec,
                     id_to_dense=id_to_dense,
                     id_to_text=id_to_text,
                     boost_cfg=BoostConfig(
                         mmr_top_k=top_k,
-                        prototype_top_m=int(max(1, prototype_top_m))
+                        prototype_top_m=int(max(1, boost_cfg.prototype_top_m))
                     ),
                     prototypes=prototypes_input,
                 )
