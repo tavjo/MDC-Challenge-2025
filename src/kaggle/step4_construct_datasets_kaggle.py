@@ -33,7 +33,7 @@ if str(THIS_DIR) not in sys.path:
 #     from src.kaggle.models import BoostConfig
 # except Exception:
 from models import CitationEntity, Dataset, BoostConfig
-from helpers import embed_texts, timer_wrap, initialize_logging
+from helpers import embed_texts, timer_wrap, initialize_logging, num_tokens
 from duckdb_utils import get_duckdb_helper
 from retrieval_module import hybrid_retrieve_with_boost, retrieval_with_boost
 
@@ -119,8 +119,8 @@ def construct_dataset_from_retrieval_results(
         logger.error("Failed to assemble dataset text from chunk ids", exc_info=e)
         text = ""
     try:
-        total_tokens = sum(len(t.split()) for t in text.split())
-        avg_tokens_per_chunk = np.mean([len(id_to_text[cid].split()) for cid in chunk_ids if cid in id_to_text]) if chunk_ids else 0.0
+        total_tokens = num_tokens(text)
+        avg_tokens_per_chunk = np.mean([num_tokens(id_to_text[cid]) for cid in chunk_ids if cid in id_to_text]) if chunk_ids else 0.0
         if np.isnan(avg_tokens_per_chunk):
             avg_tokens_per_chunk = 0.0
         total_char_length = len(text)

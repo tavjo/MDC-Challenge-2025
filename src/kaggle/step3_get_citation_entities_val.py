@@ -67,15 +67,8 @@ class UnknownCitationEntityExtractor:
         self.max_workers = max_workers
         self.globals_path = globals_path
         self.model = model
-        self.prototypes=prototypes
-        if draw_subset:
-            self.subset_size = subset_size if subset_size is not None else 20
-            logger.info(f"Drawing subset of {self.subset_size} files from {len(self.pdf_files)} files.")
-            # set seed
-            np.random.seed(42)
-            self.subset_ids = np.random.choice(self.pdf_files, self.subset_size, replace=False)
-            self.pdf_files = self.subset_ids
-            self.docs = np.random.choice(self.docs, self.subset_size, replace=False)
+        self.prototypes = prototypes
+        # Subset logic removed; keep args for compatibility
         self.boost_cfg = boost_cfg
     
 
@@ -92,35 +85,44 @@ class UnknownCitationEntityExtractor:
         """
         Load query embeddings from a pickle file
         """
-        globals_df = pd.read_parquet(self.globals_path)
-        if globals_df:
+        if not self.globals_path:
+            return pd.DataFrame()
+        # Ensure .parquet extension
+        gp = self.globals_path
+        if gp.endswith(".pkl"):
+            gp = gp[:-4] + ".parquet"
+        globals_df = pd.read_parquet(gp)
+        if globals_df is not None and not globals_df.empty:
             globals_df = globals_df.T
-        # also load the ds_prototypes
-        ds_prototypes_path = self.globals_path.replace("feature_decomposition.parquet", "prototypes.parquet")
+        # also load the ds_prototypes assuming a sister .parquet file
+        ds_prototypes_path = gp.replace("feature_decomposition.parquet", "prototypes.parquet")
+        ds_prototypes = None
         if os.path.exists(ds_prototypes_path):
-            ds_prototypes = pd.read_parquet(ds_prototypes_path)
-            if ds_prototypes:
-                ds_prototypes = ds_prototypes
-        else:
-            ds_prototypes = None
+            tmp = pd.read_parquet(ds_prototypes_path)
+            if tmp is not None and not tmp.empty:
+                ds_prototypes = tmp
         # combined the two dataframes
-        if ds_prototypes is not None:
+        if ds_prototypes is not None and not ds_prototypes.empty:
             combined = pd.concat([globals_df, ds_prototypes])
         else:
             combined = globals_df
-        return combined
+        return combined if combined is not None else pd.DataFrame()
     
     def _retrieve_context(self, doc_id: str) -> List[Chunk]:
         """
         Retrieve relevant context from documents using the hybrid retrieval model.
         """
-        if self.prototypes.empty and self.globals_path is not None:
-            prototypes = self._load_query_embeddings()
-        elif self.prototypes.empty and not self.globals_path:
-            print("Neither prototype dataframe nor path to prototypes provided. Retrieving context without prototypes.")
-            prototypes = None
-        else:
+        # Determine prototypes safely across None/DataFrame cases
+        prototypes = None
+        if isinstance(self.prototypes, pd.DataFrame) and not self.prototypes.empty:
             prototypes = self.prototypes
+        elif (self.prototypes is None or (isinstance(self.prototypes, pd.DataFrame) and self.prototypes.empty)) and self.globals_path is not None:
+            try:
+                prototypes = self._load_query_embeddings()
+            except Exception:
+                prototypes = None
+        else:
+            prototypes = None
         myres = run_hybrid_retrieval_on_document(doc_id = doc_id, 
                                                 model = self.model, 
                                                 top_k = self.k,
@@ -129,7 +131,7 @@ class UnknownCitationEntityExtractor:
                                                 boost_cfg=self.boost_cfg,
                                                 # prototype_top_m = 3
                                                 )
-        cids = [cid for cid,pre in myres]
+        cids = [cid for cid, pre in myres]
         return self._get_top_chunks(cids)
     
     def _get_top_chunks(self, chunk_ids: List[str]) -> List[Chunk]:
@@ -138,6 +140,7 @@ class UnknownCitationEntityExtractor:
         """
         db_helper = get_duckdb_helper(self.db_path)
         chunks = db_helper.get_chunks_by_chunk_ids(chunk_ids)
+        db_helper.close()
         return chunks
 
     def retrieve_context(self) -> List[Chunk]:

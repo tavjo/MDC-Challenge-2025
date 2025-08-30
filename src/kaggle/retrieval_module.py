@@ -575,6 +575,14 @@ def hybrid_retrieve_with_boost(
 
     Returns: final ranked list of chunk_ids.
     """
+    # Normalize prototypes to numpy if provided as pandas objects (surgical conversion)
+    try:
+        import pandas as pd  # type: ignore
+        if prototypes is not None and isinstance(prototypes, (pd.DataFrame, pd.Series)):
+            prototypes = prototypes.to_numpy()
+    except Exception:
+        pass
+
     # Dynamic caps based on requested output size
     sig_mult = getattr(boost_cfg, "signal_k_multiplier", 3)
     try:
@@ -705,6 +713,14 @@ def retrieval_with_boost(
     - If prototypes provided, any chunk in prototypes' top-k receives a small additive boost
     - Ranks by the resulting score and returns top `boost_cfg.mmr_top_k` chunk_ids
     """
+    # Normalize prototypes to numpy if provided as pandas objects (surgical conversion)
+    try:
+        import pandas as pd  # type: ignore
+        if prototypes is not None and isinstance(prototypes, (pd.DataFrame, pd.Series)):
+            prototypes = prototypes.to_numpy()
+    except Exception:
+        pass
+
     if not id_to_dense:
         return []
 
