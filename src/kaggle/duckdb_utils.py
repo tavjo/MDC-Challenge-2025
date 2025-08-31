@@ -382,6 +382,52 @@ class KaggleDuckDBHelper:
         finally:
             e.unregister("citations_buffer")
 
+    @timer_wrap
+    def delete_citations_by_ids(
+        self,
+        citation_ids: Union[str, Iterable[str]],
+    ) -> int:
+        """
+        Delete citation rows by their ``data_citation`` identifiers.
+
+        Parameters
+        ----------
+        citation_ids : str | Iterable[str]
+            A single citation ID or any iterable of citation IDs.
+
+        Returns
+        -------
+        int
+            Number of rows deleted.
+        """
+        # Normalise to a list
+        if isinstance(citation_ids, str):
+            citation_ids = [citation_ids]
+        citation_ids = [c for c in citation_ids if c is not None]
+
+        if not citation_ids:
+            return 0
+
+        placeholders = ", ".join("?" * len(citation_ids))
+        e = self.engine
+
+        # Count first to return the number of rows deleted
+        count_sql = f"SELECT COUNT(*) FROM citations WHERE data_citation IN ({placeholders})"
+
+        e.execute("BEGIN TRANSACTION")
+        try:
+            num_to_delete = e.execute(count_sql, citation_ids).fetchall()[0][0]
+            e.execute(
+                f"DELETE FROM citations WHERE data_citation IN ({placeholders})",
+                citation_ids,
+            )
+            e.execute("COMMIT")
+        except Exception:
+            e.execute("ROLLBACK")
+            raise
+
+        return int(num_to_delete)
+
     # --------------------- Feature Assembly ----------------------
     def get_full_dataset_dataframe(
         self,
