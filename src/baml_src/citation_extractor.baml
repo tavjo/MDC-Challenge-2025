@@ -1,6 +1,6 @@
 
 class CitationEntity {
-    evidence string[] @description("List of evidence from the text for the data citation")
+    evidence string[] @description("List of evidence from document for the data citation")
     data_citation string @description("Data citation from text")
     // doc_id string? @description("DOI of the document where the data citation is found")
     // pages int[]? @description("List of page numbers where the data citation is mentioned.")
@@ -10,8 +10,8 @@ class CitationEntity {
 function ExtractCitation(document: string[]) -> CitationEntity[] {
   client QwenLocal
   prompt #"
-    You are a research assistant tasked with extracting dataset citations from a text. Extract ALL unique dataset citations from the text.
-    The evidence should be the snippet of text that contains the dataset citation.
+    You are a research assistant tasked with extracting dataset citations from a text. Extract ALL dataset citations from the document.
+    The evidence should be the snippet of text from the document that contains the dataset citation.
 
     Dataset citations usually appear as:
       1. Accession numbers in formats like:
@@ -26,11 +26,11 @@ function ExtractCitation(document: string[]) -> CitationEntity[] {
     
     Report dataset citations EXACTLY as they appear in the text but do not include the surrounding text itself. Don't add the reporsitory name unless it already a part of the data citation. 
     
-    Do not return article/preprint/journal DOIs (e.g., bioRxiv/medRxiv, publisher DOIs). Return only dataset repository DOIs (Dryad, Zenodo, Figshare, PANGAEA, etc.) and accession IDs (GEO/SRA/ENA/GenBank/PRJNA/PRJEB/PXD/E-*). If uncertain, omit.
+    Return only dataset repository DOIs (Dryad, Zenodo, Figshare, PANGAEA, etc.) and accession IDs (GEO/SRA/ENA/GenBank/PRJNA/PRJEB/PXD/E-* etc.).  Do NOT return article/preprint/journal DOIs (e.g., bioRxiv/medRxiv, publisher DOIs).If uncertain, omit.
 
     Never make up a data citation. If you cannot find a data citation, return an empty list.
 
-    IMPORTANT: Return each accession number or DOI separately.
+    IMPORTANT: Return each accession number or dataset repository DOI as separate data citations.
 
     {{ ctx.output_format }}
 

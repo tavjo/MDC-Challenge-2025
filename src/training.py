@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 import joblib
+import skops.io as sio
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
@@ -643,6 +644,20 @@ def main():
         try:
             model_path = out_dir / "rf_model.pkl"
             joblib.dump(search.best_estimator_, model_path, compress=3)
+
+            # Also export a safe, portable copy using skops
+            skops_path = out_dir / "rf_model.skops"
+            try:
+                sio.dump(search.best_estimator_, skops_path)
+                # Persist list of types required to load safely (useful for Kaggle `trusted=`)
+                try:
+                    unknown_types = sio.get_untrusted_types(file=str(skops_path))
+                    with open(out_dir / "skops_untrusted_types.json", "w") as f:
+                        json.dump(sorted(unknown_types), f, indent=2)
+                except Exception as e:
+                    logger.warning("Could not compute skops untrusted types: %s", e)
+            except Exception as e:
+                logger.warning("Failed to save skops model: %s", e)
             
             with open(out_dir / "best_params.json", "w") as f:
                 json.dump(search.best_params_, f, indent=2)

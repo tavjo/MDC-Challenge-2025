@@ -341,7 +341,7 @@ def mmr_rerank(candidate_ids: List[str],
 # Mirror keyword categories and weights from api/services/retriever_services.py
 DATA_CITATION_KEYWORDS: Dict[str, List[str]] = {
     "access_verbs": [
-        "deposited", "downloaded", "accessed", "retrieved", "obtained",
+        "deposited", "accessed", "retrieved", "obtained",
         "collected", "gathered", "sourced", "extracted", "acquired"
     ],
     "repositories": [
@@ -351,26 +351,26 @@ DATA_CITATION_KEYWORDS: Dict[str, List[str]] = {
         "figshare", "zenodo", "dryad", "mendeley", "osf"
     ],
     "identifiers": [
-        "accession", "identifier", "doi", "pmid", "pmcid", "gse",
+        "accession", "identifier", "pmid", "pmcid", "gse",
         "srp", "srr", "prj", "sam", "biosample", "bioproject",
         "accession number", "dataset id", "study id"
     ],
     "data_terms": [
-        "dataset", "data", "supplementary data", "raw data", "processed data",
-        "transcriptome", "proteome", "genome", "metabolome", "microarray",
-        "rna-seq", "chip-seq", "mass spectrometry", "sequencing data"
+        "dataset", "supplementary data", "raw data", "processed data",
+        "transcriptomics data", "proteomics data", "genomics data", "metabolomics data", "microarray data",
+        "rna-seq data", "chip-seq data", "mass spectrometry data", "sequencing data"
     ],
 }
 
 _CATEGORY_WEIGHTS: Dict[str, float] = {
-    "access_verbs": 0.15,
-    "repositories": 0.20,
-    "identifiers": 0.15,
-    "data_terms": 0.10,
+    "access_verbs": 0.10,
+    "repositories": 0.25,
+    "identifiers": 0.10,
+    "data_terms": 0.05,
 }
 
 _TEXT_BOOST_CAP: float = 0.50
-_PROTOTYPE_PRESENCE_BOOST: float = 0.10
+_PROTOTYPE_PRESENCE_BOOST: float = 0.50
 
 
 def _preprocess_text_basic(text: str) -> str:

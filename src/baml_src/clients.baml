@@ -12,6 +12,7 @@ client<llm> LocalQwen {
 
 client<llm> QwenLocal {
   provider "openai-generic"
+  retry_policy Constant
   options {
     base_url "http://127.0.0.1:8000/v1"
     model "qwen3-8b-awq-local"

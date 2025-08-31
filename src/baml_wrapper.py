@@ -15,5 +15,11 @@ def extract_cites(doc: List[str]) -> List[Any]:
     """
     Extract citation entities from the document text using the BAML client.
     """
-    citations = baml.ExtractCitation(doc)
-    return citations
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            citations = baml.ExtractCitation(doc)
+            return citations
+        except Exception:
+            if attempt == max_attempts - 1:
+                raise
