@@ -450,6 +450,83 @@ def _find_direct_string_matches(citation: str, text_views: dict) -> List[str]:
     matches.extend(re.findall(lower_cit, text_views["prep"]))
     return matches
 
+# NEW: detect hyphenated accession ranges containing the target ID (e.g., MK838495–MK838499)
+def _id_in_hyphenated_range(citation: str, text_views: dict) -> bool:
+    import re
+    cit = clean_text_for_urls(citation).strip()
+    m = re.match(r"(?i)^\s*([A-Z]{2,10})[\s\u00A0\-\u2010-\u2015_]*([0-9]{3,})\s*$", cit)
+    if not m:
+        return False
+    prefix, digits = m.group(1).upper(), m.group(2)
+    target = int(digits)
+
+    prefix_pat = _join_chars_with_seps(prefix)
+    sep = r"[\s\u00A0\-\u2010-\u2015_,.]*"
+    dash = r"[\-\u2010-\u2015]"
+
+    # Search in views that preserve dashes
+    rng = re.compile(
+        rf"\b{prefix_pat}{sep}(\d{{3,}}){sep}{dash}{sep}(?:{prefix_pat}{sep})?(\d+)\b",
+        re.IGNORECASE,
+    )
+    for key in ("raw", "norm"):
+        page = text_views[key]
+        for start_digits, end_digits in rng.findall(page):
+            try:
+                start_num = int(start_digits)
+            except ValueError:
+                continue
+            if len(end_digits) < len(start_digits):
+                # Expand partial RHS like 95 -> 838495 using LHS prefix
+                end_full = int(start_digits[: len(start_digits) - len(end_digits)] + end_digits)
+            else:
+                try:
+                    end_full = int(end_digits)
+                except ValueError:
+                    continue
+            lo, hi = (start_num, end_full) if start_num <= end_full else (end_full, start_num)
+            if lo <= target <= hi:
+                return True
+    return False
+
+
+def _id_in_shared_prefix_list(citation: str, text_views: dict) -> bool:
+    """Detect lists where a single textual prefix applies to multiple numeric IDs.
+
+    Example: "CCDC 1951650 {..}, 1951651 {..}, 1951652 {..}, and 1951653 {..}"
+    For citation "CCDC 1951652", return True if 1951652 appears in the list.
+    """
+    import re
+    cit = clean_text_for_urls(citation).strip()
+    m = re.match(r"(?i)^\s*([A-Z]{2,10})[\s\u00A0\-\u2010-\u2015_]*([0-9]{3,})\s*$", cit)
+    if not m:
+        return False
+    prefix, digits = m.group(1).upper(), m.group(2)
+    target_str = digits
+
+    prefix_pat = _join_chars_with_seps(prefix)
+    sep = r"[\s\u00A0\-\u2010-\u2015_,.]*"
+    anchor = re.compile(rf"\b{prefix_pat}{sep}(\d{{3,}})\b", re.IGNORECASE)
+
+    # Search in views that preserve punctuation/case best
+    for key in ("raw", "norm"):
+        page = text_views[key]
+        for match in anchor.finditer(page):
+            # Include the first number right after the prefix
+            if match.group(1) == target_str:
+                return True
+            # Look ahead for nearby numbers in the same comma/and-separated list
+            tail = page[match.end(): match.end() + 300]
+            # Trim at likely list terminators
+            stop = re.search(r"[.;](?:\s|$)", tail)
+            if stop:
+                tail = tail[: stop.start()]
+            # Find numbers of the same length as the target (avoid short numbers in braces)
+            same_len_nums = re.findall(rf"\b\d{{{len(target_str)}}}\b", tail)
+            if target_str in same_len_nums:
+                return True
+    return False
+
 
 def find_citation_matches(citation: str, text: str) -> List[str]:
     """Return list of matches for a citation within text using tolerant logic.
@@ -468,6 +545,14 @@ def find_citation_matches(citation: str, text: str) -> List[str]:
             found = pattern.findall(text_views[key])
             if found:
                 return found
+
+    # 1b) hyphenated numeric ranges like MK838495–MK838499 or CCDC 1951652–1951653
+    if _id_in_hyphenated_range(citation, text_views):
+        return [citation]
+
+    # 1c) shared-prefix lists like: CCDC 1951650, 1951651, 1951652, 1951653
+    if _id_in_shared_prefix_list(citation, text_views):
+        return [citation]
 
     # 2) direct substring fallback (robust text normalisation)
     direct = _find_direct_string_matches(citation, text_views)

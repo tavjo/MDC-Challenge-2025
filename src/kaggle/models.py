@@ -28,7 +28,7 @@ class BoostConfig(BaseModel):
 
     # RRF rank fusion constant
     rrf_k: int = Field(
-        60,
+        20,
         description=(
             "RRF constant k; controls contribution of lower-ranked items across rankers."
         ),

@@ -40,6 +40,16 @@ def all_succeeded(checks: Dict[CheckName, Check]) -> bool:
 
 
 
+class DatasetType(str, Enum):
+    
+    PRIMARY = "PRIMARY"
+    SECONDARY = "SECONDARY"
+    NEITHER = "NEITHER"
+
 class CitationEntity(BaseModel):
     evidence: List[str]
     data_citation: str
+
+class DatasetTypeInput(BaseModel):
+    citation: "CitationEntity"
+    text: List[str]

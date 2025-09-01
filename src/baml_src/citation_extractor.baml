@@ -13,24 +13,17 @@ function ExtractCitation(document: string[]) -> CitationEntity[] {
     You are a research assistant tasked with extracting dataset citations from a text. Extract ALL dataset citations from the document.
     The evidence should be the snippet of text from the document that contains the dataset citation.
 
-    Dataset citations usually appear as:
-      1. Accession numbers in formats like:
-        - E-GEOD-48278
-        - JX312727
-        - PRJNA384940
-      2. Data repository DOIs in formats like:
-        - https://doi.org/10.5061/dryad.4dj6042
-        - 10.5061/dryad.4dj6042
-        - doi:10.5061/dryad.4dj6042
-        - https://doi.org/10.6084/m9.figshare.29901470.v1
+    Use context provided in the document to determine if a citation is a data citation such as "Dataset deposited in ...", "Data retrieved from ...", "Data accessed from ...", etc.
     
     Report dataset citations EXACTLY as they appear in the text but do not include the surrounding text itself. Don't add the reporsitory name unless it already a part of the data citation. 
     
-    Return only dataset repository DOIs (Dryad, Zenodo, Figshare, PANGAEA, etc.) and accession IDs (GEO/SRA/ENA/GenBank/PRJNA/PRJEB/PXD/E-* etc.).  Do NOT return article/preprint/journal DOIs (e.g., bioRxiv/medRxiv, publisher DOIs).If uncertain, omit.
+    Return only dataset repository DOIs (Dryad, Zenodo, Figshare, PANGAEA, etc.) and accession IDs (GEO/SRA/ENA/GenBank/PRJNA/PRJEB/PXD/E-* etc.). Do NOT return article/preprint/journal DOIs (e.g., bioRxiv/medRxiv, publisher DOIs). Examine context surrounding DOIs to judge whether they are data citations or not.
 
     Never make up a data citation. If you cannot find a data citation, return an empty list.
 
     IMPORTANT: Return each accession number or dataset repository DOI as separate data citations.
+
+    Accession numbers are sometimes grouped together to form a range. For example, JX312727-JX312730 (example accession range). Report each accession number in the range as a separate data citation object. 
 
     {{ ctx.output_format }}
 

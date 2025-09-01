@@ -22,15 +22,19 @@ from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIM
 class TypeBuilder(_TypeBuilder):
     def __init__(self):
         super().__init__(classes=set(
-          ["CitationEntity",]
+          ["CitationEntity","DatasetTypeInput",]
         ), enums=set(
-          []
+          ["DatasetType",]
         ), runtime=DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME)
 
 
     @property
     def CitationEntity(self) -> "CitationEntityAst":
         return CitationEntityAst(self)
+
+    @property
+    def DatasetTypeInput(self) -> "DatasetTypeInputAst":
+        return DatasetTypeInputAst(self)
 
 
 
@@ -78,7 +82,96 @@ class CitationEntityProperties:
 
     
 
+class DatasetTypeInputAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("DatasetTypeInput")
+        self._properties: typing.Set[str] = set([ "citation",  "text", ])
+        self._props = DatasetTypeInputProperties(self._bldr, self._properties)
 
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "DatasetTypeInputProperties":
+        return self._props
+
+
+class DatasetTypeInputViewer(DatasetTypeInputAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class DatasetTypeInputProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def citation(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("citation"))
+
+    @property
+    def text(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("text"))
+
+    
+
+
+
+class DatasetTypeAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.enum("DatasetType")
+        self._values: typing.Set[str] = set([ "PRIMARY",  "SECONDARY",  "NEITHER", ])
+        self._vals = DatasetTypeValues(self._bldr, self._values)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def values(self) -> "DatasetTypeValues":
+        return self._vals
+
+
+class DatasetTypeViewer(DatasetTypeAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    def list_values(self) -> typing.List[typing.Tuple[str, EnumValueViewer]]:
+        return [(name, EnumValueViewer(self._bldr.value(name))) for name in self._values]
+
+
+class DatasetTypeValues:
+    def __init__(self, enum_bldr: EnumBuilder, values: typing.Set[str]):
+        self.__bldr = enum_bldr
+        self.__values = values
+
+    
+
+    @property
+    def PRIMARY(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("PRIMARY"))
+    
+
+    @property
+    def SECONDARY(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("SECONDARY"))
+    
+
+    @property
+    def NEITHER(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("NEITHER"))
+    
+
+    
 
 
 __all__ = ["TypeBuilder"]

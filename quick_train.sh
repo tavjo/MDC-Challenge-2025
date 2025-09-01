@@ -23,7 +23,8 @@ echo "   - Input: Data/train/train_data.csv"
 echo "   - Output: artifacts/models"
 echo "   - Target: target"
 echo "   - Seed: 42"
-echo "   - Iterations: 200"
+echo "   - Iterations: 500"
+echo "   - No holdout"
 echo ""
 
 python src/training.py \
@@ -31,8 +32,8 @@ python src/training.py \
     --output_dir artifacts/models \
     --target_col target \
     --seed 42 \
-    --n_iter 200 \
-    --use_balanced_rf
+    --n_iter 500 \
+    --no_holdout
 
 if [[ $? -eq 0 ]]; then
     echo ""

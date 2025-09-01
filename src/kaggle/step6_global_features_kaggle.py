@@ -173,14 +173,34 @@ def run_global_umap(
         logger.info("Empty embeddings matrix; skipping global UMAP")
         return {}
     try:
+        # --- minimal stability for tiny N ---
+        n = int(X.shape[0])
+        safe_neighbors = min(n_neighbors, max(2, n - 1))
+        init_mode = "random" if n <= 5 else "spectral"
+
         reducer = umap.UMAP(
-            n_neighbors=n_neighbors,
+            n_neighbors=safe_neighbors,
             min_dist=min_dist,
             n_components=n_components,
             random_state=random_seed,
+            init=init_mode,
             verbose=False,
         )
-        Z = reducer.fit_transform(X)
+        try:
+            Z = reducer.fit_transform(X)
+        except TypeError as e:
+            # Retry with safest settings if the init path still trips (e.g., eigsh k>=N)
+            logger.warning("UMAP retry with init='random', n_neighbors=%d due to: %s", max(2, n - 1), e)
+            reducer = umap.UMAP(
+                n_neighbors=max(2, n - 1),
+                min_dist=min_dist,
+                n_components=n_components,
+                random_state=random_seed,
+                init="random",
+                verbose=False,
+            )
+            Z = reducer.fit_transform(X)
+
         logger.info(f"Global UMAP computed: X={X.shape} -> Z={Z.shape}")
     except Exception as e:
         logger.error("Global UMAP failed", exc_info=e)

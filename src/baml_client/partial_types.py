@@ -38,3 +38,7 @@ class StreamState(BaseModel, Generic[T]):
 class CitationEntity(BaseModel):
     evidence: List[str]
     data_citation: Optional[str] = None
+
+class DatasetTypeInput(BaseModel):
+    citation: Optional["CitationEntity"] = None
+    text: List[str]

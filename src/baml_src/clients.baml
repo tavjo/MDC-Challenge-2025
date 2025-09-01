@@ -12,7 +12,7 @@ client<llm> LocalQwen {
 
 client<llm> QwenLocal {
   provider "openai-generic"
-  retry_policy Constant
+  retry_policy Exponential
   options {
     base_url "http://127.0.0.1:8000/v1"
     model "qwen3-8b-awq-local"
@@ -52,7 +52,7 @@ retry_policy Constant {
 }
 
 retry_policy Exponential {
-  max_retries 2
+  max_retries 3
   // Strategy is optional
   strategy {
     type exponential_backoff

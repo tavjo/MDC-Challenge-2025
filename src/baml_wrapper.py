@@ -2,6 +2,7 @@ from typing import List, Any
 
 import sys
 from pathlib import Path
+import time
 
 # sys.path.append("/kaggle/input/baml-citation-extractor/src")
 # Allow importing sibling kaggle helpers/models when used as a standalone script
@@ -16,6 +17,7 @@ def extract_cites(doc: List[str]) -> List[Any]:
     Extract citation entities from the document text using the BAML client.
     """
     max_attempts = 3
+    base_delay_seconds = 60
     for attempt in range(max_attempts):
         try:
             citations = baml.ExtractCitation(doc)
@@ -23,3 +25,7 @@ def extract_cites(doc: List[str]) -> List[Any]:
         except Exception:
             if attempt == max_attempts - 1:
                 raise
+            # Exponential backoff: 0.5s, 1s, 2s, ...
+            time.sleep(base_delay_seconds * (2 ** attempt))
+
+
