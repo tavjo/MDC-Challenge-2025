@@ -1,15 +1,20 @@
 
+enum DatasetType {
+  PRIMARY @description("Raw or processed data generated as part of the paper, specifically for the study")
+  SECONDARY @description("Raw or processed data derived or reused from existing records or published data")
+}
 class CitationEntity {
     evidence string[] @description("List of evidence from document for the data citation")
+    dataset_type DatasetType @description("Type of dataset citation")
     data_citation string @description("Data citation from text")
-    // doc_id string? @description("DOI of the document where the data citation is found")
-    // pages int[]? @description("List of page numbers where the data citation is mentioned.")
 }
 
 // Create a function to extract the data citations from a list of strings.
 function ExtractCitation(document: string[]) -> CitationEntity[] {
   client QwenLocal
   prompt #"
+    /no_think
+
     You are a research assistant tasked with extracting dataset citations from a text. Extract ALL dataset citations from the document.
     The evidence should be the snippet of text from the document that contains the dataset citation.
 
@@ -22,8 +27,6 @@ function ExtractCitation(document: string[]) -> CitationEntity[] {
     Never make up a data citation. If you cannot find a data citation, return an empty list.
 
     IMPORTANT: Return each accession number or dataset repository DOI as separate data citations.
-
-    Accession numbers are sometimes grouped together to form a range. For example, JX312727-JX312730 (example accession range). Report each accession number in the range as a separate data citation object. 
 
     {{ ctx.output_format }}
 

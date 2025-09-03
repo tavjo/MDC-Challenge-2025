@@ -1,8 +1,4 @@
-enum DatasetType {
-  PRIMARY @description("Raw or processed data generated as part of the paper, specifically for the study")
-  SECONDARY @description("Raw or processed data derived or reused from existing records or published data")
-  NEITHER @description("Not a data citation")
-}
+
 
 test classify_dataset_type_prjna {
   functions [ClassifyDatasetType]

@@ -113,15 +113,40 @@ def create_chunks_summary_df(chunks: List[Chunk], export: bool = True, output_pa
     return summary_df 
 
 @timer_wrap
-def chunk_documents(chunk_size: int = 300, overlap: int = 30, db_path: str | None = None, output_dir: str = "kaggle/temp") -> List[Chunk]:
+def chunk_documents(
+    chunk_size: int = 300,
+    overlap: int = 30,
+    db_path: str | None = None,
+    output_dir: str = "kaggle/temp",
+    max_workers: int = 8,
+) -> List[Chunk]:
     db_helper = get_duckdb_helper(db_path)
     documents = db_helper.get_all_documents()
-    chunks = []
-    for doc in documents: # TODO: implement optional parallel processing
-        chunks.extend(create_chunks_from_document(doc, chunk_size, overlap)) # TODO: implement optional parallel processing
+
+    chunks: List[Chunk] = []
+
+    if len(documents) > 0:
+        workers = min(max_workers, len(documents))
+        logger.info("Using CPU ThreadPool with %d workers for chunking", workers)
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = {ex.submit(create_chunks_from_document, d, chunk_size, overlap): d for d in documents}
+            for f in as_completed(futs):
+                try:
+                    result = f.result()
+                    if result:
+                        chunks.extend(result)
+                except Exception as e:
+                    logger.error("Thread worker exception during chunking: %s", e)
+    else:
+        logger.info("No documents found to chunk.")
+
+    # DB operations must be sequential
     db_helper.bulk_insert_chunks(chunks)
     db_helper.close()
-    # generate summary csv
+
+    # generate summary parquet
     filename = os.path.join(output_dir, "chunks_for_embedding_summary.parquet")
     create_chunks_summary_df(chunks, export=True, output_path=filename)
     return chunks

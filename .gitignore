@@ -161,3 +161,4 @@ deprecated/
 wheels-extras/
 tiktoken_cache/
 *.skops
+artifacts/

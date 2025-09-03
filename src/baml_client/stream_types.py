@@ -12,49 +12,27 @@
 
 import typing
 import typing_extensions
-from enum import Enum
-
-
 from pydantic import BaseModel, ConfigDict
-
 
 import baml_py
 
-CheckT = typing_extensions.TypeVar('CheckT')
-CheckName = typing_extensions.TypeVar('CheckName', bound=str)
+from . import types
 
-class Check(BaseModel):
-    name: str
-    expression: str
-    status: str
-class Checked(BaseModel, typing.Generic[CheckT, CheckName]):
-    value: CheckT
-    checks: typing.Dict[CheckName, Check]
-
-def get_checks(checks: typing.Dict[CheckName, Check]) -> typing.List[Check]:
-    return list(checks.values())
-
-def all_succeeded(checks: typing.Dict[CheckName, Check]) -> bool:
-    return all(check.status == "succeeded" for check in get_checks(checks))
-# #########################################################################
-# Generated enums (1)
-# #########################################################################
-
-class DatasetType(str, Enum):
-    PRIMARY = "PRIMARY"
-    SECONDARY = "SECONDARY"
-
+StreamStateValueT = typing.TypeVar('StreamStateValueT')
+class StreamState(BaseModel, typing.Generic[StreamStateValueT]):
+    value: StreamStateValueT
+    state: typing_extensions.Literal["Pending", "Incomplete", "Complete"]
 # #########################################################################
 # Generated classes (2)
 # #########################################################################
 
 class CitationEntity(BaseModel):
     evidence: typing.List[str]
-    dataset_type: DatasetType
-    data_citation: str
+    dataset_type: typing.Optional[types.DatasetType] = None
+    data_citation: typing.Optional[str] = None
 
 class DatasetTypeInput(BaseModel):
-    citation: "CitationEntity"
+    citation: typing.Optional["CitationEntity"] = None
     text: typing.List[str]
 
 # #########################################################################

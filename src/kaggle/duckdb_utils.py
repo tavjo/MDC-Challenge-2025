@@ -72,6 +72,7 @@ class KaggleDuckDBHelper:
                 document_id   VARCHAR NOT NULL,
                 pages         INTEGER[],
                 evidence      VARCHAR[],
+                dataset_type  VARCHAR,
                 created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (data_citation, document_id)
             );
@@ -194,6 +195,12 @@ class KaggleDuckDBHelper:
             )
         finally:
             e.unregister("chunks_buffer")
+    
+    def get_all_chunks(self) -> List[Chunk]:
+        res = self.engine.execute("SELECT * FROM chunks")
+        rows = res.fetchall()
+        cols = [d[0] for d in res.description]
+        return [Chunk.from_duckdb_row(dict(zip(cols, r))) for r in rows]
 
     def get_chunks_by_document(self, document_id: str) -> List[Chunk]:
         res = self.engine.execute("SELECT * FROM chunks WHERE document_id = ?", [document_id])
@@ -365,6 +372,7 @@ class KaggleDuckDBHelper:
                     "document_id": ce["document_id"],
                     "pages": ce.get("pages"),
                     "evidence": ce.get("evidence"),
+                    "dataset_type": ce.get("dataset_type"),
                 }
             records.append(row)
         df = pa.Table.from_pylist(records)
@@ -374,8 +382,8 @@ class KaggleDuckDBHelper:
             e.execute(
                 """
                 INSERT OR REPLACE INTO citations 
-                (data_citation, document_id, pages, evidence, created_at)
-                SELECT data_citation, document_id, pages, evidence, CURRENT_TIMESTAMP
+                (data_citation, document_id, pages, evidence, dataset_type, created_at)
+                SELECT data_citation, document_id, pages, evidence, dataset_type, CURRENT_TIMESTAMP
                 FROM citations_buffer
                 """
             )

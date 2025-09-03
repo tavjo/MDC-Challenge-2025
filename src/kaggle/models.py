@@ -1,6 +1,7 @@
 # pydantic models
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Literal, Any, Union
+from enum import Enum
 from datetime import datetime
 
 
@@ -71,11 +72,16 @@ class BoostConfig(BaseModel):
         description="Weights for combining retrieval signals in hybrid scoring.",
     )
 
+class DatasetType(str, Enum):
+    PRIMARY = "PRIMARY"
+    SECONDARY = "SECONDARY"
+
 class CitationEntity(BaseModel):
     data_citation: str = Field(..., description="Data citation from text")
     document_id: str = Field(..., description="DOI of the document where the data citation is found")
     pages: Optional[List[int]] = Field(None, description="List of page numbers where the data citation is mentioned.")
     evidence: Optional[List[str]] = Field(None, description="List of evidence from the text for the data citation")
+    dataset_type: Optional[DatasetType] = Field(None, description="Type of dataset citation")
 
     def to_string(self) -> str:
         """
@@ -83,29 +89,33 @@ class CitationEntity(BaseModel):
         """
         pages_str = ",".join(map(str, self.pages)) if self.pages else ""
         evidence_str = ",".join(self.evidence) if self.evidence else ""
-        return f"{self.data_citation}|{self.document_id}|{pages_str}|{evidence_str}"
+        ds = (
+            self.dataset_type.value if isinstance(self.dataset_type, Enum) else self.dataset_type
+        ) if self.dataset_type else ""
+        return f"{self.data_citation}|{self.document_id}|{pages_str}|{evidence_str}|{ds}"
 
     @classmethod
     def from_string(cls, citation_entity_str: str) -> "CitationEntity":
         """
         Rehydrate the citation entity from a string.
         """
-        parts = citation_entity_str.split("|", 3)
-        data_citation, document_id, pages_str, evidence_str = (
-            parts[0],
-            parts[1],
-            parts[2] if len(parts) > 2 else "",
-            parts[3] if len(parts) > 3 else "",
-        )
+        parts = citation_entity_str.split("|")
+        data_citation = parts[0] if len(parts) > 0 else ""
+        document_id = parts[1] if len(parts) > 1 else ""
+        pages_str = parts[2] if len(parts) > 2 else ""
+        evidence_str = parts[3] if len(parts) > 3 else ""
+        ds_str = parts[4] if len(parts) > 4 else None
 
         pages = [int(p) for p in pages_str.split(",") if p] if pages_str else None
         evidence = evidence_str.split(",") if evidence_str else None
+        ds_val = None if not ds_str else ds_str
 
         return cls(
             data_citation=data_citation,
             document_id=document_id,
             pages=pages,
             evidence=evidence,
+            dataset_type=ds_val,
         )
     
     def to_duckdb_row(self) -> Dict[str, Any]:
@@ -117,6 +127,9 @@ class CitationEntity(BaseModel):
             "document_id": self.document_id,
             "pages": self.pages,
             "evidence": self.evidence,
+            "dataset_type": (
+                self.dataset_type.value if isinstance(self.dataset_type, Enum) else self.dataset_type
+            ) if self.dataset_type else None,
         }
     
     @classmethod
@@ -124,11 +137,14 @@ class CitationEntity(BaseModel):
         """
         Imports the citation entity from a DuckDB row.
         """
+        ds = row.get("dataset_type")
+        ds_val = None if ds in (None, "") else ds
         return cls(
             data_citation=row["data_citation"],
             document_id=row["document_id"],
             pages=row["pages"],
-            evidence=row["evidence"]
+            evidence=row["evidence"],
+            dataset_type=ds_val,
         )
 
 class ChunkMetadata(BaseModel):

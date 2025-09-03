@@ -24,7 +24,7 @@ from baml_wrapper import extract_cites
 THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
-from models import CitationEntity
+from models import CitationEntity, DatasetType
 
 
 def initialize_logging(filename:str= "kaggle-mdc") -> logging.Logger:
@@ -247,12 +247,10 @@ def extract_entities_baml(doc: List[str], doc_id: str) -> List[CitationEntity]:
     logger.info(f"Extracting citation entities using BAML client for {doc_id}.")
     citations = extract_cites(doc)
     if citations:
-        entities = [{
-            "data_citation": entity.data_citation,
-            "document_id": doc_id,
-            "evidence": entity.evidence,
-        } for entity in citations]
-        citation_entities = [CitationEntity.model_validate(entity) for entity in entities]
+        citation_entities = [
+            CitationEntity.model_validate({**entity.model_dump(mode="json"), "document_id": doc_id})
+            for entity in citations
+        ]
         return citation_entities
     else:
         logger.warning("No citation entities found using BAML client.")

@@ -7,12 +7,12 @@ During inference, since there will be no train_labels.csv, we will create anothe
 This script is currently only meant to operate on PDF files.
 """
 
-# import re
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict, Set
 from pathlib import Path
 import pandas as pd
 import numpy as np
 import os
+import json
 
 
 from pathlib import Path
@@ -23,16 +23,9 @@ THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
-# try:
-#     from src.kaggle.helpers import timer_wrap, initialize_logging, extract_entities_baml
-#     from src.kaggle.models import CitationEntity, Document, Chunk
-#     from src.kaggle.duckdb_utils import get_duckdb_helper
-#     from src.kaggle.get_citation_context import run_hybrid_retrieval_on_document
-# except Exception:
 from helpers import timer_wrap, initialize_logging, extract_entities_baml
-from models import CitationEntity, Document, Chunk, BoostConfig
+from models import CitationEntity, Chunk
 from duckdb_utils import get_duckdb_helper
-from get_citation_context import run_hybrid_retrieval_on_document
 
 
 logger = initialize_logging()
@@ -50,120 +43,159 @@ ds_prototypes = "/kaggle/input/rf-model-metadata-files/prototypes.pkl"
 class UnknownCitationEntityExtractor:
     def __init__(self, 
                  model,
-                 draw_subset: bool = False,
-                 subset_size: Optional[int] = None,
                  db_path: str = DEFAULT_DUCKDB,
-                 globals_path: Optional[str] = global_prototypes,
-                 prototypes: Optional[pd.DataFrame] = None,
-                 k: int = 15,
-                 max_workers: int = 8,
-                 boost_cfg: BoostConfig = BoostConfig()
-                 ):  # Add this parameter
-        logger.info(f"Initializing CitationEntityExtractor")
+                 top_ids_path: str = os.path.join(artifacts, "top_ids.json")):
+        logger.info(f"Initializing CitationEntityExtractor (JSON-driven)")
         self.db_path = db_path
         self.citation_entities: List[CitationEntity] = []
-        self.docs = self._load_doc_pages()
-        self.k = k
-        self.max_workers = max_workers
-        self.globals_path = globals_path
         self.model = model
-        self.prototypes = prototypes
-        # Subset logic removed; keep args for compatibility
-        self.boost_cfg = boost_cfg
+        self.top_ids_path = top_ids_path
+        # Loaded state
+        self.triplets: List[Tuple[Optional[str], str, Optional[str]]] = []
+        self.chunks_by_id: Dict[str, Chunk] = {}
     
 
-    def _load_doc_pages(self) -> List[Document]:
+    # Removed: per-doc loading; now JSON-driven
+    
+    # Removed: prototype/global embedding loading; not needed in this step
+    
+    def _retrieve_context(self) -> List[Chunk]:
         """
-        load all document pages into memory once.
+        Load triples from JSON, then fetch all unique chunks referenced by any triple.
+        Persists raw triples into self.triplets.
         """
+        if not os.path.exists(self.top_ids_path):
+            raise FileNotFoundError(f"top_ids JSON not found at {self.top_ids_path}")
+        with open(self.top_ids_path, "r") as f:
+            triples = json.load(f)
+        # Expect list of [pre_id, anchor_id, post_id] with possible nulls
+        # Normalize to Optional[str]
+        norm_triples: List[Tuple[Optional[str], str, Optional[str]]] = []
+        all_ids: Set[str] = set()
+        for t in triples:
+            if not isinstance(t, (list, tuple)) or len(t) != 3:
+                continue
+            pre, anchor, post = t[0], t[1], t[2]
+            pre_id = pre if isinstance(pre, str) and pre else None
+            anchor_id = anchor if isinstance(anchor, str) and anchor else None
+            post_id = post if isinstance(post, str) and post else None
+            if not anchor_id:
+                continue
+            norm_triples.append((pre_id, anchor_id, post_id))
+            all_ids.add(anchor_id)
+            if pre_id:
+                all_ids.add(pre_id)
+            if post_id:
+                all_ids.add(post_id)
+
+        self.triplets = norm_triples
+        if not all_ids:
+            return []
+
         db_helper = get_duckdb_helper(self.db_path)
-        docs = db_helper.get_all_documents()
+        chunks = db_helper.get_chunks_by_chunk_ids(list(all_ids))
         db_helper.close()
-        return docs
-    
-    def _load_query_embeddings(self) -> pd.DataFrame:
-        """
-        Load query embeddings from a pickle file
-        """
-        if not self.globals_path:
-            return pd.DataFrame()
-        # Ensure .parquet extension
-        gp = self.globals_path
-        if gp.endswith(".pkl"):
-            gp = gp[:-4] + ".parquet"
-        globals_df = pd.read_parquet(gp)
-        if globals_df is not None and not globals_df.empty:
-            globals_df = globals_df.T
-        # also load the ds_prototypes assuming a sister .parquet file
-        ds_prototypes_path = gp.replace("feature_decomposition.parquet", "prototypes.parquet")
-        ds_prototypes = None
-        if os.path.exists(ds_prototypes_path):
-            tmp = pd.read_parquet(ds_prototypes_path)
-            if tmp is not None and not tmp.empty:
-                ds_prototypes = tmp
-        # combined the two dataframes
-        if ds_prototypes is not None and not ds_prototypes.empty:
-            combined = pd.concat([globals_df, ds_prototypes])
-        else:
-            combined = globals_df
-        return combined if combined is not None else pd.DataFrame()
-    
-    def _retrieve_context(self, doc_id: str) -> List[Chunk]:
-        """
-        Retrieve relevant context from documents using the hybrid retrieval model.
-        """
-        # Determine prototypes safely across None/DataFrame cases
-        prototypes = None
-        if isinstance(self.prototypes, pd.DataFrame) and not self.prototypes.empty:
-            prototypes = self.prototypes
-        elif (self.prototypes is None or (isinstance(self.prototypes, pd.DataFrame) and self.prototypes.empty)) and self.globals_path is not None:
-            try:
-                prototypes = self._load_query_embeddings()
-            except Exception:
-                prototypes = None
-        else:
-            prototypes = None
-        myres = run_hybrid_retrieval_on_document(doc_id = doc_id, 
-                                                model = self.model, 
-                                                top_k = self.k,
-                                                prototypes=prototypes,
-                                                db_path=self.db_path,
-                                                boost_cfg=self.boost_cfg,
-                                                # prototype_top_m = 3
-                                                )
-        cids = [cid for cid, pre in myres]
-        return self._get_top_chunks(cids)
-    
-    def _get_top_chunks(self, chunk_ids: List[str]) -> List[Chunk]:
-        """
-        Retrieve top chunks by chunk IDs
-        """
-        db_helper = get_duckdb_helper(self.db_path)
-        chunks = db_helper.get_chunks_by_chunk_ids(chunk_ids)
-        db_helper.close()
+        self.chunks_by_id = {c.chunk_id: c for c in chunks}
         return chunks
 
+    # Removed: helper; retrieval now loads chunks directly
+
+    # Simplified: just call _retrieve_context once
     def retrieve_context(self) -> List[Chunk]:
-        """
-        Retrieve context from all documents using the hybrid retrieval model.
-        """
-        chunks = []
-        for doc in self.docs:
-            chunks.extend(self._retrieve_context(doc_id = doc.doi))
-        return chunks
+        return self._retrieve_context()
     
     def bulk_baml_extraction(self) -> List[CitationEntity]:
         """
-        Extract citations from all documents using the BAML client.
+        Group loaded triples by document, merge overlapping triples (>=2 shared IDs),
+        ensure merged group token budget <= 1000, then call BAML per group.
         """
         chunks = self.retrieve_context()
-        doc_ids = [ck.document_id for ck in chunks]
-        doc_ids = list(set(doc_ids))
-        doc_chunk_texts = {}
-        for doc_id in doc_ids:
-            doc_chunk_texts[doc_id] = [ck.text for ck in chunks if ck.document_id == doc_id]
-        for doc, text in doc_chunk_texts.items():
-            cites = extract_entities_baml(text, doc)
+        if not chunks:
+            return []
+
+        # Build per-doc map of triples
+        triples_by_doc: Dict[str, List[Tuple[Optional[str], str, Optional[str]]]] = {}
+        for pre_id, anchor_id, post_id in self.triplets:
+            anchor_chunk = self.chunks_by_id.get(anchor_id)
+            if anchor_chunk is None:
+                continue
+            doc_id = anchor_chunk.document_id
+            triples_by_doc.setdefault(doc_id, []).append((pre_id, anchor_id, post_id))
+
+        # Helper to compute token sum for a set of chunk IDs
+        def token_sum_for(ids: Set[str]) -> int:
+            total = 0
+            for cid in ids:
+                ch = self.chunks_by_id.get(cid)
+                if ch is not None and getattr(ch, "chunk_metadata", None) is not None:
+                    total += int(getattr(ch.chunk_metadata, "token_count", 0) or 0)
+            return total
+
+        # Merge triples that share >=2 chunk_ids
+        def merge_triples(triples: List[Tuple[Optional[str], str, Optional[str]]]) -> List[List[str]]:
+            groups: List[Set[str]] = []
+            for pre_id, anchor_id, post_id in triples:
+                ids = {x for x in [pre_id, anchor_id, post_id] if isinstance(x, str) and x}
+                if not ids:
+                    continue
+                merged = False
+                for g in groups:
+                    if len(g.intersection(ids)) >= 2:
+                        g.update(ids)
+                        merged = True
+                        break
+                if not merged:
+                    groups.append(set(ids))
+            return [sorted(list(g)) for g in groups]
+
+        # For each doc, merge and enforce 1000-token budget
+        for doc_id, triples in triples_by_doc.items():
+            merged_groups = merge_triples(triples)
+            for group_ids in merged_groups:
+                # Enforce 1000 token budget by dropping lowest-priority neighbors first
+                # Priority: keep anchors (those that appear as anchors in any triple) then neighbors
+                group_set: Set[str] = set(group_ids)
+                anchors_in_group: Set[str] = {a for (_, a, _) in triples if a in group_set}
+                neighbors_in_group: List[str] = [cid for cid in group_ids if cid not in anchors_in_group]
+
+                # If over budget, drop neighbors first (stable order), then anchors last if necessary
+                while token_sum_for(group_set) > 1000 and neighbors_in_group:
+                    drop_id = neighbors_in_group.pop()
+                    if drop_id in group_set:
+                        group_set.remove(drop_id)
+                while token_sum_for(group_set) > 1000 and anchors_in_group:
+                    # Drop the last added anchor (least likely top-ranked)
+                    drop_id = None
+                    for cid in reversed(group_ids):
+                        if cid in anchors_in_group:
+                            drop_id = cid
+                            break
+                    if drop_id is None:
+                        break
+                    anchors_in_group.remove(drop_id)
+                    if drop_id in group_set:
+                        group_set.remove(drop_id)
+
+                # Build ordered texts (anchor-first order where possible)
+                ordered_ids: List[str] = []
+                # Prefer anchor order from original triples, then any remaining neighbors
+                seen: Set[str] = set()
+                for _, a, _ in triples:
+                    if a in group_set and a not in seen:
+                        ordered_ids.append(a)
+                        seen.add(a)
+                for cid in group_ids:
+                    if cid in group_set and cid not in seen:
+                        ordered_ids.append(cid)
+                        seen.add(cid)
+                texts: List[str] = []
+                for cid in ordered_ids:
+                    ch = self.chunks_by_id.get(cid)
+                    if ch is not None:
+                        texts.append(ch.text)
+                if not texts:
+                    continue
+                cites = extract_entities_baml(texts, doc_id)
             self.citation_entities.extend(cites)
         return self.citation_entities
     

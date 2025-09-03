@@ -38,4 +38,6 @@ dependencies = [
     "pymupdf>=1.24.10",
     "pdfminer.six>=20231228",
     "skops>=0.13.0",
+    "lightgbm>=4.6.0",
+    "xgboost>=3.0.4",
 ]

@@ -15,21 +15,24 @@ client<llm> QwenLocal {
   retry_policy Exponential
   options {
     base_url "http://127.0.0.1:8000/v1"
-    model "qwen3-8b-awq-local"
+    model "qwen3-8b-local"
     default_role "user" // vLLM-specific quirk
     temperature 0.0
+    // chat_template_kwargs { "enable_thinking" false }
+    top_p 1.0
+    logprobs null
   }
 }
 
-// client<llm> MyClient {
-//   provider "openai"
-//   retry_policy Constant
-//   options {
-//     api_key env.OPENAI_API_KEY
-//     model "gpt-4.1-nano-2025-04-14"
-//     temperature 0.0
-//   }
-// }
+client<llm> MyClient {
+  provider "openai"
+  retry_policy Constant
+  options {
+    api_key env.OPENAI_API_KEY
+    model "gpt-4.1-nano-2025-04-14"
+    temperature 0.0
+  }
+}
 
 
 // https://docs.boundaryml.com/docs/snippets/clients/fallback

@@ -363,13 +363,13 @@ DATA_CITATION_KEYWORDS: Dict[str, List[str]] = {
 }
 
 _CATEGORY_WEIGHTS: Dict[str, float] = {
-    "access_verbs": 0.10,
-    "repositories": 0.25,
-    "identifiers": 0.10,
-    "data_terms": 0.05,
+    "access_verbs": 0.15,
+    "repositories": 0.20,
+    "identifiers": 0.15,
+    "data_terms": 0.10,
 }
 
-_TEXT_BOOST_CAP: float = 0.50
+_TEXT_BOOST_CAP: float = 0.70
 _PROTOTYPE_PRESENCE_BOOST: float = 0.50
 
 
@@ -570,7 +570,9 @@ def hybrid_retrieve_with_boost(
     id_to_text: Dict[str, str],
     boost_cfg: PydBoostConfig = PydBoostConfig(),
     prototypes=None,  # Prototypes | np.ndarray of centroids [P, D] | None
-) -> List[str]:
+    return_scores: bool = False,
+    return_score: Optional[bool] = None,
+) -> List[str] | Tuple[List[str], Dict[str, float]]:
     """Prototype-first hybrid retrieval with bounded priors and RRF/MMR fusion.
 
     Returns: final ranked list of chunk_ids.
@@ -683,6 +685,14 @@ def hybrid_retrieve_with_boost(
     pool_rank = [candidate_ids[i] for i in order]
     pool_rank = [cid for cid in pool_rank if cid in id_to_dense]
 
+    # Build fused score map aligned to candidate_ids
+    fused_score_map: Dict[str, float] = {cid: float(final_score[i]) for i, cid in enumerate(candidate_ids)}
+
+    # Opt-in: return ranking by fused score along with fused scores
+    if return_scores or (return_score is True):
+        # Return the fused-score order (pool_rank) and the fused score map
+        return pool_rank, fused_score_map
+
     final_ids = mmr_rerank(
         candidate_ids=pool_rank,
         query_vec=dense_query_vec,
@@ -690,6 +700,7 @@ def hybrid_retrieve_with_boost(
         lambda_diversity=boost_cfg.mmr_lambda,
         top_k=boost_cfg.mmr_top_k,
     )
+
     return final_ids
 
 # ===============================================
@@ -705,7 +716,8 @@ def retrieval_with_boost(
     id_to_text: Dict[str, str],
     boost_cfg: PydBoostConfig = PydBoostConfig(),
     prototypes=None,  # Prototypes | np.ndarray of centroids [P, D] | None
-) -> List[str]:
+    return_scores: bool = False,
+) -> List[str] | Tuple[List[str], Dict[str, float]]:
     """Simplified retrieval: dense similarity + keyword boosts (+ optional prototype presence boost).
 
     - Computes cosine similarity of each chunk embedding to the query embedding
@@ -763,4 +775,8 @@ def retrieval_with_boost(
     k = int(getattr(boost_cfg, "mmr_top_k", 15))
     k = max(1, min(k, len(ordered_ids)))
     top_ids = [ordered_ids[i] for i in order[:k]]
+    # If caller requests scores, return (ids, score_map) matching the hybrid signature
+    if return_scores:
+        score_map: Dict[str, float] = {ordered_ids[i]: float(final_score[i]) for i in order[:k]}
+        return top_ids, score_map
     return top_ids

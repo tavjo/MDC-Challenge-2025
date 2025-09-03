@@ -301,7 +301,7 @@ def construct_datasets_pipeline(
                         mmr_top_k=top_k,
                         prototype_top_m=int(max(1, boost_cfg.prototype_top_m))
                     ),
-                    prototypes=prototypes_input,
+                    prototypes=prototypes_input
                 )
             except Exception as e:
                 logger.warning(f"Retrieval failed for dataset_id={dataset_id}", exc_info=e)
