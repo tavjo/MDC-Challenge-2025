@@ -26,7 +26,7 @@ class DatasetTypeInput {
 }
 
 function ClassifyDatasetType(input: DatasetTypeInput) -> DatasetType {
-  client QwenLocal
+  client QwenLocalRR
   prompt #"
     Determine whether the provided data citation is PRIMARY, SECONDARY, or NEITHER.
     Definitions:

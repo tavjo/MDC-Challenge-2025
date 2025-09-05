@@ -162,3 +162,6 @@ wheels-extras/
 tiktoken_cache/
 *.skops
 artifacts/
+new_prototypes.parquet
+prototypes.parquet
+guides/

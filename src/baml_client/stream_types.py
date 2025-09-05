@@ -28,8 +28,8 @@ class StreamState(BaseModel, typing.Generic[StreamStateValueT]):
 
 class CitationEntity(BaseModel):
     evidence: typing.List[str]
-    dataset_type: typing.Optional[types.DatasetType] = None
     data_citation: typing.Optional[str] = None
+    dataset_type: typing.Optional[types.DatasetType] = None
 
 class DatasetTypeInput(BaseModel):
     citation: typing.Optional["CitationEntity"] = None

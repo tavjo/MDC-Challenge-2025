@@ -50,8 +50,8 @@ class DatasetType(str, Enum):
 
 class CitationEntity(BaseModel):
     evidence: typing.List[str]
-    dataset_type: DatasetType
     data_citation: str
+    dataset_type: DatasetType
 
 class DatasetTypeInput(BaseModel):
     citation: "CitationEntity"

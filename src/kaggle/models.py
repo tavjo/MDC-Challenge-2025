@@ -146,6 +146,18 @@ class CitationEntity(BaseModel):
             evidence=row["evidence"],
             dataset_type=ds_val,
         )
+    
+    def to_subsmission_row(self) -> Dict[str, Any]:
+        """
+        Convert the citation entity to a pandas DataFrame for submission.
+        Should include columns: "article_id", "dataset_id", "type"
+        """
+        return {
+            "article_id": self.document_id,
+            "dataset_id": self.data_citation,
+            "type": self.dataset_type.value if isinstance(self.dataset_type, Enum) else self.dataset_type,
+        }
+
 
 class ChunkMetadata(BaseModel):
     chunk_id: str

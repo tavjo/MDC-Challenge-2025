@@ -5,44 +5,33 @@ enum DatasetType {
 }
 class CitationEntity {
     evidence string[] @description("List of evidence from document for the data citation")
+    data_citation string @description("Data citation from text (Data repository DOI or accession number. Examples data DOI: https://doi.org/10.5061/dryad.4dj6042. Example accession number: JX312727)")
     dataset_type DatasetType @description("Type of dataset citation")
-    data_citation string @description("Data citation from text (Data repository DOI or accession number. DO NOT INCLUDE ANYTHING ELSE.)")
 }
 
 // Create a function to extract the data citations from a list of strings.
 function ExtractCitation(document: string[]) -> CitationEntity[] {
-  client QwenLocal
+  client QwenLocalRR
   prompt #"
+    /no_think
 
     You are a research assistant tasked with extracting dataset citations from a text. Extract ALL dataset citations from the document.
-    The evidence should be the snippet of text from the document that contains the dataset citation.
+    The evidence should be the snippet of text from the document that contains the dataset citation. DO NOT return article DOIs, empty strings or anything that is not a data citation.
 
-    Use context provided in the document to determine if a citation is a data citation such as "Dataset deposited in ...", "Data retrieved from ...", "Data accessed from ...","Data available " etc.
+    Use context provided in the document to determine if a citation is a data citation such as "Dataset deposited in ...", "Data retrieved from ...", "Data accessed from ...","Data available in ..." etc.
     
     Report dataset citations EXACTLY as they appear in the text but do not include the surrounding text itself. Don't add the reporsitory name unless it already a part of the data citation. 
     
-    Return only dataset repository DOIs (Dryad, Zenodo, Figshare, PANGAEA, etc.) and accession IDs (GEO/SRA/ENA/GenBank/PRJNA/PRJEB/PXD/E-* etc.). Do NOT return article/preprint/journal DOIs (e.g., bioRxiv/medRxiv, publisher DOIs). Examine context surrounding DOIs to judge whether they are data citations or not.
+    Return only dataset repository DOIs (Dryad, Zenodo, Figshare, PANGAEA, etc.) and accession IDs (GEO/SRA/ENA/GenBank/PRJNA/PRJEB/PXD/E-* etc.). Do NOT return article/preprint/journal DOIs (e.g., bioRxiv/medRxiv, publisher DOIs). Examine context surrounding DOIs to judge whether they are data citations or not. Example data citation DOI:  (example data citation DOI).
 
     Never make up a data citation. If you cannot find a data citation, return an empty list.
 
-    When accession numbers are grouped together to form a range such as in this example: JX312727-JX312728 (example accession range), you must report each accession number in the range as a separate CitationEntity:
-
-    Example:
-    [
-    {
-      "evidence": ["Data deposited in GenBank under accessions JX312727-JX312728."],
-      "dataset_type": "PRIMARY",
-      "data_citation": "JX312727",
-    },
-    {
-      "evidence": ["Data deposited in GenBank under accessions JX312727-JX312728."],
-      "dataset_type": "PRIMARY",
-      "data_citation": "JX312728",
-    },
-    ]
+    When accession numbers are grouped together to form a range such as in this example: JX312727-JX312728 (example accession range), you must report each accession number in the range as a separate data citation.
     IMPORTANT: Return each accession number or dataset repository DOI as separate data citations.
 
     DO NOT RETURN ANYTHING THAT IS NOT A DATA CITATION (i.e. accession number or repository DOI). 
+
+    NEVER return article/preprint/journal DOIs (e.g., bioRxiv/medRxiv, publisher DOIs). Examine context surrounding DOIs to judge whether they are data citations or not.
 
     {{ ctx.output_format }}
 

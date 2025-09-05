@@ -12,20 +12,19 @@ if str(THIS_DIR) not in sys.path:
 
 from baml_client import b as baml
 
-def extract_cites(doc: List[str]) -> List[Any]:
+def extract_cites(chunk_group: List[str]) -> List[Any]:
     """
-    Extract citation entities from the document text using the BAML client.
+    Call BAML once on a small list of chunk texts (e.g., up to 3).
+    Returns a list[CitationEntity] for that group.
     """
-    max_attempts = 3
-    base_delay_seconds = 60
+    max_attempts = 2
+    delay = 0.5
     for attempt in range(max_attempts):
         try:
-            citations = baml.ExtractCitation(doc)
-            return citations
+            return baml.ExtractCitation(chunk_group)
         except Exception:
             if attempt == max_attempts - 1:
                 raise
-            # Exponential backoff: 0.5s, 1s, 2s, ...
-            time.sleep(base_delay_seconds * (2 ** attempt))
+            time.sleep(delay * (2 ** attempt))
 
 

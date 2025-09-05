@@ -174,7 +174,9 @@ def build_dataset_embeddings(datasets: List[Dataset], model, out_path: str = DEF
 @timer_wrap
 def get_query_texts(data_citation: CitationEntity, db_helper):
     """
-    Get the query text for a given dataset ID
+    Build query text and target chunk_ids for a given dataset ID.
+    Now supports multiple target chunks (anchor + neighbors already attached upstream),
+    so no neighbor fetching is required here.
     """
     ce = data_citation
     logger.info(f"Building query text for dataset_id={ce.data_citation} in document_id={ce.document_id}")
@@ -184,33 +186,25 @@ def get_query_texts(data_citation: CitationEntity, db_helper):
     except Exception as e:
         logger.error(f"Failed to retrieve chunks for document {ce.document_id}", exc_info=e)
         return "", []
-    # Find the chunk containing this dataset citation
-    target = None
+    # Collect all chunks in this document that carry this data_citation
+    targets = []
     for c in chunks:
         ents = c.chunk_metadata.citation_entities or []
         if any(ent.data_citation == ce.data_citation for ent in ents):
-            target = c
-            break
-    if not target:
+            targets.append(c)
+    if not targets:
         logger.warning(f"No chunk found for citation {ce.data_citation} in document {ce.document_id}")
         return "", []
 
-    # Fetch neighbor chunks
-    neighbor_ids = [cid for cid in (
-        target.chunk_metadata.previous_chunk_id,
-        target.chunk_metadata.next_chunk_id
-    ) if cid]
-    # neighbors = db_helper.get_chunks_by_chunk_ids(neighbor_ids)
-    # get neighboring chunks from chunks that are in the same document --> no need to get from DB
-    neighbors = [c for c in chunks if c.chunk_id in neighbor_ids]
-    query_chunk_ids = neighbor_ids + [target.chunk_id]
-    # Construct the query string
-    if len(neighbors) > 0:
-        parts = [target.text] + [n.text for n in neighbors]
-    else:
-        parts = [target.text]
-    query_text = " ".join(parts)
-    logger.debug(f"Query text length: {len(query_text)}; neighbor_ids={neighbor_ids}")
+    # Deterministic ordering: by numeric suffix of chunk_id when available
+    def _suffix(cid: str) -> int:
+        m = re.search(r"_(\d+)$", cid)
+        return int(m.group(1)) if m else 10**9
+
+    targets_sorted = sorted(targets, key=lambda x: _suffix(x.chunk_id))
+    query_chunk_ids = [c.chunk_id for c in targets_sorted]
+    query_text = " ".join([c.text for c in targets_sorted])
+    logger.debug(f"Query text length: {len(query_text)}; targets={len(query_chunk_ids)}")
     return query_text, query_chunk_ids
 
 @timer_wrap

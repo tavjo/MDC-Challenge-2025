@@ -18,9 +18,7 @@ import re
 from functools import lru_cache
 
 
-baml_wrapper = '/kaggle/input/baml-components/src/baml_wrapper'
-sys.path.append(str(Path(baml_wrapper).parent))
-from baml_wrapper import extract_cites
+
 THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
@@ -239,22 +237,6 @@ def embed_texts(model, texts: List[str], batch_size: int = 64) -> np.ndarray:
         show_progress_bar=True,
     )
     return emb
-
-def extract_entities_baml(doc: List[str], doc_id: str) -> List[CitationEntity]:
-    """
-    Extract citation entities from the document text using the BAML client.
-    """
-    logger.info(f"Extracting citation entities using BAML client for {doc_id}.")
-    citations = extract_cites(doc)
-    if citations:
-        citation_entities = [
-            CitationEntity.model_validate({**entity.model_dump(mode="json"), "document_id": doc_id})
-            for entity in citations
-        ]
-        return citation_entities
-    else:
-        logger.warning("No citation entities found using BAML client.")
-        return []
 
 # -----------------------------------------------------------------------------
 # Citation matching helper (parity with src/get_citation_entities.py)

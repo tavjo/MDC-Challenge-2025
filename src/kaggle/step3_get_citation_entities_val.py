@@ -13,17 +13,23 @@ import pandas as pd
 import numpy as np
 import os
 import json
+import threading
+import re
 
 
 from pathlib import Path
 import sys
+
+baml_wrapper = '/kaggle/input/baml-components/src/baml_wrapper'
+sys.path.append(str(Path(baml_wrapper).parent))
+from baml_wrapper import extract_cites
 
 # Allow importing sibling kaggle helpers/models when used as a standalone script
 THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
-from helpers import timer_wrap, initialize_logging, extract_entities_baml
+from helpers import timer_wrap, initialize_logging
 from models import CitationEntity, Chunk
 from duckdb_utils import get_duckdb_helper
 
@@ -39,11 +45,56 @@ DEFAULT_DUCKDB = os.path.join(artifacts, "mdc_challenge.db")
 global_prototypes = "/kaggle/input/rf-model-metadata-files/feature_decomposition.pkl"
 ds_prototypes = "/kaggle/input/rf-model-metadata-files/prototypes.pkl"
 
+# Prompt examples (verbatim from prompt)
+PROMPT_EXAMPLE_STRINGS = [
+    "E-GEOD-48278",
+    "JX312727",
+    "PRJNA384940",
+    "https://doi.org/10.5061/dryad.4dj6042",
+    "10.5061/dryad.4dj6042",
+    "doi:10.5061/dryad.4dj6042",
+    "https://doi.org/10.6084/m9.figshare.29901470.v1",
+    "https://doi.org/10.15468/dl.354f8k",
+    "JX312727-JX312728",
+    "JX312728",
+]
+
+# Minimal DOI finder and variants
+DOI_BARE = re.compile(r"\b10\.\d{4,9}/\S+\b", re.IGNORECASE)
+def doi_variants_from_string(s: str) -> Set[str]:
+    m = DOI_BARE.search(str(s) if s is not None else "")
+    if not m:
+        return set()
+    bare = m.group(0)
+    return {
+        bare,
+        f"https://doi.org/{bare}",
+        f"http://dx.doi.org/{bare}",
+        f"doi:{bare}",
+    }
+
+def extract_entities_baml(doc: List[str], doc_id: str) -> List[CitationEntity]:
+    """
+    Extract citation entities from the document text using the BAML client.
+    """
+    logger.info(f"Extracting citation entities using BAML client for {doc_id}.")
+    citations = extract_cites(doc)
+    if citations:
+        citation_entities = [
+            CitationEntity.model_validate({**entity.model_dump(mode="json"), "document_id": doc_id})
+            for entity in citations
+        ]
+        return citation_entities
+    else:
+        logger.warning("No citation entities found using BAML client.")
+        return []
+
 @timer_wrap
 class UnknownCitationEntityExtractor:
     def __init__(self, 
                  model,
                  db_path: str = DEFAULT_DUCKDB,
+                 max_workers: int = 8,
                  top_ids_path: str = os.path.join(artifacts, "top_ids.json")):
         logger.info(f"Initializing CitationEntityExtractor (JSON-driven)")
         self.db_path = db_path
@@ -53,6 +104,10 @@ class UnknownCitationEntityExtractor:
         # Loaded state
         self.triplets: List[Tuple[Optional[str], str, Optional[str]]] = []
         self.chunks_by_id: Dict[str, Chunk] = {}
+        self.max_workers = max_workers
+        # Parallel aggregation target: chunk_id -> set of data_citation strings
+        self._chunk_to_citations: Dict[str, Set[str]] = {}
+        self._chunk_map_lock = threading.Lock()
     
 
     # Removed: per-doc loading; now JSON-driven
@@ -104,6 +159,46 @@ class UnknownCitationEntityExtractor:
     def retrieve_context(self) -> List[Chunk]:
         return self._retrieve_context()
     
+    def _validate_citations(self, doc_id: str, cites: List[CitationEntity]) -> List[CitationEntity]:
+        """Minimal, conservative filtering for low-quality citations."""
+        doi_vars = doi_variants_from_string(doc_id)
+        keep: List[CitationEntity] = []
+        for ce in cites:
+            dc = (ce.data_citation or "").strip()
+            if not dc or len(dc) < 2:
+                continue
+            if dc in doi_vars:
+                continue
+            if dc in PROMPT_EXAMPLE_STRINGS:
+                continue
+            if any(ch in dc for ch in ["\n", "\t", ","]):
+                continue
+            # Allow specific space patterns; otherwise drop if space exists
+            if " " in dc:
+                if not re.match(r"(?i)^(?:CCDC|E-?PROT|EPROT|PXD|SRR|ERR)\s+\d+$", dc) and \
+                   not re.match(r"(?i)^ENS[A-Z]+\s+\d+$", dc):
+                    continue
+            # Quick guard: must have at least a digit or start with DOI prefix
+            if not (any(ch.isdigit() for ch in dc) or dc.startswith("10.")):
+                continue
+            keep.append(ce)
+        return keep
+    
+    def _process_group(self, doc_id: str, chunk_ids: List[str], texts: List[str]) -> List[CitationEntity]:
+        """Worker invoked by the thread pool: extract, validate, record per-chunk strings."""
+        raw = extract_cites(texts) or []
+        cites = [
+            CitationEntity.model_validate({**e.model_dump(mode="json"), "document_id": doc_id})
+            for e in raw
+        ]
+        cites = self._validate_citations(doc_id, cites)
+        if cites:
+            with self._chunk_map_lock:
+                for cid in chunk_ids:
+                    bucket = self._chunk_to_citations.setdefault(cid, set())
+                    bucket.update(ce.data_citation for ce in cites)
+        return cites
+    
     def bulk_baml_extraction(self) -> List[CitationEntity]:
         """
         Group loaded triples by document, merge overlapping triples (>=2 shared IDs),
@@ -148,7 +243,10 @@ class UnknownCitationEntityExtractor:
                     groups.append(set(ids))
             return [sorted(list(g)) for g in groups]
 
-        # For each doc, merge and enforce 1000-token budget
+        # Collect (doc_id, group_chunk_ids, group_texts) per group for concurrent BAML calls
+        group_payloads: List[Tuple[str, List[str], List[str]]] = []
+
+        # For each doc, merge and enforce 1000-token budget, then collect group texts
         for doc_id, triples in triples_by_doc.items():
             merged_groups = merge_triples(triples)
             for group_ids in merged_groups:
@@ -193,10 +291,76 @@ class UnknownCitationEntityExtractor:
                     ch = self.chunks_by_id.get(cid)
                     if ch is not None:
                         texts.append(ch.text)
-                if not texts:
-                    continue
-                cites = extract_entities_baml(texts, doc_id)
-            self.citation_entities.extend(cites)
+                if texts:
+                    # Maintain anchor-first ordering for chunk IDs and texts
+                    group_payloads.append((doc_id, ordered_ids, texts))
+
+        # Nothing to process
+        if not group_payloads:
+            return []
+
+        # Run all group calls concurrently using configured self.max_workers
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        all_cites: List[CitationEntity] = []
+        workers = max(1, int(self.max_workers))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = [ex.submit(self._process_group, doc_id, chunk_ids, texts) for (doc_id, chunk_ids, texts) in group_payloads]
+            for fut in as_completed(futures):
+                try:
+                    cites = fut.result() or []
+                except Exception:
+                    cites = []
+                if cites:
+                    all_cites.extend(cites)
+
+        # Single flush of chunk metadata updates, based on per-chunk citation strings
+        if self._chunk_to_citations:
+            chunk_ids_all = list(self._chunk_to_citations.keys())
+            db = get_duckdb_helper(self.db_path)
+            try:
+                # Batch fetch if very large
+                fetched_chunks: List[Chunk] = []
+                if len(chunk_ids_all) > 1000:
+                    for i in range(0, len(chunk_ids_all), 1000):
+                        batch_ids = chunk_ids_all[i:i+1000]
+                        fetched_chunks.extend(db.get_chunks_by_chunk_ids(batch_ids))
+                else:
+                    fetched_chunks = db.get_chunks_by_chunk_ids(chunk_ids_all)
+
+                updated_chunks: List[Chunk] = []
+                # Rehydrate full CitationEntity objects for each chunk using combined citations
+                combined_pool = all_cites + self.citation_entities
+                for ck in fetched_chunks:
+                    want = self._chunk_to_citations.get(ck.chunk_id, set())
+                    if not want:
+                        continue
+                    # Build to_add by scanning combined pool for first match of (doc_id, data_citation)
+                    to_add: List[CitationEntity] = []
+                    for dc in want:
+                        found = None
+                        for ce in combined_pool:
+                            if ce.document_id == ck.document_id and ce.data_citation == dc:
+                                found = ce
+                                break
+                        if found is not None:
+                            to_add.append(found)
+                    if not to_add:
+                        continue
+                    existing = {e.data_citation: e for e in (ck.chunk_metadata.citation_entities or [])}
+                    for ce in to_add:
+                        if ce.data_citation not in existing:
+                            existing[ce.data_citation] = ce
+                    ck.chunk_metadata.citation_entities = list(existing.values())
+                    updated_chunks.append(ck)
+
+                if updated_chunks:
+                    db.bulk_insert_chunks(updated_chunks)
+            finally:
+                db.close()
+
+        #TODO: Verify that the citations are valid + add citation entities to metadata of triples
+        self.citation_entities.extend(all_cites)
         return self.citation_entities
     
     def extract_entities(self) -> List[CitationEntity]:

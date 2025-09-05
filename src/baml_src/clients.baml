@@ -10,17 +10,43 @@ client<llm> LocalQwen {
   }
 }
 
-client<llm> QwenLocal {
+client<llm> QwenLocal0 {
   provider "openai-generic"
   retry_policy Exponential
   options {
     base_url "http://127.0.0.1:8000/v1"
     model "qwen3-1.7b-local"
-    default_role "user" // vLLM-specific quirk
+    default_role "user"  // vLLM quirk
     temperature 0.0
-    // chat_template_kwargs { "enable_thinking" false }
-    // top_p 1.0
-    logprobs null
+    top_p 1.0
+    max_tokens 768
+    // Fail fast if the model gets cut off; prevents silently truncated parses
+    finish_reason_deny_list ["length"]
+  }
+}
+
+client<llm> QwenLocal1 {
+  provider "openai-generic"
+  retry_policy Exponential
+  options {
+    base_url "http://127.0.0.1:8001/v1"
+    model "qwen3-1.7b-local"
+    default_role "user"
+    temperature 0.0
+    top_p 1.0
+    max_tokens 768
+    finish_reason_deny_list ["length"]
+  }
+}
+
+// Fan out across the two single-GPU servers
+client<llm> QwenLocalRR {
+  provider round-robin
+  options {
+    strategy [
+      QwenLocal0
+      QwenLocal1
+    ]
   }
 }
 
@@ -40,7 +66,7 @@ client<llm> OpenaiFallback {
   provider fallback
   options {
     // This will try the clients in order until one succeeds
-    strategy [QwenLocal, QwenLocal]
+    strategy [QwenLocal0, QwenLocal1]
   }
 }
 
