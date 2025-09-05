@@ -369,7 +369,7 @@ _CATEGORY_WEIGHTS: Dict[str, float] = {
     "data_terms": 0.10,
 }
 
-_TEXT_BOOST_CAP: float = 0.70
+_TEXT_BOOST_CAP: float = 0.80
 _PROTOTYPE_PRESENCE_BOOST: float = 0.50
 
 

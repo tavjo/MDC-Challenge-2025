@@ -15,11 +15,11 @@ client<llm> QwenLocal {
   retry_policy Exponential
   options {
     base_url "http://127.0.0.1:8000/v1"
-    model "qwen3-8b-local"
+    model "qwen3-1.7b-local"
     default_role "user" // vLLM-specific quirk
     temperature 0.0
     // chat_template_kwargs { "enable_thinking" false }
-    top_p 1.0
+    // top_p 1.0
     logprobs null
   }
 }

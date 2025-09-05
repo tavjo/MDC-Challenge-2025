@@ -6,14 +6,13 @@ enum DatasetType {
 class CitationEntity {
     evidence string[] @description("List of evidence from document for the data citation")
     dataset_type DatasetType @description("Type of dataset citation")
-    data_citation string @description("Data citation from text")
+    data_citation string @description("Data citation from text (Data repository DOI or accession number. DO NOT INCLUDE ANYTHING ELSE.)")
 }
 
 // Create a function to extract the data citations from a list of strings.
 function ExtractCitation(document: string[]) -> CitationEntity[] {
   client QwenLocal
   prompt #"
-    /no_think
 
     You are a research assistant tasked with extracting dataset citations from a text. Extract ALL dataset citations from the document.
     The evidence should be the snippet of text from the document that contains the dataset citation.
