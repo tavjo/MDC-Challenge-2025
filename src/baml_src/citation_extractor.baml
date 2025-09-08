@@ -5,8 +5,9 @@ enum DatasetType {
 }
 class CitationEntity {
     evidence string[] @description("List of evidence from document for the data citation")
-    data_citation string @description("Data citation from text (Data repository DOI or accession number. Examples data DOI: https://doi.org/10.5061/dryad.4dj6042. Example accession number: JX312727)")
+    data_citation string @description("Data citation from text (Data repository DOI or accession number. Examples data DOI: https://doi.org/10.5061/dryad.4dj6042. Example accession number: JX123456)")
     dataset_type DatasetType @description("Type of dataset citation")
+    @@assert(citation_in_evidence, {{ this.data_citation in (this.evidence | join(' ')) }})
 }
 
 // Create a function to extract the data citations from a list of strings.
@@ -14,32 +15,50 @@ function ExtractCitation(document: string[]) -> CitationEntity[] {
   client QwenLocalRR
   prompt #"
     /no_think
+    Extract dataset citations from scientific text. A valid citation MUST contain either:
+    1. A complete dataset DOI or accession number
+    2. A complete range of accession numbers (which you'll split into individual entries)
 
-    You are a research assistant tasked with extracting dataset citations from a text. Extract ALL dataset citations from the document.
-    The evidence should be the snippet of text from the document that contains the dataset citation. DO NOT return article DOIs, empty strings or anything that is not a data citation.
+    Critical Rules:
+    - Evidence MUST be the exact text snippet containing the citation
+    - The data_citation field MUST contain only the DOI or accession number, not surrounding text
+    - For DOIs, include the full DOI including the "10." prefix
+    - For accession numbers, include the complete ID (e.g., "MK123456" not just "GenBank")
+    - When given a range or multiple accession numbers (e.g., "MK123456 to MK123457" or "MK123456, MK123457, MK123458"), create separate entries for each number. DO NOT return a range or multiple accession numbers as a single entry.
+    - Never return:
+      * Generic database URLs (like "www.gbif.org")
+      * Database names without specific IDs
+      * Article DOIs or references
+      * Random numbers or partial text
+      * Just the evidence phrases without actual citations
 
-    Use context provided in the document to determine if a citation is a data citation such as "Dataset deposited in ...", "Data retrieved from ...", "Data accessed from ...","Data available in ..." etc.
-    
-    Report dataset citations EXACTLY as they appear in the text but do not include the surrounding text itself. Don't add the reporsitory name unless it already a part of the data citation. 
-    
-    Return only dataset repository DOIs (Dryad, Zenodo, Figshare, PANGAEA, etc.) and accession IDs (GEO/SRA/ENA/GenBank/PRJNA/PRJEB/PXD/E-* etc.). Do NOT return article/preprint/journal DOIs (e.g., bioRxiv/medRxiv, publisher DOIs). Examine context surrounding DOIs to judge whether they are data citations or not. Example data citation DOI:  (example data citation DOI).
+    Example correct outputs:
+    ✓ "10.5061/dryad.4dj6042" (complete data DOI)
+    ✓ "https://doi.org/10.5061/dryad.4dj6042" (complete data DOI)
+    ✓ "MK123456" (specific accession)
+    ✓ "GSE123456" (specific accession)
+    ✓ "JX123456" (specific accession number)
 
-    Never make up a data citation. If you cannot find a data citation, return an empty list.
+    Example incorrect outputs:
+    ✗ "GenBank" (database without ID)
+    ✗ "http://www.gbif.org" (generic URL)
+    ✗ "20457758, 2020, 7" (random numbers)
+    ✗ "Dataset deposited in" (phrase without citation)
+    ✗ " "
+    ✗ ""
+    ✗ "WorldClim"
+    ✗ "JX123456-JX123457" (range of accession numbers)
+    ✗ "JX123456, JX123457, JX123458" (multiple accession numbers in one entru)
 
-    When accession numbers are grouped together to form a range such as in this example: JX312727-JX312728 (example accession range), you must report each accession number in the range as a separate data citation.
-    IMPORTANT: Return each accession number or dataset repository DOI as separate data citations.
+    If a document text does not contain any data citations, return an empty list. NEVER make up a citation or return a citation that is not present in the document text.
 
-    DO NOT RETURN ANYTHING THAT IS NOT A DATA CITATION (i.e. accession number or repository DOI). 
-
-    NEVER return article/preprint/journal DOIs (e.g., bioRxiv/medRxiv, publisher DOIs). Examine context surrounding DOIs to judge whether they are data citations or not.
+    {{ _.role("user") }}
+    {% for text in document %}
+    {{ text }}
+    {% endfor %}
 
     {{ ctx.output_format }}
 
-    {{ _.role("user") }}
-
-    {% for text in document %}
-    --- {{ text }}
-    {% endfor %}
   "#
 }
 

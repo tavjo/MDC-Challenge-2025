@@ -95,13 +95,22 @@ def run_global_pca(
     if not SKLEARN_AVAILABLE:
         logger.warning("sklearn not available; skipping global PCA")
         return {}
-    if X.shape[0] == 0:
+    n_samples = int(X.shape[0])
+    if n_samples == 0:
         logger.info("Empty embeddings matrix; skipping global PCA")
         return {}
+    pca = None
     try:
-        pca = PCA(n_components=n_components, random_state=random_seed, svd_solver="full")
-        Z = pca.fit_transform(X)  # shape (N, n_components)
-        logger.info(f"Global PCA computed: X={X.shape} -> Z={Z.shape}")
+        # Fallback for tiny sample sizes: use simple summaries per row
+        if n_samples < 3:
+            pc1 = np.mean(X, axis=1)
+            pc2 = np.median(X, axis=1)
+            Z = np.column_stack([pc1, pc2])
+            logger.info(f"n_samples < 3; using mean/median fallback: X={X.shape} -> Z={Z.shape}")
+        else:
+            pca = PCA(n_components=n_components, random_state=random_seed, svd_solver="full")
+            Z = pca.fit_transform(X)  # shape (N, n_components)
+            logger.info(f"Global PCA computed: X={X.shape} -> Z={Z.shape}")
     except Exception as e:
         logger.error("Global PCA failed", exc_info=e)
         return {}

@@ -19,7 +19,7 @@ client<llm> QwenLocal0 {
     default_role "user"  // vLLM quirk
     temperature 0.0
     top_p 1.0
-    max_tokens 768
+    max_tokens 512
     // Fail fast if the model gets cut off; prevents silently truncated parses
     finish_reason_deny_list ["length"]
   }
@@ -34,7 +34,7 @@ client<llm> QwenLocal1 {
     default_role "user"
     temperature 0.0
     top_p 1.0
-    max_tokens 768
+    max_tokens 512
     finish_reason_deny_list ["length"]
   }
 }

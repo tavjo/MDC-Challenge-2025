@@ -314,25 +314,58 @@ def _cos(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b) / (na * nb))
 
 
-def mmr_rerank(candidate_ids: List[str],
-               query_vec: np.ndarray,
-               id_to_vec: Dict[str, np.ndarray],
+def mmr_rerank(candidate_ids,
+               query_vec,
+               id_to_vec,
                lambda_diversity: float = 0.7,
-               top_k: int = 25) -> List[str]:
-    selected: List[str] = []
-    remaining = candidate_ids[:]
-    while remaining and len(selected) < top_k:
-        best_id, best_score = None, -1e9
-        for cid in remaining:
-            v = id_to_vec[cid]
-            rel = _cos(query_vec, v)
-            div = 0.0 if not selected else max(_cos(v, id_to_vec[sid]) for sid in selected)
-            score = lambda_diversity * rel - (1 - lambda_diversity) * div
-            if score > best_score:
-                best_score, best_id = score, cid
-        selected.append(best_id)
-        remaining.remove(best_id)
-    return selected
+               top_k: int = 25):
+    """
+    Vectorized greedy MMR:
+      score(i | S) = lambda * cos(q, i) - (1 - lambda) * max_{s in S} cos(i, s)
+    Returns a list of selected candidate_ids in selection order.
+    """
+    import numpy as np
+
+    n = len(candidate_ids)
+    if n == 0 or top_k <= 0:
+        return []
+    top_k = min(top_k, n)
+
+    # Stack embeddings in candidate order (n,d) and query (d,)
+    A = np.asarray([id_to_vec[cid] for cid in candidate_ids], dtype=np.float32)
+    q = np.asarray(query_vec, dtype=np.float32)
+
+    # L2-normalize for cosine; safe against zero vectors
+    def _l2norm(x, axis=-1, eps=1e-12):
+        return x / (np.linalg.norm(x, axis=axis, keepdims=True) + eps)
+
+    An = _l2norm(A)
+    qn = q / (np.linalg.norm(q) + 1e-12)
+
+    # Relevance term: cos(q, i) for all i
+    rel = An @ qn  # (n,)
+
+    # Track max diversity term (max cos(i, s) over selected s)
+    max_div = np.zeros(n, dtype=np.float32)
+    used = np.zeros(n, dtype=bool)
+    selected_idx = np.empty(top_k, dtype=np.int32)
+
+    for t in range(top_k):
+        # MMR score for all unused candidates
+        scores = lambda_diversity * rel - (1.0 - lambda_diversity) * max_div
+        scores[used] = -np.inf
+
+        j = int(np.argmax(scores))      # pick next
+        selected_idx[t] = j
+        used[j] = True
+
+        # Update diversity term with similarities to the newly selected vector
+        sim_to_j = An @ An[j]           # (n,) cosine to selected j
+        np.maximum(max_div, sim_to_j, out=max_div)
+
+    return [candidate_ids[i] for i in selected_idx.tolist()]
+
+
 
 # ==============================================
 # Boosting (keyword categories)

@@ -47,16 +47,39 @@ ds_prototypes = "/kaggle/input/rf-model-metadata-files/prototypes.pkl"
 
 # Prompt examples (verbatim from prompt)
 PROMPT_EXAMPLE_STRINGS = [
-    "E-GEOD-48278",
-    "JX312727",
-    "PRJNA384940",
+    "JX123456",
     "https://doi.org/10.5061/dryad.4dj6042",
     "10.5061/dryad.4dj6042",
     "doi:10.5061/dryad.4dj6042",
-    "https://doi.org/10.6084/m9.figshare.29901470.v1",
-    "https://doi.org/10.15468/dl.354f8k",
-    "JX312727-JX312728",
-    "JX312728",
+    "http://dx.doi.org/10.5061/dryad.4dj6042",
+    # "https://doi.org/10.6084/m9.figshare.29901470.v1",
+    # "https://doi.org/10.15468/dl.354f8k",
+    # "10.15468/dl.354f8k",
+    # "doi:10.15468/dl.354f8k",
+    # "http://dx.doi.org/10.15468/dl.354f8k",
+    # "https://doi.org/10.15468/dl.pdjqte",
+    # "10.15468/dl.pdjqte",
+    # "doi:10.15468/dl.pdjqte",
+    # "http://dx.doi.org/10.15468/dl.pdjqte",
+    # "https://doi.org/10.15468/dl.nbku3v",
+    # "10.15468/dl.nbku3v",
+    # "doi:10.15468/dl.nbku3v",
+    # "http://dx.doi.org/10.15468/dl.nbku3v",
+    # "https://doi.org/10.15468/dl.uejpg6",
+    # "10.15468/dl.uejpg6",
+    # "doi:10.15468/dl.uejpg6",
+    # "http://dx.doi.org/10.15468/dl.uejpg6",
+    # "https://doi.org/10.1101/2022.07.21.501061",
+    # "10.1101/2022.07.21.501061",
+    # "doi:10.1101/2022.07.21.501061",
+    # "http://dx.doi.org/10.1101/2022.07.21.501061",
+    "JX123456-JX123457",
+    "JX123458",
+    "JX123456", 
+    "JX123457",
+    "JX123458",
+    "MK123456",
+    "GSE123456",
 ]
 
 # Minimal DOI finder and variants
@@ -66,11 +89,21 @@ def doi_variants_from_string(s: str) -> Set[str]:
     if not m:
         return set()
     bare = m.group(0)
+    mutated = re.sub("_","/", bare)
+    upper = bare.upper()
     return {
         bare,
+        mutated,
+        upper,
         f"https://doi.org/{bare}",
         f"http://dx.doi.org/{bare}",
         f"doi:{bare}",
+        f"https://doi.org/{mutated}",
+        f"http://dx.doi.org/{mutated}",
+        f"doi:{mutated}",
+        f"https://doi.org/{upper}",
+        f"http://dx.doi.org/{upper}",
+        f"doi:{upper}",
     }
 
 def extract_entities_baml(doc: List[str], doc_id: str) -> List[CitationEntity]:

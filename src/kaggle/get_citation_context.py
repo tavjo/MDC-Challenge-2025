@@ -337,7 +337,7 @@ def run_hybrid_retrieval_on_docs(
     prototypes: Optional[np.ndarray] = None,
     db_path: str | None = None,
     boost_cfg: BoostConfig = BoostConfig(),
-    threshold_percentile: float = 70.0,
+    threshold_percentile: float = 85.0,
 ) -> Optional[List[Tuple[str, str, str]]]:
     """
     Global hybrid retrieval → neighbor collapse (pre-threshold) → percentile gate →
@@ -504,21 +504,28 @@ def run_hybrid_retrieval_on_docs(
         len(anchor_ids),
         len(collapsed_ids),
     )
+    n = len(anchor_ids)
+    # 20% with guards (feel free to tweak)
+    _frac = 0.20
+    MIN_K, MAX_K = 50, 3000
     if not anchor_ids:
         logger.info("No anchors survived threshold; returning empty result.")
         return []
+    
+    if len(anchor_ids) > 7000:
+        logger.debug("Large anchor set after threshold (%d) may impact latency. Skipping MMR rerank.", len(anchor_ids))
+        mmr_ranked = anchor_ids[:k]
+    else:
+        # (C) MMR over true anchors (bounded set)
+        mmr_ranked = mmr_rerank(
+            candidate_ids=anchor_ids,
+            query_vec=query_vec,
+            id_to_vec=id_to_dense,
+            lambda_diversity=boost_cfg.mmr_lambda,
+            top_k=max(MIN_K, min(int(np.ceil(_frac * n)), MAX_K)),
+        )
+        logger.info("Anchors after MMR rerank: %d", len(mmr_ranked))
 
-    # (C) MMR over true anchors (bounded set)
-    mmr_ranked = mmr_rerank(
-        candidate_ids=anchor_ids,
-        query_vec=query_vec,
-        id_to_vec=id_to_dense,
-        lambda_diversity=boost_cfg.mmr_lambda,
-        top_k=len(anchor_ids),
-    )
-    logger.info("Anchors after MMR rerank: %d", len(mmr_ranked))
-    if len(anchor_ids) > 5000:
-        logger.debug("Large anchor set after threshold (%d) may impact latency.", len(anchor_ids))
 
     # (D) Build triplets from MMR-ranked anchors
     results: List[Tuple[str, str, str]] = []

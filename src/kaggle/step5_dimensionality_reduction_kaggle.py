@@ -66,6 +66,15 @@ def _run_pca_on_cluster(
     if PCA is None:
         logger.error("scikit-learn is required for PCA but not available")
         raise RuntimeError("scikit-learn is required for PCA")
+    # Fallback for tiny sample sizes: PCA with n_components=1 can be unstable with <2 samples
+    n_samples = int(dataset_embeddings.shape[0]) if dataset_embeddings is not None and dataset_embeddings.ndim == 2 else 0
+    if n_samples < 2:
+        logger.debug(f"Cluster {cluster_id}: n_samples < 2, skipping PCA and returning raw column")
+        try:
+            return cluster_id, dataset_embeddings[:, feature_idx[0]].copy()
+        except Exception as e:
+            logger.error(f"Failed extracting single column for cluster {cluster_id}", exc_info=e)
+            raise
     if len(feature_idx) < 2:
         # fallback to the single column values
         logger.debug(f"Cluster {cluster_id}: <2 features, skipping PCA and returning raw column")

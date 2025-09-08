@@ -225,7 +225,7 @@ def load_bge_model(local_dir: str | Path):
     model = SentenceTransformer(str(local_dir))  # local path works offline
     return model
 
-def embed_texts(model, texts: List[str], batch_size: int = 64) -> np.ndarray:
+def embed_texts(model, texts: List[str], batch_size: int = 100) -> np.ndarray:
     """
     Encode texts with L2-normalized embeddings for cosine similarity.
     """

@@ -50,23 +50,15 @@ from sklearn.model_selection import (RandomizedSearchCV, StratifiedGroupKFold,
                                      train_test_split, GroupShuffleSplit)
 from sklearn.pipeline import Pipeline
 from sklearn.utils.class_weight import compute_class_weight
+from sklearn.metrics import average_precision_score, precision_recall_curve, fbeta_score
+from sklearn.model_selection import cross_val_predict
+from sklearn.calibration import CalibratedClassifierCV
 
 # Optional Balanced RF
 try:
     from imblearn.ensemble import BalancedRandomForestClassifier  # type: ignore
 except ImportError:  # pragma: no cover
     BalancedRandomForestClassifier = None  # type: ignore
-
-# Optional LightGBM / XGBoost
-try:
-    import lightgbm as lgb  # type: ignore
-except ImportError:  # pragma: no cover
-    lgb = None  # type: ignore
-
-try:
-    from xgboost import XGBClassifier  # type: ignore
-except ImportError:  # pragma: no cover
-    XGBClassifier = None  # type: ignore
 
 
 def parse_args() -> argparse.Namespace:
@@ -92,7 +84,7 @@ def parse_args() -> argparse.Namespace:
     """
     try:
         parser = argparse.ArgumentParser(
-            description="Train Classifier (Phase 09) according to MDC checklist."
+            description="Train Random‑Forest (Phase 09) according to MDC checklist."
         )
         parser.add_argument("--input_csv", type=str, required=True,
                             help="Path to input CSV containing features + label.")
@@ -102,8 +94,8 @@ def parse_args() -> argparse.Namespace:
                             help="Directory to write all artefacts into.")
         parser.add_argument("--target_col", type=str, default="target",
                             help="Name of the target column in CSV (default: target).")
-        parser.add_argument("--group_col", default="document_id",
-                    help="Grouping column for CV + hold‑out split (default: document_id).")
+        parser.add_argument("--group_col", default=None,
+                    help="Optional grouping column for CV + hold‑out split.")
 
         parser.add_argument("--val_frac", type=float, default=0.20,
                     help="Fraction of data to reserve as frozen validation set (0 = no hold‑out).")
@@ -115,14 +107,14 @@ def parse_args() -> argparse.Namespace:
                             help="RandomizedSearch iterations (default: 100).")
         parser.add_argument("--use_balanced_rf", action="store_true",
                             help="If set, use BalancedRandomForestClassifier from imblearn.")
-        parser.add_argument("--model", choices=["lightgbm", "xgboost", "rf"], default="lightgbm",
-                            help="Model to train (default: lightgbm; rf is fallback baseline).")
-        parser.add_argument("--calibrate", choices=["none", "platt", "isotonic"], default="platt",
-                            help="Probability calibration method (default: platt).")
-        parser.add_argument("--doc_recall_target", type=float, default=0.95,
-                            help="Target document-level recall for doc gate threshold selection (default: 0.95).")
-        parser.add_argument("--save_val_probs", action="store_true",
-                            help="Save validation probabilities for offline threshold tuning.")
+        parser.add_argument("--threshold_strategy", choices=["cost", "fbeta"], default="cost",
+                            help="How to set the decision threshold (default: cost).")
+        parser.add_argument("--cost_fp", type=float, default=1.0, help="Cost of a false positive.")
+        parser.add_argument("--cost_fn", type=float, default=2.0, help="Cost of a false negative.")
+        parser.add_argument("--beta", type=float, default=1.0, help="Beta for F-beta fallback.")
+        parser.add_argument("--use_lgbm", action="store_true", help="Use LightGBM (requires lightgbm).")
+        parser.add_argument("--use_xgb", action="store_true", help="Use XGBoost (requires xgboost).")
+        parser.add_argument("--use_easy_ensemble", action="store_true", help="Use EasyEnsembleClassifier (imblearn).")
         return parser.parse_args()
     except Exception as e:
         logging.error(f"Failed to parse command-line arguments: {e}")
@@ -189,9 +181,8 @@ def _split_train_val(
     group_col: Optional[str],
     val_frac: float,
     seed: int,
-
-) -> Tuple[pd.DataFrame, pd.Series, Optional[pd.DataFrame], Optional[pd.Series], Optional[pd.Series], Optional[pd.Series]]:
-    """Return X_train, y_train, X_val, y_val, groups_train, groups_val.
+) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, Optional[pd.Series]]:
+    """Return X_train, y_train, X_val, y_val (+ groups_train).
 
     If *val_frac* == 0 → validation outputs are None and all rows go to train.
     """
@@ -207,14 +198,12 @@ def _split_train_val(
             None,
             None,
             df[group_col] if group_col else None,
-            None,
         )
 
     if group_col and group_col in df.columns:
         splitter = GroupShuffleSplit(n_splits=1, test_size=val_frac, random_state=seed)
         train_idx, val_idx = next(splitter.split(df, y_full, groups=df[group_col]))
         groups_train = df[group_col].iloc[train_idx]
-        groups_val = df[group_col].iloc[val_idx]
     else:
         train_idx, val_idx = train_test_split(
             np.arange(len(df)),
@@ -223,7 +212,6 @@ def _split_train_val(
             random_state=seed,
         )
         groups_train = None
-        groups_val = None
 
     train_df = df.iloc[train_idx]
     val_df = df.iloc[val_idx]
@@ -237,7 +225,7 @@ def _split_train_val(
         "Hold‑out split: %d train / %d validation rows (%.1f %%).",
         len(train_df), len(val_df), val_frac * 100,
     )
-    return X_train, y_train, X_val, y_val, groups_train, groups_val
+    return X_train, y_train, X_val, y_val, groups_train
 
 
 def load_data(
@@ -247,7 +235,7 @@ def load_data(
         val_frac: float,
         disable_holdout: bool,
         seed: int
-        ) -> tuple[pd.DataFrame, pd.Series, Optional[pd.DataFrame], Optional[pd.Series], Optional[pd.Series], Optional[pd.Series]]:
+        ) -> tuple[pd.DataFrame, pd.Series]:
     """Load and validate training data from CSV file.
     
     Parameters
@@ -298,7 +286,7 @@ def load_data(
                 f"Available columns: {available_cols}"
             )
         
-        X, y, X_val, y_val, groups_train, groups_val = _split_train_val(
+        X, y, X_val, y_val, groups_train = _split_train_val(
         df, target_col, group_col, 0 if disable_holdout else val_frac, seed
     )
         
@@ -315,7 +303,11 @@ def load_data(
         if y.isna().all():
             raise ValueError(f"Target column '{target_col}' contains only missing values")
             
-        # Sanity checks (skip brittle fixed-shape expectations)
+        # Sanity checks
+        if X.shape != (487, 55):
+            logging.warning(
+                "Data shape is %s (expected 487, 55). Continuing anyway.", X.shape
+            )
             
         # Check for numeric columns
         numeric_cols = X.select_dtypes(include="number").columns
@@ -347,7 +339,7 @@ def load_data(
             #check that X_val has the same number of columns as X
             if X_val.shape[1] != X.shape[1]:
                 raise ValueError(f"X_val has {X_val.shape[1]} columns, but X has {X.shape[1]} columns")
-        return X, y, X_val, y_val, groups_train, groups_val
+        return X, y, X_val, y_val, groups_train
         
     except Exception as e:
         logging.error(f"Failed to load data from {csv_path}: {e}")
@@ -415,8 +407,8 @@ def build_cv(y: pd.Series, groups: Optional[pd.Series], seed: int):
         raise
 
 
-def build_pipeline(seed: int, use_balanced: bool, model: str):
-    """Build pipeline with imputation and selected classifier (LightGBM/XGBoost/RF).
+def build_pipeline(seed: int, use_balanced: bool, use_lgbm: bool = False, use_xgb: bool = False, use_easy_ensemble: bool = False, scale_pos_weight: float = 1.0):
+    """Build scikit-learn pipeline with imputation and Random Forest classifier.
     
     Parameters
     ----------
@@ -445,49 +437,46 @@ def build_pipeline(seed: int, use_balanced: bool, model: str):
         # Build imputer
         imputer = ("imputer", SimpleImputer(strategy="median"))
         
-        # Build classifier based on requested model
-        if model == "lightgbm":
-            if lgb is None:
-                raise ImportError("lightgbm is not installed. pip install lightgbm")
-            # Class-imbalance knobs: is_unbalance True lets LGBM auto-weight classes
-            clf = lgb.LGBMClassifier(
-                n_estimators=600,
-                learning_rate=0.05,
-                num_leaves=64,
-                max_depth=-1,
-                subsample=0.9,
-                colsample_bytree=0.8,
-                reg_lambda=1.0,
-                objective="binary",
-                is_unbalance=True,
-                n_jobs=-1,
-                random_state=seed,
+        # Build classifier based on selected model
+        if use_lgbm:
+            try:
+                from lightgbm import LGBMClassifier  # type: ignore
+            except Exception as exc:
+                raise ImportError("LightGBM is not installed. Install with: pip install lightgbm") from exc
+            clf = LGBMClassifier(
+                random_state=seed, n_estimators=600, learning_rate=0.05,
+                max_depth=-1, subsample=0.9, colsample_bytree=0.9,
+                scale_pos_weight=scale_pos_weight, n_jobs=-1,
             )
-            logging.info("Using LightGBM classifier (is_unbalance=True)")
-        elif model == "xgboost":
-            if XGBClassifier is None:
-                raise ImportError("xgboost is not installed. pip install xgboost")
-            # Use scale_pos_weight as imbalance knob; set later after seeing y
+            logging.info("Using LightGBM in 'rf' step.")
+        elif use_xgb:
+            try:
+                from xgboost import XGBClassifier  # type: ignore
+            except Exception as exc:
+                raise ImportError("XGBoost is not installed. Install with: pip install xgboost") from exc
             clf = XGBClassifier(
-                n_estimators=600,
-                learning_rate=0.05,
-                max_depth=6,
-                subsample=0.9,
-                colsample_bytree=0.8,
-                reg_lambda=1.0,
-                objective="binary:logistic",
-                n_jobs=-1,
-                tree_method="hist",
-                random_state=seed,
+                random_state=seed, n_estimators=800, learning_rate=0.05, max_depth=6,
+                subsample=0.9, colsample_bytree=0.9, tree_method="hist",
+                scale_pos_weight=scale_pos_weight, n_jobs=-1, eval_metric="logloss",
             )
-            logging.info("Using XGBoost classifier (hist)")
+            logging.info("Using XGBoost in 'rf' step.")
+        elif use_easy_ensemble:
+            try:
+                from imblearn.ensemble import EasyEnsembleClassifier  # type: ignore
+            except Exception as exc:
+                raise ImportError("imblearn is not installed. Install with: pip install imbalanced-learn") from exc
+            clf = EasyEnsembleClassifier(n_estimators=10, random_state=seed, n_jobs=-1)
+            logging.info("Using EasyEnsembleClassifier in 'rf' step.")
         else:
-            # RandomForest fallback
-            if use_balanced and BalancedRandomForestClassifier is not None:
+            if use_balanced:
+                if BalancedRandomForestClassifier is None:
+                    raise ImportError(
+                        "imblearn is not installed. Install with: pip install imbalanced-learn"
+                    )
                 clf = BalancedRandomForestClassifier(
-                    n_jobs=-1,
-                    random_state=seed,
-                    bootstrap=True,
+                    n_jobs=-1, 
+                    random_state=seed, 
+                    bootstrap=True
                 )
                 logging.info("Using BalancedRandomForestClassifier from imblearn")
             else:
@@ -500,7 +489,7 @@ def build_pipeline(seed: int, use_balanced: bool, model: str):
                 logging.info("Using standard RandomForestClassifier with balanced class weights")
             
         # Build pipeline
-        pipeline = Pipeline(steps=[imputer, ("clf", clf)])
+        pipeline = Pipeline(steps=[imputer, ("rf", clf)])
         logging.info("Pipeline created successfully with steps: %s", [step[0] for step in pipeline.steps])
         
         return pipeline
@@ -509,8 +498,12 @@ def build_pipeline(seed: int, use_balanced: bool, model: str):
         logging.error(f"Failed to build pipeline: {e}")
         raise
 
-def evaluate_holdout(best_estimator, X_val, y_val, out_dir: Path):
-    preds = best_estimator.predict(X_val)
+def evaluate_holdout(best_estimator, X_val, y_val, out_dir: Path, threshold: Optional[float] = None):
+    if threshold is None:
+        preds = best_estimator.predict(X_val)
+    else:
+        probs = best_estimator.predict_proba(X_val)[:, 1]
+        preds = (probs >= threshold).astype(int)
     metrics = {
         "f1": float(f1_score(y_val, preds)),
         "precision": float(precision_score(y_val, preds)),
@@ -520,6 +513,25 @@ def evaluate_holdout(best_estimator, X_val, y_val, out_dir: Path):
     json.dump(metrics, open(out_dir / "holdout_metrics.json", "w"), indent=2)
     logging.info("Hold‑out metrics → %s", metrics)
     return metrics
+
+
+def pick_threshold_by_fbeta(y_true: pd.Series, y_score: np.ndarray, beta: float = 1.0) -> tuple[float, dict]:
+    precision, recall, thresh = precision_recall_curve(y_true, y_score)
+    fbs = []
+    for p, r in zip(precision[1:], recall[1:]):
+        if p == 0 and r == 0:
+            fbs.append(0.0)
+        else:
+            fbs.append((1 + beta**2) * (p * r) / (beta**2 * p + r))
+    best_idx = int(np.argmax(fbs)) if fbs else 0
+    best_thr = thresh[best_idx] if len(thresh) > 0 else 0.5
+    summary = {
+        "best_fbeta": float(fbs[best_idx]) if fbs else 0.0,
+        "beta": beta,
+        "best_precision": float(precision[1:][best_idx]) if fbs else None,
+        "best_recall": float(recall[1:][best_idx]) if fbs else None,
+    }
+    return float(best_thr), summary
 
 def main():
     """Main function to execute the Random Forest training pipeline.
@@ -554,7 +566,7 @@ def main():
         # Load and validate data
         try:
             # X, y = load_data(Path(args.input_csv), args.target_col)
-            X, y, X_val, y_val, groups_train, groups_val = load_data(
+            X, y, X_val, y_val, groups_train = load_data(
                 Path(args.input_csv),
                 args.target_col,
                 args.group_col,
@@ -566,12 +578,12 @@ def main():
             logger.error("Data loading failed: %s", e)
             sys.exit(1)
 
-        # Handle grouping column using groups from the split (no leakage)
-        groups = groups_train if args.group_col else None
+        # Handle grouping column (use groups from load_data to avoid leakage)
+        groups = groups_train
         if args.group_col and groups is not None:
-            logger.info("Using '%s' for grouping in CV.", args.group_col)
+            logger.info("Using groups from load_data() for Group-aware CV.")
         elif args.group_col:
-            logger.warning("Group column requested but no groups available – defaulting to StratifiedKFold.")
+            logger.warning("Group column '%s' requested, but no groups were returned by load_data().", args.group_col)
 
         # Analyze class distribution and compute weights
         try:
@@ -586,41 +598,61 @@ def main():
             logger.error("Failed to compute class weights: %s", e)
             sys.exit(1)
 
+        # Baseline PR-AUC (prevalence)
+        try:
+            pos_rate = float(y.mean()) if set(y.unique()) <= {0, 1} else None
+            if pos_rate is not None:
+                logger.info("Baseline PR-AUC (positive prevalence): %.4f", pos_rate)
+        except Exception as e:
+            logger.warning("Could not compute baseline PR-AUC: %s", e)
+
         # Build cross-validation and pipeline
         try:
             cv = build_cv(y, groups, args.seed)
-            pipe = build_pipeline(args.seed, args.use_balanced_rf, args.model)
+            # Compute scale_pos_weight once (used by boosted trees)
+            neg, pos = int((y == 0).sum()), int((y == 1).sum())
+            scale_pos_weight = float(neg / max(pos, 1))
+            logger.info("scale_pos_weight ≈ %.3f (neg/pos = %d/%d)", scale_pos_weight, neg, pos)
+
+            pipe = build_pipeline(
+                args.seed,
+                args.use_balanced_rf,
+                use_lgbm=args.use_lgbm,
+                use_xgb=args.use_xgb,
+                use_easy_ensemble=args.use_easy_ensemble,
+                scale_pos_weight=scale_pos_weight,
+            )
         except (ValueError, ImportError) as e:
             logger.error("Failed to build CV or pipeline: %s", e)
             sys.exit(1)
 
         # Define hyperparameter search space
-        # Hyperparameter space by model
-        if args.model == "lightgbm":
+        if args.use_lgbm:
             param_dist = {
-                "clf__n_estimators": ss.randint(300, 901),
-                "clf__num_leaves": ss.randint(31, 129),
-                "clf__learning_rate": ss.uniform(0.02, 0.08),
-                "clf__subsample": ss.uniform(0.7, 0.3),
-                "clf__colsample_bytree": ss.uniform(0.6, 0.4),
-                "clf__reg_lambda": ss.uniform(0.0, 2.0),
+                "rf__n_estimators": ss.randint(300, 1201),
+                "rf__num_leaves": ss.randint(16, 256),
+                "rf__min_child_samples": ss.randint(5, 50),
+                "rf__learning_rate": ss.uniform(0.02, 0.08),
+                "rf__subsample": ss.uniform(0.7, 0.3),
+                "rf__colsample_bytree": ss.uniform(0.7, 0.3),
             }
-        elif args.model == "xgboost":
+        elif args.use_xgb:
             param_dist = {
-                "clf__n_estimators": ss.randint(300, 901),
-                "clf__max_depth": ss.randint(4, 9),
-                "clf__learning_rate": ss.uniform(0.02, 0.08),
-                "clf__subsample": ss.uniform(0.7, 0.3),
-                "clf__colsample_bytree": ss.uniform(0.6, 0.4),
-                "clf__reg_lambda": ss.uniform(0.0, 2.0),
+                "rf__n_estimators": ss.randint(300, 1201),
+                "rf__max_depth": ss.randint(3, 10),
+                "rf__learning_rate": ss.uniform(0.02, 0.08),
+                "rf__subsample": ss.uniform(0.7, 0.3),
+                "rf__colsample_bytree": ss.uniform(0.7, 0.3),
             }
+        elif args.use_easy_ensemble:
+            param_dist = {"rf__n_estimators": ss.randint(5, 31)}
         else:
             param_dist = {
-                "clf__n_estimators": ss.randint(200, 1001),
-                "clf__max_depth": [None, 10, 20, 30],
-                "clf__max_features": ["sqrt", "log2", 0.7],
-                "clf__min_samples_leaf": [1, 2, 4],
-                "clf__max_samples": [0.8],
+                "rf__n_estimators": ss.randint(200, 1001),
+                "rf__max_depth": [None, 10, 20, 30],
+                "rf__max_features": ["sqrt", "log2", 0.7],
+                "rf__min_samples_leaf": [1, 2, 4],
+                "rf__max_samples": [0.8],
             }
 
         # Perform hyperparameter optimization
@@ -630,7 +662,7 @@ def main():
                 estimator=pipe,
                 param_distributions=param_dist,
                 n_iter=args.n_iter,
-                scoring="f1",
+                scoring="average_precision",
                 n_jobs=-1,
                 cv=cv,
                 verbose=2,
@@ -638,35 +670,10 @@ def main():
                 refit=True,
             )
 
-            # If using XGBoost, set scale_pos_weight from class imbalance
-            if args.model == "xgboost" and XGBClassifier is not None:
-                pos = (y == 1).sum()
-                neg = (y == 0).sum()
-                spw = max(1.0, neg / max(1, pos))
-                if hasattr(pipe.named_steps["clf"], "set_params"):
-                    pipe.named_steps["clf"].set_params(scale_pos_weight=spw)
-                logger.info("Set XGBoost scale_pos_weight=%.3f (neg/pos)", spw)
-
             search.fit(X, y, groups=groups)
             logger.info("Best parameters: %s", search.best_params_)
-            logger.info("Best CV F1: %.4f", search.best_score_)
-            best_est = search.best_estimator_
-
-            # Probability calibration (optional)
-            calibrated_est = best_est
-            if args.calibrate != "none":
-                from sklearn.calibration import CalibratedClassifierCV
-                method = "isotonic" if args.calibrate == "isotonic" else "sigmoid"
-                if X_val is not None and y_val is not None:
-                    calibrator = CalibratedClassifierCV(best_est, method=method, cv="prefit")
-                    calibrator.fit(X_val, y_val)
-                    calibrated_est = calibrator
-                    logger.info("Applied %s calibration on holdout.", method)
-                else:
-                    calibrator = CalibratedClassifierCV(best_est, method=method, cv=5)
-                    calibrated_est = calibrator.fit(X, y)
-                    logger.info("Applied %s calibration via CV=5.", method)
-
+            logger.info("Best CV PR-AUC: %.4f", search.best_score_)
+            
         except Exception as e:
             logger.error("Hyperparameter optimization failed: %s", e)
             sys.exit(1)
@@ -675,18 +682,19 @@ def main():
         try:
             logger.info("Computing cross-validation metrics...")
             cv_results = cross_validate(
-                calibrated_est if 'calibrated_est' in locals() else search.best_estimator_, X, y,
+                search.best_estimator_, X, y,
                 cv=cv,
-                scoring=["f1", "precision", "recall", "accuracy"],
+                scoring=["average_precision", "f1", "precision", "recall", "accuracy"],
                 n_jobs=-1,
-                return_estimator=False
+                return_estimator=False,
+                groups=groups,
             )
             cv_df = pd.DataFrame(cv_results)
             cv_df.to_csv(out_dir / "cv_results.csv", index=False)
             logger.info("Saved cv_results.csv")
             
             # Log summary statistics
-            for metric in ["test_f1", "test_precision", "test_recall", "test_accuracy"]:
+            for metric in ["test_average_precision", "test_f1", "test_precision", "test_recall", "test_accuracy"]:
                 if metric in cv_df.columns:
                     mean_val = cv_df[metric].mean()
                     std_val = cv_df[metric].std()
@@ -696,16 +704,66 @@ def main():
             logger.error("Cross-validation evaluation failed: %s", e)
             # Continue execution as this is not critical
         
+        # OOF probabilities for analysis
+        try:
+            oof_proba = cross_val_predict(
+                search.best_estimator_, X, y,
+                cv=cv,
+                method="predict_proba",
+                n_jobs=-1,
+                groups=groups,
+            )[:, 1]
+            np.save(out_dir / "oof_proba.npy", oof_proba)
+            logger.info("Saved OOF probabilities for analysis.")
+        except Exception as e:
+            logger.warning("Could not compute OOF probabilities: %s", e)
+            oof_proba = None
+
+        # Calibrate probabilities with group-respecting splits
+        try:
+            if groups is not None:
+                cv_splits = list(cv.split(X, y, groups=groups))
+            else:
+                cv_splits = cv
+
+            calibrated = CalibratedClassifierCV(
+                estimator=search.best_estimator_,
+                method="isotonic",
+                cv=cv_splits
+            )
+            calibrated.fit(X, y)
+            final_estimator = calibrated
+            logger.info("Calibrated probabilities using group-respecting splits.")
+        except Exception as e:
+            logger.warning("Calibration failed (%s). Falling back to uncalibrated best estimator.", e)
+            final_estimator = search.best_estimator_
+
+        # Decide threshold (default: cost-based)
+        if args.threshold_strategy == "cost":
+            thr = float(args.cost_fp) / (float(args.cost_fp) + float(args.cost_fn))
+            thr_info = {"strategy": "cost", "C_FP": args.cost_fp, "C_FN": args.cost_fn}
+            threshold_source = "analytic_cost_rule"
+        else:
+            threshold_source = "oof_fbeta" if 'oof_proba' in locals() and oof_proba is not None else "holdout_fbeta"
+            if 'oof_proba' in locals() and oof_proba is not None:
+                thr, fb = pick_threshold_by_fbeta(y, oof_proba, beta=args.beta)
+            elif X_val is not None:
+                try:
+                    val_proba_tmp = final_estimator.predict_proba(X_val)[:, 1]
+                    thr, fb = pick_threshold_by_fbeta(y_val, val_proba_tmp, beta=args.beta)
+                except Exception:
+                    thr, fb = 0.5, {"best_fbeta": None, "beta": args.beta}
+            else:
+                thr, fb = 0.5, {"best_fbeta": None, "beta": args.beta}
+            thr_info = {"strategy": "fbeta", **fb}
+
+        logger.info("Decision threshold (source=%s): %.4f | details=%s", threshold_source, thr, thr_info)
+        json.dump({"threshold": thr, "source": threshold_source, **thr_info}, open(out_dir / "decision_threshold.json", "w"), indent=2)
+
         # Hold‑out evaluation (if present)
         if X_val is not None:
             try:
-                evaluate_holdout(calibrated_est if 'calibrated_est' in locals() else search.best_estimator_, X_val, y_val, out_dir)
-                # Save validation probabilities for threshold tuning
-                if args.save_val_probs and 'calibrated_est' in locals() and hasattr(calibrated_est, "predict_proba"):
-                    val_proba = calibrated_est.predict_proba(X_val)[:, 1]
-                    pd.DataFrame({"y_val": y_val.values, "proba": val_proba}).to_csv(
-                        out_dir / "val_probs.csv", index=False
-                    )
+                evaluate_holdout(final_estimator, X_val, y_val, out_dir, threshold=thr)
             except Exception as e:
                 logger.error("Hold‑out evaluation failed: %s", e)
                 # Continue execution as this is not critical
@@ -718,7 +776,7 @@ def main():
                 n_repeats=30,
                 random_state=args.seed,
                 n_jobs=-1,
-                scoring="f1"
+                scoring="average_precision"
             )
             importances = pd.DataFrame({
                 "feature": X.columns,
@@ -741,29 +799,17 @@ def main():
 
         # Save model artifacts
         try:
-            # Threshold selection (chunk/doc gates) on holdout if available
-            try:
-                if X_val is not None and 'calibrated_est' in locals() and hasattr(calibrated_est, "predict_proba"):
-                    from sklearn.metrics import precision_recall_curve
-                    proba = calibrated_est.predict_proba(X_val)[:, 1]
-                    df_eval = pd.DataFrame({"y": y_val.values, "proba": proba})
-                    prec, rec, thr = precision_recall_curve(df_eval["y"], df_eval["proba"])
-                    f05 = (1+0.5**2) * (prec * rec) / (0.5**2 * prec + rec + 1e-9)
-                    t_idx = np.nanargmax(f05[:-1])
-                    gate = {"chunk_threshold": float(thr[t_idx])}
-                    with open(out_dir / "gating_thresholds.json", "w") as f:
-                        json.dump(gate, f, indent=2)
-                    logger.info("Saved gating thresholds: %s", gate)
-            except Exception as e:
-                logger.warning("Threshold selection failed: %s", e)
-
             model_path = out_dir / "rf_model.pkl"
-            joblib.dump(calibrated_est if 'calibrated_est' in locals() else search.best_estimator_, model_path, compress=3)
+            # Persist the calibrated estimator if available
+            try:
+                joblib.dump(final_estimator, model_path, compress=3)
+            except Exception:
+                joblib.dump(search.best_estimator_, model_path, compress=3)
 
             # Also export a safe, portable copy using skops
             skops_path = out_dir / "rf_model.skops"
             try:
-                sio.dump(calibrated_est if 'calibrated_est' in locals() else search.best_estimator_, skops_path)
+                sio.dump(final_estimator, skops_path)
                 # Persist list of types required to load safely (useful for Kaggle `trusted=`)
                 try:
                     unknown_types = sio.get_untrusted_types(file=str(skops_path))

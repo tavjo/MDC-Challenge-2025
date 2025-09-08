@@ -19,21 +19,21 @@ mkdir -p artifacts/models
 
 # Run training with default parameters
 echo "📊 Training Random Forest with default parameters..."
-echo "   - Input: Data/train/train_data.csv"
+echo "   - Input: train_data_chunks_reduced.csv"
 echo "   - Output: artifacts/models"
 echo "   - Target: target"
 echo "   - Seed: 42"
-echo "   - Iterations: 500"
-echo "   - No holdout"
+echo "   - Iterations: 100"
 echo ""
 
 python src/training.py \
-    --input_csv Data/train/train_data.csv \
+    --input_csv Data/train/train_data_chunks_reduced.csv \
     --output_dir artifacts/models \
     --target_col target \
     --seed 42 \
-    --n_iter 500 \
-    --no_holdout
+    --n_iter 100 \
+    --use_balanced_rf \
+    --group_col document_id
 
 if [[ $? -eq 0 ]]; then
     echo ""
