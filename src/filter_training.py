@@ -111,7 +111,7 @@ def parse_args() -> argparse.Namespace:
                             help="How to set the decision threshold (default: cost).")
         parser.add_argument("--cost_fp", type=float, default=1.0, help="Cost of a false positive.")
         parser.add_argument("--cost_fn", type=float, default=2.0, help="Cost of a false negative.")
-        parser.add_argument("--beta", type=float, default=1.0, help="Beta for F-beta fallback.")
+        parser.add_argument("--beta", type=float, default=2.0, help="Beta for F-beta fallback.")
         parser.add_argument("--use_lgbm", action="store_true", help="Use LightGBM (requires lightgbm).")
         parser.add_argument("--use_xgb", action="store_true", help="Use XGBoost (requires xgboost).")
         parser.add_argument("--use_easy_ensemble", action="store_true", help="Use EasyEnsembleClassifier (imblearn).")

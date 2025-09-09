@@ -41,7 +41,7 @@ if str(THIS_DIR) not in sys.path:
 #     from src.kaggle.helpers import load_bge_model, embed_texts, timer_wrap, initialize_logging
 #     from src.kaggle.duckdb_utils import get_duckdb_helper
 # except Exception:
-from retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON, retrieval_with_boost, mmr_rerank, prefilter_chunks_for_embeddings
+from retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON, retrieval_with_boost, mmr_rerank, prefilter_chunks_for_embeddings, DATA_CITATION_KEYWORDS, _REPO_DOI_COMPILED, _REGEX_SPECIFIC_COMPILED
 from models import BoostConfig
 from helpers import load_bge_model, embed_texts, timer_wrap, initialize_logging
 from duckdb_utils import get_duckdb_helper
@@ -90,21 +90,27 @@ def collapse_neighbors_by_rank(
     """
     keep: List[str] = []
     banned: set[str] = set()
-    in_rank: set[str] = set(ranked_ids)
+    try:
+        in_rank: set[str] = set(ranked_ids)
+    except Exception:
+        in_rank = set()
 
-    for cid in ranked_ids:  # ranked_ids is already in descending fused order
+    for cid in ranked_ids or []:  # ranked_ids is already in descending fused order
         if cid in banned:
             continue
         keep.append(cid)
         ch = id_to_chunk.get(cid)
-        if ch is not None and getattr(ch, "chunk_metadata", None) is not None:
-            prev_id = getattr(ch.chunk_metadata, "previous_chunk_id", None)
-            next_id = getattr(ch.chunk_metadata, "next_chunk_id", None)
-            # Only ban if the neighbor is also present in ranked_ids
-            if isinstance(prev_id, str) and prev_id in in_rank:
-                banned.add(prev_id)
-            if isinstance(next_id, str) and next_id in in_rank:
-                banned.add(next_id)
+        try:
+            if ch is not None and getattr(ch, "chunk_metadata", None) is not None:
+                prev_id = getattr(ch.chunk_metadata, "previous_chunk_id", None)
+                next_id = getattr(ch.chunk_metadata, "next_chunk_id", None)
+                # Only ban if the neighbor is also present in ranked_ids
+                if isinstance(prev_id, str) and prev_id in in_rank:
+                    banned.add(prev_id)
+                if isinstance(next_id, str) and next_id in in_rank:
+                    banned.add(next_id)
+        except Exception:
+            continue
     return keep
 
 
@@ -131,43 +137,46 @@ def run_hybrid_retrieval_on_document(
     upward through ranks until under budget.
     """
     print(f"Initializing DB Helper")
-    db_helper = get_duckdb_helper(db_path)
-    print(f"Retrieving chunks for document {doc_id}")
-    chunks = db_helper.get_chunks_by_document_id(doc_id)
+    db_helper = None
+    try:
+        db_helper = get_duckdb_helper(db_path)
+        print(f"Retrieving chunks for document {doc_id}")
+        chunks = db_helper.get_chunks_by_document_id(doc_id)
+    finally:
+        try:
+            if db_helper is not None:
+                db_helper.close()
+        except Exception:
+            pass
     if len(chunks) == 0:
         print(f"Retrieved no chunks for {doc_id}. Returning None.")
         return None
     print(f"Retrieved {len(chunks)} chunks for {doc_id}")
-    db_helper.close()
     id_to_text: Dict[str, str] = {ch.chunk_id: ch.text for ch in chunks}
     id_to_chunk = {ch.chunk_id: ch for ch in chunks}
-
-    # 1.5) Prefilter chunks for embeddings
-    prefiltered_ids, pf_scores = prefilter_chunks_for_embeddings(
-    id_to_text=id_to_text,
-    DAS_LEXICON=DAS_LEXICON,
-    DATA_CITATION_KEYWORDS=DATA_CITATION_KEYWORDS,
-    REPO_DOI_COMPILED=_REPO_DOI_COMPILED,
-    REGEX_SPECIFIC_COMPILED=_REGEX_SPECIFIC_COMPILED,
-    keep_top_k=None,           # or set an upper bound like 50_000 for very large corpora
-    min_keep=len(chunks)*0.3,
-    score_threshold=1.0,
-    penalize_references=True)
 
     # 2) Load local BGE-small and embed chunks
     print("Loading BGE small embeddings model...")
     # model = load_bge_model(model_dir)
-    # chunk_ids = list(id_to_text.keys())
-    chunk_ids = prefiltered_ids
+    chunk_ids = list(id_to_text.keys())
+    # chunk_ids = prefiltered_ids
     chunk_texts = [id_to_text[cid] for cid in chunk_ids]
-    chunk_vecs = embed_texts(model, chunk_texts)
+    try:
+        chunk_vecs = embed_texts(model, chunk_texts)
+    except Exception as e:
+        logger.error("Chunk embedding failed in get_citation_context", exc_info=e)
+        return None
     id_to_dense: Dict[str, np.ndarray] = {cid: vec for cid, vec in zip(chunk_ids, chunk_vecs)}
 
     # 3) Build the (short) semantic query and embed it
     print("Build and embed short semantic query")
     query_text = build_query_text()
     query_for_embedding = maybe_add_bge_instruction(query_text, use_instruction=use_instruction)
-    query_vec = embed_texts(model, [query_for_embedding])[0]
+    try:
+        query_vec = embed_texts(model, [query_for_embedding])[0]
+    except Exception as e:
+        logger.error("Query embedding failed in get_citation_context", exc_info=e)
+        return None
 
     # 4) Run hybrid retrieval: sparse (BM25/TF-IDF) + dense -> RRF -> MMR
     print("🔄 Starting hybrid retrieval...")
@@ -387,10 +396,21 @@ def run_hybrid_retrieval_on_docs(
 
     id_to_text: Dict[str, str] = {ch.chunk_id: ch.text for ch in chunks}
     id_to_chunk = {ch.chunk_id: ch for ch in chunks}
+    # 1.5) Prefilter chunks for embeddings
+    prefiltered_ids, pf_scores = prefilter_chunks_for_embeddings(
+    id_to_text=id_to_text,
+    DAS_LEXICON=DAS_LEXICON,
+    DATA_CITATION_KEYWORDS=DATA_CITATION_KEYWORDS,
+    REPO_DOI_COMPILED=_REPO_DOI_COMPILED,
+    REGEX_SPECIFIC_COMPILED=_REGEX_SPECIFIC_COMPILED,
+    keep_top_k=int(len(chunks)*0.8),           # or set an upper bound like 50_000 for very large corpora
+    min_keep=int(len(chunks)*0.3),
+    score_threshold=1.0,
+    penalize_references=True)
 
     # Embeddings for all chunks
     logger.info("Encoding %d chunks with BGE-small (all-docs)", len(id_to_text))
-    chunk_ids = list(id_to_text.keys())
+    chunk_ids = prefiltered_ids
     chunk_texts = [id_to_text[cid] for cid in chunk_ids]
     chunk_vecs = embed_texts(model, chunk_texts)
     id_to_dense: Dict[str, np.ndarray] = {cid: vec for cid, vec in zip(chunk_ids, chunk_vecs)}
@@ -520,7 +540,7 @@ def run_hybrid_retrieval_on_docs(
     )
     n = len(anchor_ids)
     # 20% with guards (feel free to tweak)
-    _frac = 0.20
+    _frac = 0.30
     MIN_K, MAX_K = 50, 3000
     if not anchor_ids:
         logger.info("No anchors survived threshold; returning empty result.")

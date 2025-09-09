@@ -38,7 +38,11 @@ class KaggleDuckDBHelper:
         self.db_path = db_path or DEFAULT_DUCKDB
         path = Path(self.db_path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.engine: duckdb.DuckDBPyConnection = duckdb.connect(str(path))
+        try:
+            self.engine: duckdb.DuckDBPyConnection = duckdb.connect(str(path))
+        except Exception as e:
+            logger.error("Failed to connect to DuckDB at %s", str(path), exc_info=e)
+            raise
         self.init_schema()
 
     # --------------------------- Schema ---------------------------
@@ -71,7 +75,7 @@ class KaggleDuckDBHelper:
                 data_citation VARCHAR NOT NULL,
                 document_id   VARCHAR NOT NULL,
                 pages         INTEGER[],
-                evidence      VARCHAR[],
+                evidence      VARCHAR,
                 dataset_type  VARCHAR,
                 created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (data_citation, document_id)
@@ -169,10 +173,14 @@ class KaggleDuckDBHelper:
             raise
 
     def get_all_documents(self) -> List[Document]:
-        res = self.engine.execute("SELECT * FROM documents")
-        rows = res.fetchall()
-        cols = [d[0] for d in res.description]
-        return [Document.from_duckdb_row(dict(zip(cols, r))) for r in rows]
+        try:
+            res = self.engine.execute("SELECT * FROM documents")
+            rows = res.fetchall()
+            cols = [d[0] for d in res.description]
+            return [Document.from_duckdb_row(dict(zip(cols, r))) for r in rows]
+        except Exception as e:
+            logger.error("Failed to retrieve all documents", exc_info=e)
+            raise ValueError("Database query failed: documents") from e
 
     # --------------------------- Chunks --------------------------
     @timer_wrap
@@ -197,16 +205,24 @@ class KaggleDuckDBHelper:
             e.unregister("chunks_buffer")
     
     def get_all_chunks(self) -> List[Chunk]:
-        res = self.engine.execute("SELECT * FROM chunks")
-        rows = res.fetchall()
-        cols = [d[0] for d in res.description]
-        return [Chunk.from_duckdb_row(dict(zip(cols, r))) for r in rows]
+        try:
+            res = self.engine.execute("SELECT * FROM chunks")
+            rows = res.fetchall()
+            cols = [d[0] for d in res.description]
+            return [Chunk.from_duckdb_row(dict(zip(cols, r))) for r in rows]
+        except Exception as e:
+            logger.error("Failed to retrieve all chunks", exc_info=e)
+            raise ValueError("Database query failed: chunks") from e
 
     def get_chunks_by_document(self, document_id: str) -> List[Chunk]:
-        res = self.engine.execute("SELECT * FROM chunks WHERE document_id = ?", [document_id])
-        rows = res.fetchall()
-        cols = [d[0] for d in res.description]
-        return [Chunk.from_duckdb_row(dict(zip(cols, r))) for r in rows]
+        try:
+            res = self.engine.execute("SELECT * FROM chunks WHERE document_id = ?", [document_id])
+            rows = res.fetchall()
+            cols = [d[0] for d in res.description]
+            return [Chunk.from_duckdb_row(dict(zip(cols, r))) for r in rows]
+        except Exception as e:
+            logger.error("Failed to retrieve chunks for document_id=%s", document_id, exc_info=e)
+            raise ValueError(f"Database query failed: chunks for document {document_id}") from e
     
     def get_chunks_by_document_id(self, document_id: str) -> List[Chunk]:
         """
@@ -334,10 +350,14 @@ class KaggleDuckDBHelper:
 
     # --------------------------- Citations -----------------------
     def get_all_citation_entities(self) -> List[CitationEntity]:
-        res = self.engine.execute("SELECT * FROM citations")
-        rows = res.fetchall()
-        cols = [d[0] for d in res.description]
-        return [CitationEntity.from_duckdb_row(dict(zip(cols, r))) for r in rows]
+        try:
+            res = self.engine.execute("SELECT * FROM citations")
+            rows = res.fetchall()
+            cols = [d[0] for d in res.description]
+            return [CitationEntity.from_duckdb_row(dict(zip(cols, r))) for r in rows]
+        except Exception as e:
+            logger.error("Failed to retrieve citation entities", exc_info=e)
+            raise ValueError("Database query failed: citations") from e
 
     def get_all_datasets(self) -> List[Dataset]:
         """Get all datasets from the database."""

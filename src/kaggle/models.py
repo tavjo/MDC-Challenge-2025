@@ -80,7 +80,7 @@ class CitationEntity(BaseModel):
     data_citation: str = Field(..., description="Data citation from text")
     document_id: str = Field(..., description="DOI of the document where the data citation is found")
     pages: Optional[List[int]] = Field(None, description="List of page numbers where the data citation is mentioned.")
-    evidence: Optional[List[str]] = Field(None, description="List of evidence from the text for the data citation")
+    evidence: Optional[Union[List[str], str]] = Field(None, description="List of evidence from the text for the data citation")
     dataset_type: Optional[DatasetType] = Field(None, description="Type of dataset citation")
 
     def to_string(self) -> str:
@@ -88,7 +88,7 @@ class CitationEntity(BaseModel):
         Flatten the citation entity into a string.
         """
         pages_str = ",".join(map(str, self.pages)) if self.pages else ""
-        evidence_str = ",".join(self.evidence) if self.evidence else ""
+        evidence_str = ",".join(self.evidence) if isinstance(self.evidence, list) else self.evidence if self.evidence else ""
         ds = (
             self.dataset_type.value if isinstance(self.dataset_type, Enum) else self.dataset_type
         ) if self.dataset_type else ""
@@ -99,24 +99,30 @@ class CitationEntity(BaseModel):
         """
         Rehydrate the citation entity from a string.
         """
-        parts = citation_entity_str.split("|")
-        data_citation = parts[0] if len(parts) > 0 else ""
-        document_id = parts[1] if len(parts) > 1 else ""
-        pages_str = parts[2] if len(parts) > 2 else ""
-        evidence_str = parts[3] if len(parts) > 3 else ""
-        ds_str = parts[4] if len(parts) > 4 else None
+        try:
+            parts = citation_entity_str.split("|")
+            data_citation = parts[0] if len(parts) > 0 else ""
+            document_id = parts[1] if len(parts) > 1 else ""
+            pages_str = parts[2] if len(parts) > 2 else ""
+            evidence_str = parts[3] if len(parts) > 3 else ""
+            ds_str = parts[4] if len(parts) > 4 else None
 
-        pages = [int(p) for p in pages_str.split(",") if p] if pages_str else None
-        evidence = evidence_str.split(",") if evidence_str else None
-        ds_val = None if not ds_str else ds_str
+            pages = [int(p) for p in pages_str.split(",") if p] if pages_str else None
+            ds_val = None if not ds_str else ds_str
 
-        return cls(
-            data_citation=data_citation,
-            document_id=document_id,
-            pages=pages,
-            evidence=evidence,
-            dataset_type=ds_val,
-        )
+            return cls(
+                data_citation=data_citation,
+                document_id=document_id,
+                pages=pages,
+                evidence=evidence_str,
+                dataset_type=ds_val,
+            )
+        except Exception:
+            # fallback minimal parse
+            return cls(
+                data_citation=citation_entity_str.split("|")[0] if citation_entity_str else "",
+                document_id="",
+            )
     
     def to_duckdb_row(self) -> Dict[str, Any]:
         """
@@ -198,20 +204,38 @@ class Chunk(BaseModel):
         """
         Rehydrate the chunk from a DuckDB row.
         """
-        citation_entities = [CitationEntity.from_string(ce_str) for ce_str in row["chunk_metadata"]["citation_entities"] if ce_str]
-        return cls(
-            chunk_id=row["chunk_id"],
-            document_id=row["document_id"],
-            text=row["chunk_text"],
-            score=row["score"],
-            chunk_metadata = ChunkMetadata(
+        try:
+            raw_meta = row.get("chunk_metadata") or {}
+            ce_list = raw_meta.get("citation_entities") or []
+            citation_entities = [CitationEntity.from_string(ce_str) for ce_str in ce_list if ce_str]
+            return cls(
                 chunk_id=row["chunk_id"],
-                previous_chunk_id=row["chunk_metadata"]["previous_chunk_id"],
-                next_chunk_id=row["chunk_metadata"]["next_chunk_id"],
-                token_count=row["chunk_metadata"]["token_count"],
-                citation_entities=citation_entities
+                document_id=row["document_id"],
+                text=row.get("chunk_text", ""),
+                score=row.get("score"),
+                chunk_metadata = ChunkMetadata(
+                    chunk_id=row["chunk_id"],
+                    previous_chunk_id=raw_meta.get("previous_chunk_id"),
+                    next_chunk_id=raw_meta.get("next_chunk_id"),
+                    token_count=int(raw_meta.get("token_count", 0) or 0),
+                    citation_entities=citation_entities
+                )
             )
-        )
+        except Exception:
+            # minimal fallback
+            return cls(
+                chunk_id=row.get("chunk_id", ""),
+                document_id=row.get("document_id", ""),
+                text=row.get("chunk_text", ""),
+                score=row.get("score"),
+                chunk_metadata=ChunkMetadata(
+                    chunk_id=row.get("chunk_id", ""),
+                    previous_chunk_id=None,
+                    next_chunk_id=None,
+                    token_count=int(0),
+                    citation_entities=[],
+                ),
+            )
 
 
 class Document(BaseModel):
@@ -257,21 +281,32 @@ class Document(BaseModel):
         """
         Rehydrate the document from a DuckDB row.
         """
-        citation_entities = [CitationEntity.from_string(ce_str) for ce_str in row["citation_entities"] if ce_str]
-        return cls(
-            doi=row["doi"],
-            has_dataset_citation=row["has_dataset_citation"],
-            full_text=row["full_text"],
-            total_char_length=row["total_char_length"],
-            parsed_timestamp=str(row["parsed_timestamp"]),
-            total_chunks=row["total_chunks"],
-            total_tokens=row["total_tokens"],
-            avg_tokens_per_chunk=row["avg_tokens_per_chunk"],
-            file_hash=row["file_hash"],
-            file_path=row["file_path"],
-            citation_entities=citation_entities,
-            n_pages=row["n_pages"]
-        )
+        try:
+            ce_raw = row.get("citation_entities") or []
+            citation_entities = [CitationEntity.from_string(ce_str) for ce_str in ce_raw if ce_str]
+            return cls(
+                doi=row["doi"],
+                has_dataset_citation=row.get("has_dataset_citation"),
+                full_text=row.get("full_text", ""),
+                total_char_length=int(row.get("total_char_length", 0) or 0),
+                parsed_timestamp=str(row.get("parsed_timestamp", "")),
+                total_chunks=row.get("total_chunks"),
+                total_tokens=row.get("total_tokens"),
+                avg_tokens_per_chunk=row.get("avg_tokens_per_chunk"),
+                file_hash=row.get("file_hash", ""),
+                file_path=row.get("file_path", ""),
+                citation_entities=citation_entities,
+                n_pages=row.get("n_pages"),
+            )
+        except Exception:
+            return cls(
+                doi=row.get("doi", ""),
+                full_text=row.get("full_text", ""),
+                total_char_length=int(row.get("total_char_length", 0) or 0),
+                parsed_timestamp=str(row.get("parsed_timestamp", "")),
+                file_hash=row.get("file_hash", ""),
+                file_path=row.get("file_path", ""),
+            )
 class Dataset(BaseModel):
     """Dataset Citation Extracted from Document text"""
     dataset_id: str = Field(..., description="Dataset ID")
@@ -308,17 +343,28 @@ class Dataset(BaseModel):
         """
         Rehydrate the dataset from a DuckDB row.
         """
-        return cls(
-            dataset_id=row["dataset_id"],
-            document_id=row["document_id"],
-            total_tokens=row["total_tokens"],
-            avg_tokens_per_chunk=row["avg_tokens_per_chunk"],
-            total_char_length=row["total_char_length"],
-            clean_text_length=row["clean_text_length"],
-            cluster=row["cluster"],
-            dataset_type=row["dataset_type"],
-            text=row["text"]
-        )
+        try:
+            return cls(
+                dataset_id=row["dataset_id"],
+                document_id=row["document_id"],
+                total_tokens=int(row.get("total_tokens", 0) or 0),
+                avg_tokens_per_chunk=float(row.get("avg_tokens_per_chunk", 0.0) or 0.0),
+                total_char_length=int(row.get("total_char_length", 0) or 0),
+                clean_text_length=int(row.get("clean_text_length", 0) or 0),
+                cluster=row.get("cluster"),
+                dataset_type=row.get("dataset_type"),
+                text=row.get("text", ""),
+            )
+        except Exception:
+            return cls(
+                dataset_id=row.get("dataset_id", ""),
+                document_id=row.get("document_id", ""),
+                total_tokens=int(row.get("total_tokens", 0) or 0),
+                avg_tokens_per_chunk=float(row.get("avg_tokens_per_chunk", 0.0) or 0.0),
+                total_char_length=int(row.get("total_char_length", 0) or 0),
+                clean_text_length=int(row.get("clean_text_length", 0) or 0),
+                text=row.get("text", ""),
+            )
 
 class EngineeredFeatures(BaseModel):
     """Engineered features for the dataset citation classification task"""
@@ -351,8 +397,11 @@ class EngineeredFeatures(BaseModel):
     def from_eav_rows(cls, rows: List[Dict[str, Any]]) -> "EngineeredFeatures":
         """Hydrate a model from SELECT * WHERE dataset_id=… AND document_id=…"""
         merged: Dict[str, Any] = {}
-        for r in rows:
-            merged.setdefault("dataset_id", r["dataset_id"])
-            merged.setdefault("document_id", r["document_id"])
-            merged[r["feature_name"]] = r["feature_value"]
+        for r in rows or []:
+            try:
+                merged.setdefault("dataset_id", r["dataset_id"])
+                merged.setdefault("document_id", r["document_id"])
+                merged[r["feature_name"]] = r.get("feature_value")
+            except Exception:
+                continue
         return cls.model_validate(merged)

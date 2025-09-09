@@ -7,7 +7,7 @@ During inference, since there will be no train_labels.csv, we will create anothe
 This script is currently only meant to operate on PDF files.
 """
 
-from typing import List, Optional, Tuple, Dict, Set
+from typing import List, Optional, Tuple, Dict, Set, Union
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -29,9 +29,10 @@ THIS_DIR = Path(__file__).parent
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
 
-from helpers import timer_wrap, initialize_logging
+from helpers import timer_wrap, initialize_logging, find_citation_matches
 from models import CitationEntity, Chunk
 from duckdb_utils import get_duckdb_helper
+from retrieval_module import DAS_LEXICON, DATA_CITATION_KEYWORDS, _REPO_DOI_COMPILED, _REGEX_SPECIFIC_COMPILED
 
 
 logger = initialize_logging()
@@ -52,27 +53,6 @@ PROMPT_EXAMPLE_STRINGS = [
     "10.5061/dryad.4dj6042",
     "doi:10.5061/dryad.4dj6042",
     "http://dx.doi.org/10.5061/dryad.4dj6042",
-    # "https://doi.org/10.6084/m9.figshare.29901470.v1",
-    # "https://doi.org/10.15468/dl.354f8k",
-    # "10.15468/dl.354f8k",
-    # "doi:10.15468/dl.354f8k",
-    # "http://dx.doi.org/10.15468/dl.354f8k",
-    # "https://doi.org/10.15468/dl.pdjqte",
-    # "10.15468/dl.pdjqte",
-    # "doi:10.15468/dl.pdjqte",
-    # "http://dx.doi.org/10.15468/dl.pdjqte",
-    # "https://doi.org/10.15468/dl.nbku3v",
-    # "10.15468/dl.nbku3v",
-    # "doi:10.15468/dl.nbku3v",
-    # "http://dx.doi.org/10.15468/dl.nbku3v",
-    # "https://doi.org/10.15468/dl.uejpg6",
-    # "10.15468/dl.uejpg6",
-    # "doi:10.15468/dl.uejpg6",
-    # "http://dx.doi.org/10.15468/dl.uejpg6",
-    # "https://doi.org/10.1101/2022.07.21.501061",
-    # "10.1101/2022.07.21.501061",
-    # "doi:10.1101/2022.07.21.501061",
-    # "http://dx.doi.org/10.1101/2022.07.21.501061",
     "JX123456-JX123457",
     "JX123458",
     "JX123456", 
@@ -80,6 +60,22 @@ PROMPT_EXAMPLE_STRINGS = [
     "JX123458",
     "MK123456",
     "GSE123456",
+    # Verbatim accession examples from prompt, expanded to individual entries
+    "GSE",
+    "GSM",
+    "SRR",
+    "ERR",
+    "DRR",
+    "PRJNA",
+    "PRJEB",
+    "PRJDB",
+    "E-MTAB-",
+    "E-MEXP-",
+    "PXD",
+    "MSV",
+    "EGAD",
+    "EGAS",
+    "PDB 1Y2T",
 ]
 
 # Minimal DOI finder and variants
@@ -148,16 +144,80 @@ def extract_candidate_doi_sentences_list(texts: List[str], limit: int = 80) -> L
 def is_article_doi_prefix(s: str) -> bool:
     return any(s.startswith(p) for p in ARTICLE_DOI_DENYLIST_PREFIXES)
 
-def evidence_has_das_context(evidence: List[str]) -> bool:
-    ev = " ".join(evidence).lower()
-    return any(c in ev for c in DAS_STRONG_CUES)
+def evidence_has_das_context(evidence: Union[List[str], str]) -> bool:
+    ev = " ".join(evidence) if isinstance(evidence, list) else (evidence or "")
+    ev = ev.lower()
+    # Expanded DAS context using retrieval_module terms
+    terms: Set[str] = set(w.lower() for w in DAS_LEXICON)
+    for words in DATA_CITATION_KEYWORDS.values():
+        terms.update(w.lower() for w in words)
+    return any(c in ev for c in terms)
 
 def is_generic_non_doi_url(s: str) -> bool:
     sl = s.lower().strip()
     return sl.startswith("http") and ("doi.org/10." not in sl and "dx.doi.org/10." not in sl)
 
 def expand_multi_ids(s: str) -> List[str]:
-    return [m.group(0).strip().rstrip(".,;:)") for m in ID_TOKEN.finditer(s)]
+    """Extract and expand multiple IDs or ranges from a string.
+
+    - Captures standalone IDs via ID_TOKEN
+    - Expands hyphenated ranges with optional repeated prefix and compressed RHS (e.g., JX123456-58)
+    - Tolerates spaces and unicode dashes around the hyphen
+    Returns unique IDs in discovery order.
+    """
+    out: List[str] = []
+    seen: Set[str] = set()
+
+    text = s or ""
+    # 1) Expand hyphenated ranges like PREFIX123456–PREFIX123458 or PREFIX123456–58
+    dash_class = "-\u2010-\u2015"  # hyphen and unicode dashes
+    range_re = re.compile(
+        rf"(?i)\b([A-Z]{{2,10}})\s*([0-9]{{3,}})\s*[{dash_class}]\s*(?:([A-Z]{{2,10}})\s*)?([0-9]+)\b"
+    )
+    for m in range_re.finditer(text):
+        prefix_left = m.group(1).upper()
+        left_digits = m.group(2)
+        prefix_right = (m.group(3) or prefix_left).upper()
+        right_digits = m.group(4)
+
+        try:
+            start_num = int(left_digits)
+        except Exception:
+            continue
+        if len(right_digits) < len(left_digits):
+            try:
+                end_full = int(left_digits[: len(left_digits) - len(right_digits)] + right_digits)
+            except Exception:
+                continue
+        else:
+            try:
+                end_full = int(right_digits)
+            except Exception:
+                continue
+        lo, hi = (start_num, end_full) if start_num <= end_full else (end_full, start_num)
+
+        # Clamp pathological ranges
+        if hi - lo > 5000:
+            candidates = [lo, hi]
+        else:
+            candidates = range(lo, hi + 1)
+
+        width = len(left_digits)
+        for n in candidates:
+            pref = prefix_left if prefix_right == prefix_left else (prefix_left if n == start_num else prefix_right)
+            val = f"{pref}{str(n).zfill(width)}"
+            if val not in seen:
+                seen.add(val)
+                out.append(val)
+
+    # 2) Add any standalone IDs matched by ID_TOKEN (avoid duplicates)
+    for m in ID_TOKEN.finditer(text):
+        tok = m.group(0).strip().rstrip(".,;:)")
+        if tok and tok not in seen:
+            seen.add(tok)
+            out.append(tok)
+
+    return out
 
 def post_additions(entities: List[CitationEntity], paper_dois: Set[str]) -> List[CitationEntity]:
     out: List[CitationEntity] = []
@@ -167,14 +227,14 @@ def post_additions(entities: List[CitationEntity], paper_dois: Set[str]) -> List
             continue
         if s in paper_dois or is_article_doi_prefix(s):
             continue
-        if any(tok in s for tok in (",", " and ", " to ", ";")):
-            for id_ in expand_multi_ids(s):
+        expanded_ids = expand_multi_ids(s)
+        if len(expanded_ids) >= 2:
+            # Create a clone per expanded ID and drop the aggregated string
+            for id_ in expanded_ids:
                 if id_ and (id_ not in paper_dois) and (not is_article_doi_prefix(id_)):
-                    out.append(e.model_copy(update={"data_citation": id_}))
+                    out.append(e.model_copy(deep=True,update={"data_citation": id_}))
             continue
-        # Permit generic dataset webpages if evidence has DAS context
-        if is_generic_non_doi_url(s) and not evidence_has_das_context(e.evidence):
-            continue
+        # Do NOT require DAS context in evidence; accept sparse evidence
         out.append(e)
     return out
 
@@ -226,8 +286,15 @@ class UnknownCitationEntityExtractor:
         """
         if not os.path.exists(self.top_ids_path):
             raise FileNotFoundError(f"top_ids JSON not found at {self.top_ids_path}")
-        with open(self.top_ids_path, "r") as f:
-            triples = json.load(f)
+        try:
+            with open(self.top_ids_path, "r") as f:
+                triples = json.load(f)
+        except FileNotFoundError as e:
+            logger.error("top_ids JSON not found", exc_info=e)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error("Invalid JSON in top_ids file: %s", self.top_ids_path, exc_info=e)
+            raise
         # Expect list of [pre_id, anchor_id, post_id] with possible nulls
         # Normalize to Optional[str]
         norm_triples: List[Tuple[Optional[str], str, Optional[str]]] = []
@@ -253,8 +320,10 @@ class UnknownCitationEntityExtractor:
             return []
 
         db_helper = get_duckdb_helper(self.db_path)
-        chunks = db_helper.get_chunks_by_chunk_ids(list(all_ids))
-        db_helper.close()
+        try:
+            chunks = db_helper.get_chunks_by_chunk_ids(list(all_ids))
+        finally:
+            db_helper.close()
         self.chunks_by_id = {c.chunk_id: c for c in chunks}
         return chunks
 
@@ -291,10 +360,11 @@ class UnknownCitationEntityExtractor:
     
     def _process_group(self, doc_id: str, chunk_ids: List[str], texts: List[str]) -> List[CitationEntity]:
         """Worker invoked by the thread pool: extract, validate, record per-chunk strings."""
-        # Optional pre-filter: shrink list-of-strings to sentences with DOI + DAS cues
-        pre = extract_candidate_doi_sentences_list(texts)
-        inp = pre if pre else texts
-        raw = extract_cites(inp) or []
+        try:
+            raw = extract_cites(texts) or []
+        except Exception as e:
+            logger.warning("BAML extract_cites failed for group; returning empty", exc_info=e)
+            raw = []
         cites = [
             CitationEntity.model_validate({**e.model_dump(mode="json"), "document_id": doc_id})
             for e in raw
@@ -303,6 +373,30 @@ class UnknownCitationEntityExtractor:
         # Additional conservative filters and multi-ID splitting
         paper_dois = doi_variants_from_string(doc_id)
         cites = post_additions(cites, paper_dois)
+
+        # Presence checks (evidence and triplet text) and DAS context on triplet text
+        group_text = " ".join(texts) if texts else ""
+        das_terms: Set[str] = set(w.lower() for w in DAS_LEXICON)
+        for words in DATA_CITATION_KEYWORDS.values():
+            das_terms.update(w.lower() for w in words)
+        def _has_das_context(t: str) -> bool:
+            tl = (t or "").lower()
+            return any(term in tl for term in das_terms)
+
+        filtered: List[CitationEntity] = []
+        for ce in cites:
+            ev = ce.evidence
+            ev_text = " ".join(ev) if isinstance(ev, list) else (ev or "")
+            in_evidence = bool(ev_text and find_citation_matches(ce.data_citation, ev_text))
+            in_triplet = bool(group_text and find_citation_matches(ce.data_citation, group_text))
+            # Drop if missing from both evidence and triplet text
+            if not (in_evidence or in_triplet):
+                continue
+            # If present in triplet text, require expanded DAS context
+            if in_triplet and not _has_das_context(group_text):
+                continue
+            filtered.append(ce)
+        cites = filtered
         if cites:
             with self._chunk_map_lock:
                 for cid in chunk_ids:

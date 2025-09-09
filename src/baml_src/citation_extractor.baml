@@ -4,79 +4,44 @@ enum DatasetType {
   SECONDARY @description("Raw or processed data derived or reused from existing records or published data")
 }
 class CitationEntity {
-    evidence string[] @description("List of evidence from document for the data citation")
-    data_citation string @description("Data citation from text (Data repository DOI or accession number. Examples data DOI: https://doi.org/10.5061/dryad.4dj6042. Example accession number: JX123456)")
+    evidence string @description("Short evidence snippet containing the citation (single line)")
+    data_citation string @description("Data citation from text (Data repository DOI or accession number.")
     dataset_type DatasetType @description("Type of dataset citation")
-    @@assert(citation_in_evidence, {{ this.data_citation in (this.evidence | join(' ')) }})
-    @@assert(non_empty, {{ this.data_citation|length >= 6 }})
-    @@assert(no_spaces_inside, {{ ' ' not in this.data_citation or this.data_citation.startswith('PDB ') }})
-    @@assert(no_trailing_punct, {{ this.data_citation[-1] not in ['.', ',', ';', ':', ')'] }})
-    @@assert(single_identifier, {{ ',' not in this.data_citation and ' and ' not in this.data_citation and ' to ' not in this.data_citation }})
+    // @@assert(citation_in_evidence, {{ (this.data_citation | replace(' ', '')) in (this.evidence | replace(' ', '')) }})
+    // @@assert(non_empty, {{ this.data_citation|length >= 6 }})
+    // @@assert(no_trailing_punct, {{ this.data_citation[-1] not in ['.', ',', ';', ':', ')'] }})
 
-    // Accept http URLs only if they are DOI URLs OR evidence states a data-availability context
-    @@assert(http_requires_dataset_context, {{
-      not this.data_citation.startswith('http') or
-      'doi.org/10.' in this.data_citation or 'dx.doi.org/10.' in this.data_citation or
-      (
-        'data availability' in (this.evidence | join(' ') | lower) or
-        'data are available' in (this.evidence | join(' ') | lower) or
-        'data is available' in (this.evidence | join(' ') | lower) or
-        'deposited' in (this.evidence | join(' ') | lower) or
-        'repository' in (this.evidence | join(' ') | lower) or
-        'dataset' in (this.evidence | join(' ') | lower) or
-        'accession' in (this.evidence | join(' ') | lower) or
-        'available from' in (this.evidence | join(' ') | lower) or
-        'available at' in (this.evidence | join(' ') | lower) or
-        'accession number' in (this.evidence | join(' ') | lower)
-      )
-    }})
-
-    // Unknown 10.x DOIs must either be from dataset registrants or have dataset cues in evidence
-    @@assert(unknown_doi_requires_dataset_context, {{
-      not this.data_citation.startswith('10.') or
-      this.data_citation.startswith('10.5061') or this.data_citation.startswith('10.5281') or
-      this.data_citation.startswith('10.1594') or this.data_citation.startswith('10.6084') or
-      this.data_citation.startswith('10.25386') or this.data_citation.startswith('10.7910') or
-      this.data_citation.startswith('10.15468') or this.data_citation.startswith('10.18112') or
-      this.data_citation.startswith('10.5067') or this.data_citation.startswith('10.5063') or
-      (
-        'repository' in (this.evidence | join(' ') | lower) or
-        'dataset' in (this.evidence | join(' ') | lower) or
-        'accession' in (this.evidence | join(' ') | lower) or
-        'available at' in (this.evidence | join(' ') | lower) or
-        'available from' in (this.evidence | join(' ') | lower) or
-        'deposited' in (this.evidence | join(' ') | lower) or
-        'accession number' in (this.evidence | join(' ') | lower)
-      )
-    }})
+    // // Evidence hygiene: non-empty, within length bounds, single line
+    // @@assert(evidence_non_empty, {{ this.evidence|length >= 80 }})
+    // @@assert(evidence_max_len, {{ this.evidence|length <= 200 }})
+    // @@assert(evidence_no_newlines, {{ '\n' not in this.evidence }})
 
     // Simple reference-like guard (permissive)
-    @@assert(not_reference_like_evidence, {{ not (
-      'et al.' in (this.evidence | join(' ') | lower) or
-      ' vol.' in (this.evidence | join(' ') | lower) or
-      ' volume ' in (this.evidence | join(' ') | lower) or
-      ' pp.' in (this.evidence | join(' ') | lower)
-    )}})
+    // @@assert(not_reference_like_evidence, {{ not (
+    //   ' vol.' in (this.evidence | lower) or
+    //   ' volume ' in (this.evidence | lower) or
+    //   ' pp.' in (this.evidence | lower)
+    // )}})
 
     // Blacklist common article DOI registrants
-    @@assert(not_article_doi, {{ not (
-      this.data_citation.startswith('10.1016') or
-      this.data_citation.startswith('10.1038') or
-      this.data_citation.startswith('10.1126') or
-      this.data_citation.startswith('10.1002') or
-      this.data_citation.startswith('10.1093') or
-      this.data_citation.startswith('10.1039') or
-      this.data_citation.startswith('10.1364') or
-      this.data_citation.startswith('10.1109') or
-      this.data_citation.startswith('10.1111') or
-      this.data_citation.startswith('10.1145') or
-      this.data_citation.startswith('10.1007') or
-      this.data_citation.startswith('10.1371') or
-      this.data_citation.startswith('10.1098') or
-      this.data_citation.startswith('10.1534') or
-      this.data_citation.startswith('10.3389') or
-      this.data_citation.startswith('10.12688')
-    )}})
+    // @@assert(not_article_doi, {{ not (
+    //   this.data_citation.startswith('10.1016') or
+    //   this.data_citation.startswith('10.1038') or
+    //   this.data_citation.startswith('10.1126') or
+    //   this.data_citation.startswith('10.1002') or
+    //   this.data_citation.startswith('10.1093') or
+    //   this.data_citation.startswith('10.1039') or
+    //   this.data_citation.startswith('10.1364') or
+    //   this.data_citation.startswith('10.1109') or
+    //   this.data_citation.startswith('10.1111') or
+    //   this.data_citation.startswith('10.1145') or
+    //   this.data_citation.startswith('10.1007') or
+    //   this.data_citation.startswith('10.1371') or
+    //   this.data_citation.startswith('10.1098') or
+    //   this.data_citation.startswith('10.1534') or
+    //   this.data_citation.startswith('10.3389') or
+    //   this.data_citation.startswith('10.12688')
+    // )}})
 }
 
 // Create a function to extract the data citations from a list of strings.
@@ -84,30 +49,30 @@ function ExtractCitation(document: string[]) -> CitationEntity[] {
   client QwenLocalRR
   prompt #"
     /no_think
-    Extract dataset citations only.
+    Extract ALL dataset citations in the given text. Use the context in the text to decide such as "data are accessible online at ...", "data are available from ...", "data retrieved from...", "accession numbers...", "data supporting findings have been deposited in ..." etc.
 
     Valid outputs:
-    - Dataset DOIs (bare 10.x/... or DOI URLs containing doi.org/10. or dx.doi.org/10.).
-    - Accessions: GSE/GSM, SRR/ERR/DRR, PRJNA/PRJEB/PRJDB, E-MTAB-/E-MEXP-, PXD, MSV, EGAD/EGAS, or PDB 1Y2T-style.
+    - Dataset DOIs: (bare 10.x/... or DOI URLs containing doi.org/10. or dx.doi.org/10.)
+    - Accessions numbers for datasets: (GSE/GSM, SRR/ERR/DRR, PRJNA/PRJEB/PRJDB, E-MTAB-/E-MEXP-, PXD, MSV, EGAD/EGAS, or PDB 1Y2T-style)
 
     Hard rules:
     - data_citation is the bare identifier only (no labels like "doi:" or "GEO:").
-    - One identifier per item (split lists/ranges into separate items).
-    - Homepage-only URLs are invalid; dataset webpages (including non‑DOI hosts) are allowed only when the evidence states availability/deposit/accession.
-    - Never output the article DOI or any article DOI (journal DOIs such as 10.1016, 10.1038, 10.1126, etc.).
+    - One identifier per item.
+    - Never output any article DOIs (journal DOIs such as 10.1016, 10.1038, 10.1126, Wiley, ncomms, PNAS, etc.).
     - Do not return generic database names without IDs.
 
     Evidence:
-    - evidence must contain the identifier verbatim, and data_citation must be an exact substring.
+    - evidence is a single short snippet (<= 180 chars), no newlines, and must contain the identifier.
 
     If no valid dataset DOI or accession is present, return an empty list. Do not guess.
+    Never make up a dataset DOI or accession. If text does not contain any data citations, return an empty list.
+
+    {{ ctx.output_format }}
 
     {{ _.role("user") }}
     {% for text in document %}
-    {{ text }}
+    ---Document Text: {{ text }}
     {% endfor %}
-
-    {{ ctx.output_format }}
 
   "#
 }

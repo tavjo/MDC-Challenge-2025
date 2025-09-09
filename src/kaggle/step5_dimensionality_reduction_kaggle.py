@@ -92,7 +92,12 @@ def _run_pca_on_cluster(
         return cluster_id, pc1
     except Exception as e:
         logger.error(f"PCA failed for cluster {cluster_id}", exc_info=e)
-        raise
+        # Fallback: return normalized mean of columns
+        try:
+            v = np.mean(X_sub, axis=1)
+            return cluster_id, v
+        except Exception:
+            raise
 
 @timer_wrap
 def run_per_cluster_pca(

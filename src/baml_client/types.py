@@ -49,7 +49,7 @@ class DatasetType(str, Enum):
 # #########################################################################
 
 class CitationEntity(BaseModel):
-    evidence: typing.List[str]
+    evidence: str
     data_citation: str
     dataset_type: DatasetType
 

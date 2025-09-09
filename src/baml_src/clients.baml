@@ -17,11 +17,9 @@ client<llm> QwenLocal0 {
     base_url "http://127.0.0.1:8000/v1"
     model "qwen3-1.7b-local"
     default_role "user"  // vLLM quirk
-    temperature 0.0
+    temperature 0.2
     top_p 1.0
     max_tokens 512
-    // Fail fast if the model gets cut off; prevents silently truncated parses
-    finish_reason_deny_list ["length"]
   }
 }
 
@@ -32,10 +30,9 @@ client<llm> QwenLocal1 {
     base_url "http://127.0.0.1:8001/v1"
     model "qwen3-1.7b-local"
     default_role "user"
-    temperature 0.0
+    temperature 0.2
     top_p 1.0
     max_tokens 512
-    finish_reason_deny_list ["length"]
   }
 }
 

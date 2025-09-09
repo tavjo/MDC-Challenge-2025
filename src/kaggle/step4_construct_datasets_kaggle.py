@@ -13,7 +13,7 @@ Flow:
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union, Any
 import re
 import numpy as np
 import pandas as pd
@@ -72,20 +72,30 @@ def load_embeddings_parquet(path: str = DEFAULT_EMB_PATH) -> Tuple[List[str], np
 @timer_wrap
 def add_target_and_neighbors_union(ranked_ids: List[str], target_and_neighbors: List[str], top_k: int) -> List[str]:
     """Return union of retrieval results and explicit target+neighbors, preserving order preference."""
-    logger.debug(f"Combining ranked_ids(top_k={top_k}) with explicit target+neighbors (n={len(target_and_neighbors)})")
+    try:
+        logger.debug(f"Combining ranked_ids(top_k={top_k}) with explicit target+neighbors (n={len(target_and_neighbors)})")
+    except Exception:
+        pass
     seen = set()
     ordered = []
-    # include retrieval-ranked first (top_k)
-    for cid in ranked_ids[:top_k]:
-        if cid not in seen:
-            seen.add(cid)
-            ordered.append(cid)
-    # ensure target + neighbors are present
-    for cid in target_and_neighbors:
-        if cid and cid not in seen:
-            seen.add(cid)
-            ordered.append(cid)
-    logger.debug(f"Combined selection size: {len(ordered)}")
+    try:
+        # include retrieval-ranked first (top_k)
+        for cid in (ranked_ids or [])[: max(0, int(top_k))]:
+            if cid not in seen:
+                seen.add(cid)
+                ordered.append(cid)
+        # ensure target + neighbors are present
+        for cid in target_and_neighbors or []:
+            if cid and cid not in seen:
+                seen.add(cid)
+                ordered.append(cid)
+    except Exception:
+        # best-effort fallback
+        ordered = list(dict.fromkeys((ranked_ids or []) + (target_and_neighbors or [])))
+    try:
+        logger.debug(f"Combined selection size: {len(ordered)}")
+    except Exception:
+        pass
     return ordered
 
 
@@ -215,7 +225,7 @@ def construct_datasets_pipeline(
     # prototype_top_m: int = TOP_M,
     boost_cfg: BoostConfig = BoostConfig(),
     prototypes: np.ndarray = None,
-) -> Tuple[List[Dataset], Path]:
+) -> Union[Tuple[List[Dataset], Path], Tuple[List[Any], Path]]:
     logger.info(f"Starting construct_datasets_pipeline(db_path={db_path}, top_k={top_k}, boost_cfg={boost_cfg})")
     db = get_duckdb_helper(db_path)
     try:
@@ -225,6 +235,11 @@ def construct_datasets_pipeline(
             logger.error("Failed to load citation entities from DuckDB", exc_info=e)
             raise
         logger.info(f"Loaded {len(citations)} citation entities")
+
+        # Early exit: nothing to do if no citations; close DB and return empty outputs
+        if not citations:
+            logger.warning("No citation entities found. Skipping dataset construction and closing DB.")
+            return [], Path("")
 
         # Cache per-document chunk text and dense embeddings to avoid recompute
         doc_cache_text: Dict[str, Dict[str, str]] = {}

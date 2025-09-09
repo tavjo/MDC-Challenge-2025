@@ -126,18 +126,17 @@ def _cache_has(enc_name: str) -> bool:
 
 def _resolve_model_to_encoding(model: str) -> str:
     """Pure-offline best effort: explicit base → use as-is; else map common models."""
-    # 1) If caller passed a base name, use it directly
-    if model in _BASES:
-        return model
-    # 2) Heuristics for modern models when tables lag:
-    if not enc:
-        # Most “o* / 4o / 4.1” models use o200k_base; classic chat/embeddings use cl100k_base
-        lower = model.lower()
+    try:
+        # 1) If caller passed a base name, use it directly
+        if model in _BASES:
+            return model
+        # 2) Heuristics for modern models when tables lag:
+        lower = str(model).lower()
         if lower.startswith(("gpt-4o", "o4", "4.1", "o1")):
-            enc = "o200k_base"
-        else:
-            enc = "cl100k_base"
-    return enc
+            return "o200k_base"
+        return "cl100k_base"
+    except Exception:
+        return "cl100k_base"
 
 def get_encoding_name_for_model(model: str = "cl100k_base") -> str:
     """Helper: what we *intend* to use (even if cache missing)."""
@@ -159,15 +158,18 @@ def _get_offline_encoding(enc_name: str):
     return None
 
 def num_tokens(text: str, model: str = "o200k_base") -> int:
-    enc_name = get_encoding_name_for_model(model)
-    enc = _get_offline_encoding(enc_name)
-    if enc:
-        try:
-            return len(enc.encode(text, disallowed_special=()))
-        except Exception:
-            pass
-    # Offline fallback (≈ bytes/4)
-    return max(1, (len(text.encode("utf-8")) + 3) // 4)
+    try:
+        enc_name = get_encoding_name_for_model(model)
+        enc = _get_offline_encoding(enc_name)
+        if enc:
+            try:
+                return len(enc.encode(text, disallowed_special=()))
+            except Exception:
+                pass
+        # Offline fallback (≈ bytes/4)
+        return max(1, (len(text.encode("utf-8")) + 3) // 4)
+    except Exception:
+        return max(1, (len(str(text).encode("utf-8")) + 3) // 4)
 
 def compute_file_hash(file_path: Path) -> str:
     """Compute MD5 hash of XML file for debugging reference."""
@@ -182,61 +184,79 @@ def sliding_window_chunks(text: str, window_size: int = 300, overlap: int = 30) 
     """
     Split the input text into sliding window chunks based on word count.
     """
-    logger.info(f"Creating chunks with window size {window_size} and overlap {overlap}")
-    # Normalize whitespace and split into words
-    words = text.replace('\n', ' ').split()
-    chunks = []
-    start = 0
-    total_words = len(words)
-    # Create chunks with specified overlap
-    while start < total_words:
-        end = min(start + window_size, total_words)
-        chunk_words = words[start:end]
-        chunks.append(" ".join(chunk_words))
-        # Move start by window_size minus overlap
-        start += window_size - overlap
-    # Merge any chunks smaller than twice the overlap into the previous chunk
-    min_size = overlap * 2
-    refined_chunks: List[str] = []
-    for ch in chunks:
-        word_count = len(ch.split())
-        if refined_chunks and word_count < min_size:
-            refined_chunks[-1] += " " + ch
-        else:
-            refined_chunks.append(ch)
-    chunks = refined_chunks
-    logger.info(f"Successfully created {len(chunks)} chunks after merging small fragments")
-    return chunks
+    try:
+        logger.info(f"Creating chunks with window size {window_size} and overlap {overlap}")
+        # Normalize whitespace and split into words
+        words = (text or "").replace('\n', ' ').split()
+        chunks = []
+        start = 0
+        total_words = len(words)
+        # Create chunks with specified overlap
+        while start < total_words:
+            end = min(start + window_size, total_words)
+            chunk_words = words[start:end]
+            chunks.append(" ".join(chunk_words))
+            # Move start by window_size minus overlap
+            start += max(1, window_size - overlap)
+        # Merge any chunks smaller than twice the overlap into the previous chunk
+        min_size = max(0, overlap * 2)
+        refined_chunks: List[str] = []
+        for ch in chunks:
+            word_count = len(ch.split())
+            if refined_chunks and word_count < min_size:
+                refined_chunks[-1] += " " + ch
+            else:
+                refined_chunks.append(ch)
+        chunks = refined_chunks
+        logger.info(f"Successfully created {len(chunks)} chunks after merging small fragments")
+        return chunks
+    except Exception as e:
+        logger.error("sliding_window_chunks failed; returning original text as single chunk", exc_info=e)
+        return [text or ""]
 
 def cosine_sim_matrix(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     """Row-wise cosine similarity between A [N,D] and B [M,D]."""
-    A = A.astype(np.float32, copy=False)
-    B = B.astype(np.float32, copy=False)
-    A = A / (np.linalg.norm(A, axis=1, keepdims=True) + 1e-8)
-    B = B / (np.linalg.norm(B, axis=1, keepdims=True) + 1e-8)
-    return A @ B.T  # [N, M]
+    try:
+        A = A.astype(np.float32, copy=False)
+        B = B.astype(np.float32, copy=False)
+        A = A / (np.linalg.norm(A, axis=1, keepdims=True) + 1e-8)
+        B = B / (np.linalg.norm(B, axis=1, keepdims=True) + 1e-8)
+        return A @ B.T  # [N, M]
+    except Exception:
+        return np.zeros((getattr(A, 'shape', [0,])[0] or 0, getattr(B, 'shape', [0,])[0] or 0), dtype=np.float32)
 
 # --- Embedding with local BGE-small ---
 def load_bge_model(local_dir: str | Path):
     """
     Load a local, pre-downloaded BGE-small v1.5 SentenceTransformers model (offline-friendly).
     """
-    from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer(str(local_dir))  # local path works offline
-    return model
+    try:
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer(str(local_dir))  # local path works offline
+        return model
+    except FileNotFoundError as e:
+        logger.error("BGE model directory not found: %s", str(local_dir), exc_info=e)
+        raise
+    except Exception as e:
+        logger.error("Failed to load BGE model from %s", str(local_dir), exc_info=e)
+        raise
 
 def embed_texts(model, texts: List[str], batch_size: int = 100) -> np.ndarray:
     """
     Encode texts with L2-normalized embeddings for cosine similarity.
     """
-    emb = model.encode(
-        texts,
-        batch_size=batch_size,
-        convert_to_numpy=True,
-        normalize_embeddings=True,  # recommended for BGE
-        show_progress_bar=True,
-    )
-    return emb
+    try:
+        emb = model.encode(
+            texts,
+            batch_size=batch_size,
+            convert_to_numpy=True,
+            normalize_embeddings=True,  # recommended for BGE
+            show_progress_bar=False,
+        )
+        return emb
+    except Exception as e:
+        logger.error("Model.encode failed for %d texts", len(texts) if isinstance(texts, list) else -1, exc_info=e)
+        raise
 
 # -----------------------------------------------------------------------------
 # Citation matching helper (parity with src/get_citation_entities.py)
@@ -270,18 +290,24 @@ def clean_text_for_urls(text: str) -> str:
     return text
 
 def normalise(page:str) -> str:
-    page = page.replace('-\n', '')   # undo soft-hyphen splits
-    page = page.replace('\n', ' ')
-    return clean_text_for_urls(page)
+    try:
+        page = (page or '').replace('-\n', '')   # undo soft-hyphen splits
+        page = page.replace('\n', ' ')
+        return clean_text_for_urls(page)
+    except Exception:
+        return page or ''
 
 
 
 def preprocess_text(text):
     import re
     # from nltk.corpus import stopwords
-    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
-    text = text.lower()  # Lowercase
-    text = text.replace("\n", " ")
+    try:
+        text = re.sub(r'[^\w\s]', '', text or '')  # Remove punctuation
+        text = text.lower()  # Lowercase
+        text = text.replace("\n", " ")
+    except Exception:
+        text = str(text or '')
     # stop_words = set(stopwords.words("english"))
     # text = " ".join(word for word in text.split() if word not in stop_words)
     return text
@@ -413,21 +439,28 @@ def _make_pattern(ds_id: str) -> re.Pattern:
 
 
 def _build_text_views(text: str) -> dict:
-    raw = text
-    norm = normalise(text)
-    prep = preprocess_text(text)
-    prep_norm = preprocess_text(norm)
-    alnum = _alnum_collapse(text)
-    return {"raw": raw, "norm": norm, "prep": prep, "prep_norm": prep_norm, "alnum": alnum}
+    try:
+        raw = text
+        norm = normalise(text)
+        prep = preprocess_text(text)
+        prep_norm = preprocess_text(norm)
+        alnum = _alnum_collapse(text or '')
+        return {"raw": raw, "norm": norm, "prep": prep, "prep_norm": prep_norm, "alnum": alnum}
+    except Exception:
+        t = str(text or '')
+        return {"raw": t, "norm": t, "prep": t, "prep_norm": t, "alnum": _alnum_collapse(t)}
 
 
 def _find_direct_string_matches(citation: str, text_views: dict) -> List[str]:
     cit_norm = clean_text_for_urls(citation).lower()
     lower_cit = re.escape(cit_norm)
     matches: List[str] = []
-    matches.extend(re.findall(lower_cit, text_views["raw"].lower()))
-    matches.extend(re.findall(lower_cit, text_views["norm"].lower()))
-    matches.extend(re.findall(lower_cit, text_views["prep"]))
+    try:
+        matches.extend(re.findall(lower_cit, (text_views.get("raw", "") or '').lower()))
+        matches.extend(re.findall(lower_cit, (text_views.get("norm", "") or '').lower()))
+        matches.extend(re.findall(lower_cit, (text_views.get("prep", "") or '')))
+    except Exception:
+        pass
     return matches
 
 # NEW: detect hyphenated accession ranges containing the target ID (e.g., MK838495–MK838499)

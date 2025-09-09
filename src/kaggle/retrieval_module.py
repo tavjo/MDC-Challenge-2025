@@ -228,14 +228,18 @@ def build_regex_index(id_to_text: Dict[str, str]) -> Dict[str, Dict[str, int]]:
     """Precompute regex hit counts per chunk_id by kind and total."""
     out: Dict[str, Dict[str, int]] = {}
     for cid, txt in id_to_text.items():
-        counts = {k: 0 for k in ACCESSION_REGEXES}
-        total = 0
-        for kind, pat in COMPILED_REGEXES.items():
-            n = len(pat.findall(txt))
-            counts[kind] = n
-            total += n
-        counts["_total"] = total
-        out[cid] = counts
+        try:
+            t = txt if isinstance(txt, str) else str(txt)
+            counts = {k: 0 for k in ACCESSION_REGEXES}
+            total = 0
+            for kind, pat in COMPILED_REGEXES.items():
+                n = len(pat.findall(t))
+                counts[kind] = n
+                total += n
+            counts["_total"] = total
+            out[cid] = counts
+        except Exception:
+            out[cid] = {**{k: 0 for k in ACCESSION_REGEXES}, "_total": 0}
     return out
 
 
@@ -381,7 +385,7 @@ DATA_CITATION_KEYWORDS: Dict[str, List[str]] = {
         "repository", "database", "databank", "archive", "portal",
         "ncbi", "uniprot", "ensembl", "genbank", "embl", "ddbj",
         "geo", "arrayexpress", "sra", "ena", "pride", "metabolights",
-        "figshare", "zenodo", "dryad", "mendeley", "osf"
+        "figshare", "zenodo", "dryad", "mendeley", "osf", "figshare", "pangaea", "ccdc", "tcia", "pasta"
     ],
     "identifiers": [
         "accession", "identifier", "pmid", "pmcid", "gse",
@@ -390,19 +394,19 @@ DATA_CITATION_KEYWORDS: Dict[str, List[str]] = {
     ],
     "data_terms": [
         "dataset", "supplementary data", "raw data", "processed data",
-        "transcriptomics data", "proteomics data", "genomics data", "metabolomics data", "microarray data",
+        "transcriptomics data", "proteomics data", "genomics data", "metabolomics data", "microarray data", "data available", "data availability", "accessible", 
         "rna-seq data", "chip-seq data", "mass spectrometry data", "sequencing data"
     ],
 }
 
 _CATEGORY_WEIGHTS: Dict[str, float] = {
-    "access_verbs": 0.15,
-    "repositories": 0.20,
-    "identifiers": 0.15,
-    "data_terms": 0.10,
+    "access_verbs": 0.30,
+    "repositories": 0.25,
+    "identifiers": 0.20,
+    "data_terms": 0.25,
 }
 
-_TEXT_BOOST_CAP: float = 0.80
+_TEXT_BOOST_CAP: float = 1.0
 _PROTOTYPE_PRESENCE_BOOST: float = 0.50
 
 
@@ -778,8 +782,14 @@ def hybrid_retrieve_with_boost(
     else:
         dense_query_for_dense = dense_query_vec
 
-    sparse_ids = _sparse_topk(query_text, id_to_text, k=TOPK_PER_SIGNAL)
-    dense_ids = _dense_topk(dense_query_for_dense, id_to_dense, k=TOPK_PER_SIGNAL)
+    try:
+        sparse_ids = _sparse_topk(query_text, id_to_text, k=TOPK_PER_SIGNAL)
+    except Exception:
+        sparse_ids = []
+    try:
+        dense_ids = _dense_topk(dense_query_for_dense, id_to_dense, k=TOPK_PER_SIGNAL)
+    except Exception:
+        dense_ids = []
     boost_cfg.rrf_k = max(5, int(0.5 * min(len(sparse_ids), len(dense_ids), len(id_to_dense))))
     rrf = reciprocal_rank_fusion([sparse_ids, dense_ids], k=boost_cfg.rrf_k)
     rrf_ranking: List[str] = rrf.ranking
@@ -844,7 +854,10 @@ def hybrid_retrieve_with_boost(
     text_boost_vec = np.array([_text_boost_score(t) for t in texts], dtype=float)
     final_score = final_score + text_boost_vec
 
-    order = np.argsort(final_score)[::-1]
+    try:
+        order = np.argsort(final_score)[::-1]
+    except Exception:
+        order = np.arange(len(candidate_ids))
     pool_rank = [candidate_ids[i] for i in order]
     pool_rank = [cid for cid in pool_rank if cid in id_to_dense]
 

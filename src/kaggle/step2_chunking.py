@@ -121,7 +121,12 @@ def chunk_documents(
     max_workers: int = 8,
 ) -> List[Chunk]:
     db_helper = get_duckdb_helper(db_path)
-    documents = db_helper.get_all_documents()
+    try:
+        documents = db_helper.get_all_documents()
+    except Exception as e:
+        logger.error("Failed to load documents from DuckDB", exc_info=e)
+        db_helper.close()
+        raise
 
     chunks: List[Chunk] = []
 
@@ -143,12 +148,17 @@ def chunk_documents(
         logger.info("No documents found to chunk.")
 
     # DB operations must be sequential
-    db_helper.bulk_insert_chunks(chunks)
-    db_helper.close()
+    try:
+        db_helper.bulk_insert_chunks(chunks)
+    finally:
+        db_helper.close()
 
     # generate summary parquet
     filename = os.path.join(output_dir, "chunks_for_embedding_summary.parquet")
-    create_chunks_summary_df(chunks, export=True, output_path=filename)
+    try:
+        create_chunks_summary_df(chunks, export=True, output_path=filename)
+    except Exception as e:
+        logger.warning("Failed to export chunk summary parquet", exc_info=e)
     return chunks
 
 

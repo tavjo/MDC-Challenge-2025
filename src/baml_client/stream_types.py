@@ -27,7 +27,7 @@ class StreamState(BaseModel, typing.Generic[StreamStateValueT]):
 # #########################################################################
 
 class CitationEntity(BaseModel):
-    evidence: typing.List[str]
+    evidence: typing.Optional[str] = None
     data_citation: typing.Optional[str] = None
     dataset_type: typing.Optional[types.DatasetType] = None
 

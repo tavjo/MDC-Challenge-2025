@@ -71,7 +71,10 @@ DEFAULT_EMB_PATH = dataset_embeddings_path
 
 
 def _ensure_report_dir() -> Path:
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.warning("Failed to create report dir: %s", str(REPORT_DIR), exc_info=e)
     return REPORT_DIR
 
 

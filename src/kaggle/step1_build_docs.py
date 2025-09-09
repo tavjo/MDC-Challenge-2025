@@ -179,9 +179,19 @@ def extract_xml_text(xml_path: str, encoding: Optional[str] = None) -> str:
     path = Path(xml_path)
     if not path.exists():
         raise FileNotFoundError(f"XML file not found: {xml_path}")
-    raw = " ".join(fragment.strip() for fragment in ET.fromstring(path.read_bytes()).itertext()
-                   if fragment and fragment.strip())
-    return clean_page(raw)
+    try:
+        raw = " ".join(
+            fragment.strip()
+            for fragment in ET.fromstring(path.read_bytes()).itertext()
+            if fragment and fragment.strip()
+        )
+        return clean_page(raw)
+    except ET.ParseError as e:
+        logger.error("XML parse failed for %s", xml_path, exc_info=e)
+        return ""
+    except Exception as e:
+        logger.error("XML read failed for %s", xml_path, exc_info=e)
+        return ""
 
 # ------------------------------- OCR helpers ---------------------------------
 def _render_pages_with_fitz(pdf_path: Path, dpi: int = 250):
@@ -191,19 +201,27 @@ def _render_pages_with_fitz(pdf_path: Path, dpi: int = 250):
     from PIL import Image
     import fitz  # type: ignore
     imgs, zoom = [], dpi / 72.0
-    with fitz.open(str(pdf_path)) as doc:
-        if doc.needs_pass and not doc.authenticate(""):
-            raise PermissionError(f"Encrypted PDF requires a password: {pdf_path}")
-        for i in range(doc.page_count):
-            pix = doc.load_page(i).get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
-            imgs.append(Image.open(io.BytesIO(pix.tobytes("png"))))
-    return imgs
+    try:
+        with fitz.open(str(pdf_path)) as doc:
+            if doc.needs_pass and not doc.authenticate(""):
+                raise PermissionError(f"Encrypted PDF requires a password: {pdf_path}")
+            for i in range(doc.page_count):
+                pix = doc.load_page(i).get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+                imgs.append(Image.open(io.BytesIO(pix.tobytes("png"))))
+        return imgs
+    except Exception as e:
+        logger.error("Rendering via fitz failed for %s", str(pdf_path), exc_info=e)
+        raise
 
 def _render_pages_with_pdf2image(pdf_path: Path, dpi: int = 250):
     if not _HAVE_PDF2IMAGE:
         raise RuntimeError("pdf2image not available")
     from pdf2image import convert_from_path  # type: ignore
-    return convert_from_path(str(pdf_path), dpi=dpi)
+    try:
+        return convert_from_path(str(pdf_path), dpi=dpi)
+    except Exception as e:
+        logger.error("Rendering via pdf2image failed for %s", str(pdf_path), exc_info=e)
+        raise
 
 # EasyOCR cached reader + offline model dir (set EASYOCR_MODEL_DIR to your Kaggle input path)
 from functools import lru_cache
