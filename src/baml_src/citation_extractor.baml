@@ -8,6 +8,75 @@ class CitationEntity {
     data_citation string @description("Data citation from text (Data repository DOI or accession number. Examples data DOI: https://doi.org/10.5061/dryad.4dj6042. Example accession number: JX123456)")
     dataset_type DatasetType @description("Type of dataset citation")
     @@assert(citation_in_evidence, {{ this.data_citation in (this.evidence | join(' ')) }})
+    @@assert(non_empty, {{ this.data_citation|length >= 6 }})
+    @@assert(no_spaces_inside, {{ ' ' not in this.data_citation or this.data_citation.startswith('PDB ') }})
+    @@assert(no_trailing_punct, {{ this.data_citation[-1] not in ['.', ',', ';', ':', ')'] }})
+    @@assert(single_identifier, {{ ',' not in this.data_citation and ' and ' not in this.data_citation and ' to ' not in this.data_citation }})
+
+    // Accept http URLs only if they are DOI URLs OR evidence states a data-availability context
+    @@assert(http_requires_dataset_context, {{
+      not this.data_citation.startswith('http') or
+      'doi.org/10.' in this.data_citation or 'dx.doi.org/10.' in this.data_citation or
+      (
+        'data availability' in (this.evidence | join(' ') | lower) or
+        'data are available' in (this.evidence | join(' ') | lower) or
+        'data is available' in (this.evidence | join(' ') | lower) or
+        'deposited' in (this.evidence | join(' ') | lower) or
+        'repository' in (this.evidence | join(' ') | lower) or
+        'dataset' in (this.evidence | join(' ') | lower) or
+        'accession' in (this.evidence | join(' ') | lower) or
+        'available from' in (this.evidence | join(' ') | lower) or
+        'available at' in (this.evidence | join(' ') | lower) or
+        'accession number' in (this.evidence | join(' ') | lower)
+      )
+    }})
+
+    // Unknown 10.x DOIs must either be from dataset registrants or have dataset cues in evidence
+    @@assert(unknown_doi_requires_dataset_context, {{
+      not this.data_citation.startswith('10.') or
+      this.data_citation.startswith('10.5061') or this.data_citation.startswith('10.5281') or
+      this.data_citation.startswith('10.1594') or this.data_citation.startswith('10.6084') or
+      this.data_citation.startswith('10.25386') or this.data_citation.startswith('10.7910') or
+      this.data_citation.startswith('10.15468') or this.data_citation.startswith('10.18112') or
+      this.data_citation.startswith('10.5067') or this.data_citation.startswith('10.5063') or
+      (
+        'repository' in (this.evidence | join(' ') | lower) or
+        'dataset' in (this.evidence | join(' ') | lower) or
+        'accession' in (this.evidence | join(' ') | lower) or
+        'available at' in (this.evidence | join(' ') | lower) or
+        'available from' in (this.evidence | join(' ') | lower) or
+        'deposited' in (this.evidence | join(' ') | lower) or
+        'accession number' in (this.evidence | join(' ') | lower)
+      )
+    }})
+
+    // Simple reference-like guard (permissive)
+    @@assert(not_reference_like_evidence, {{ not (
+      'et al.' in (this.evidence | join(' ') | lower) or
+      ' vol.' in (this.evidence | join(' ') | lower) or
+      ' volume ' in (this.evidence | join(' ') | lower) or
+      ' pp.' in (this.evidence | join(' ') | lower)
+    )}})
+
+    // Blacklist common article DOI registrants
+    @@assert(not_article_doi, {{ not (
+      this.data_citation.startswith('10.1016') or
+      this.data_citation.startswith('10.1038') or
+      this.data_citation.startswith('10.1126') or
+      this.data_citation.startswith('10.1002') or
+      this.data_citation.startswith('10.1093') or
+      this.data_citation.startswith('10.1039') or
+      this.data_citation.startswith('10.1364') or
+      this.data_citation.startswith('10.1109') or
+      this.data_citation.startswith('10.1111') or
+      this.data_citation.startswith('10.1145') or
+      this.data_citation.startswith('10.1007') or
+      this.data_citation.startswith('10.1371') or
+      this.data_citation.startswith('10.1098') or
+      this.data_citation.startswith('10.1534') or
+      this.data_citation.startswith('10.3389') or
+      this.data_citation.startswith('10.12688')
+    )}})
 }
 
 // Create a function to extract the data citations from a list of strings.
@@ -15,42 +84,23 @@ function ExtractCitation(document: string[]) -> CitationEntity[] {
   client QwenLocalRR
   prompt #"
     /no_think
-    Extract dataset citations from scientific text. A valid citation MUST contain either:
-    1. A complete dataset DOI or accession number
-    2. A complete range of accession numbers (which you'll split into individual entries)
+    Extract dataset citations only.
 
-    Critical Rules:
-    - Evidence MUST be the exact text snippet containing the citation
-    - The data_citation field MUST contain only the DOI or accession number, not surrounding text
-    - For DOIs, include the full DOI including the "10." prefix
-    - For accession numbers, include the complete ID (e.g., "MK123456" not just "GenBank")
-    - When given a range or multiple accession numbers (e.g., "MK123456 to MK123457" or "MK123456, MK123457, MK123458"), create separate entries for each number. DO NOT return a range or multiple accession numbers as a single entry.
-    - Never return:
-      * Generic database URLs (like "www.gbif.org")
-      * Database names without specific IDs
-      * Article DOIs or references
-      * Random numbers or partial text
-      * Just the evidence phrases without actual citations
+    Valid outputs:
+    - Dataset DOIs (bare 10.x/... or DOI URLs containing doi.org/10. or dx.doi.org/10.).
+    - Accessions: GSE/GSM, SRR/ERR/DRR, PRJNA/PRJEB/PRJDB, E-MTAB-/E-MEXP-, PXD, MSV, EGAD/EGAS, or PDB 1Y2T-style.
 
-    Example correct outputs:
-    ✓ "10.5061/dryad.4dj6042" (complete data DOI)
-    ✓ "https://doi.org/10.5061/dryad.4dj6042" (complete data DOI)
-    ✓ "MK123456" (specific accession)
-    ✓ "GSE123456" (specific accession)
-    ✓ "JX123456" (specific accession number)
+    Hard rules:
+    - data_citation is the bare identifier only (no labels like "doi:" or "GEO:").
+    - One identifier per item (split lists/ranges into separate items).
+    - Homepage-only URLs are invalid; dataset webpages (including non‑DOI hosts) are allowed only when the evidence states availability/deposit/accession.
+    - Never output the article DOI or any article DOI (journal DOIs such as 10.1016, 10.1038, 10.1126, etc.).
+    - Do not return generic database names without IDs.
 
-    Example incorrect outputs:
-    ✗ "GenBank" (database without ID)
-    ✗ "http://www.gbif.org" (generic URL)
-    ✗ "20457758, 2020, 7" (random numbers)
-    ✗ "Dataset deposited in" (phrase without citation)
-    ✗ " "
-    ✗ ""
-    ✗ "WorldClim"
-    ✗ "JX123456-JX123457" (range of accession numbers)
-    ✗ "JX123456, JX123457, JX123458" (multiple accession numbers in one entru)
+    Evidence:
+    - evidence must contain the identifier verbatim, and data_citation must be an exact substring.
 
-    If a document text does not contain any data citations, return an empty list. NEVER make up a citation or return a citation that is not present in the document text.
+    If no valid dataset DOI or accession is present, return an empty list. Do not guess.
 
     {{ _.role("user") }}
     {% for text in document %}

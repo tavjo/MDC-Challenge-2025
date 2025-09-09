@@ -106,6 +106,78 @@ def doi_variants_from_string(s: str) -> Set[str]:
         f"doi:{upper}",
     }
 
+DOI_URL_RE  = re.compile(r"\bhttps?://(?:dx\.)?doi\.org/10\.\d{4,9}/[^\s\"<>),;]+", re.IGNORECASE)
+ARTICLE_DOI_DENYLIST_PREFIXES = (
+    "10.1016","10.1038","10.1126","10.1002","10.1093","10.1039","10.1364","10.1109",
+    "10.1111","10.1145","10.1007","10.1371","10.1098","10.1534","10.3389","10.12688",
+)
+
+DAS_STRONG_CUES: Set[str] = {
+    "data availability","data are available","data is available","deposited",
+    "repository","dataset","accession","available at","available from","accession number"
+}
+
+ID_TOKEN = re.compile(
+    r"(?:https?://(?:dx\.)?doi\.org/)?(10\.\d{4,9}/[^\s\"<>),;]+)|"
+    r"(GSE\d+|GSM\d+|SRR\d+|ERR\d+|DRR\d+|PRJNA\d+|PRJEB\d+|PRJDB\d+|E-MTAB-\d+|E-MEXP-\d+|PXD\d+|MSV\d+|EGAD\d+|EGAS\d+|PDB\s?[0-9][A-Za-z0-9]{3})",
+    re.IGNORECASE
+)
+
+def _sentences(text: str) -> List[str]:
+    return re.split(r'(?<=[.!?])\s+', text)
+
+def extract_candidate_doi_sentences_list(texts: List[str], limit: int = 80) -> List[str]:
+    out: List[str] = []
+    seen: Set[str] = set()
+    for t in texts:
+        for s in _sentences(t):
+            s_trim = s.strip()
+            if not s_trim or s_trim in seen:
+                continue
+            has_doi = bool(DOI_BARE.search(s_trim) or DOI_URL_RE.search(s_trim))
+            if not has_doi:
+                continue
+            s_low = s_trim.lower()
+            has_cue = any(c in s_low for c in DAS_STRONG_CUES)
+            if has_cue:
+                out.append(s_trim); seen.add(s_trim)
+                if len(out) >= limit:
+                    return out
+    return out
+
+def is_article_doi_prefix(s: str) -> bool:
+    return any(s.startswith(p) for p in ARTICLE_DOI_DENYLIST_PREFIXES)
+
+def evidence_has_das_context(evidence: List[str]) -> bool:
+    ev = " ".join(evidence).lower()
+    return any(c in ev for c in DAS_STRONG_CUES)
+
+def is_generic_non_doi_url(s: str) -> bool:
+    sl = s.lower().strip()
+    return sl.startswith("http") and ("doi.org/10." not in sl and "dx.doi.org/10." not in sl)
+
+def expand_multi_ids(s: str) -> List[str]:
+    return [m.group(0).strip().rstrip(".,;:)") for m in ID_TOKEN.finditer(s)]
+
+def post_additions(entities: List[CitationEntity], paper_dois: Set[str]) -> List[CitationEntity]:
+    out: List[CitationEntity] = []
+    for e in entities:
+        s = (e.data_citation or "").strip().rstrip(".,;:)")
+        if not s:
+            continue
+        if s in paper_dois or is_article_doi_prefix(s):
+            continue
+        if any(tok in s for tok in (",", " and ", " to ", ";")):
+            for id_ in expand_multi_ids(s):
+                if id_ and (id_ not in paper_dois) and (not is_article_doi_prefix(id_)):
+                    out.append(e.model_copy(update={"data_citation": id_}))
+            continue
+        # Permit generic dataset webpages if evidence has DAS context
+        if is_generic_non_doi_url(s) and not evidence_has_das_context(e.evidence):
+            continue
+        out.append(e)
+    return out
+
 def extract_entities_baml(doc: List[str], doc_id: str) -> List[CitationEntity]:
     """
     Extract citation entities from the document text using the BAML client.
@@ -219,12 +291,18 @@ class UnknownCitationEntityExtractor:
     
     def _process_group(self, doc_id: str, chunk_ids: List[str], texts: List[str]) -> List[CitationEntity]:
         """Worker invoked by the thread pool: extract, validate, record per-chunk strings."""
-        raw = extract_cites(texts) or []
+        # Optional pre-filter: shrink list-of-strings to sentences with DOI + DAS cues
+        pre = extract_candidate_doi_sentences_list(texts)
+        inp = pre if pre else texts
+        raw = extract_cites(inp) or []
         cites = [
             CitationEntity.model_validate({**e.model_dump(mode="json"), "document_id": doc_id})
             for e in raw
         ]
         cites = self._validate_citations(doc_id, cites)
+        # Additional conservative filters and multi-ID splitting
+        paper_dois = doi_variants_from_string(doc_id)
+        cites = post_additions(cites, paper_dois)
         if cites:
             with self._chunk_map_lock:
                 for cid in chunk_ids:

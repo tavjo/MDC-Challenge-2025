@@ -41,7 +41,7 @@ if str(THIS_DIR) not in sys.path:
 #     from src.kaggle.helpers import load_bge_model, embed_texts, timer_wrap, initialize_logging
 #     from src.kaggle.duckdb_utils import get_duckdb_helper
 # except Exception:
-from retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON, retrieval_with_boost, mmr_rerank
+from retrieval_module import hybrid_retrieve_with_boost, DAS_LEXICON, retrieval_with_boost, mmr_rerank, prefilter_chunks_for_embeddings
 from models import BoostConfig
 from helpers import load_bge_model, embed_texts, timer_wrap, initialize_logging
 from duckdb_utils import get_duckdb_helper
@@ -107,6 +107,7 @@ def collapse_neighbors_by_rank(
                 banned.add(next_id)
     return keep
 
+
 # --- Run retrieval on a single new document ---
 @timer_wrap
 def run_hybrid_retrieval_on_document(
@@ -141,10 +142,23 @@ def run_hybrid_retrieval_on_document(
     id_to_text: Dict[str, str] = {ch.chunk_id: ch.text for ch in chunks}
     id_to_chunk = {ch.chunk_id: ch for ch in chunks}
 
+    # 1.5) Prefilter chunks for embeddings
+    prefiltered_ids, pf_scores = prefilter_chunks_for_embeddings(
+    id_to_text=id_to_text,
+    DAS_LEXICON=DAS_LEXICON,
+    DATA_CITATION_KEYWORDS=DATA_CITATION_KEYWORDS,
+    REPO_DOI_COMPILED=_REPO_DOI_COMPILED,
+    REGEX_SPECIFIC_COMPILED=_REGEX_SPECIFIC_COMPILED,
+    keep_top_k=None,           # or set an upper bound like 50_000 for very large corpora
+    min_keep=len(chunks)*0.3,
+    score_threshold=1.0,
+    penalize_references=True)
+
     # 2) Load local BGE-small and embed chunks
     print("Loading BGE small embeddings model...")
     # model = load_bge_model(model_dir)
-    chunk_ids = list(id_to_text.keys())
+    # chunk_ids = list(id_to_text.keys())
+    chunk_ids = prefiltered_ids
     chunk_texts = [id_to_text[cid] for cid in chunk_ids]
     chunk_vecs = embed_texts(model, chunk_texts)
     id_to_dense: Dict[str, np.ndarray] = {cid: vec for cid, vec in zip(chunk_ids, chunk_vecs)}

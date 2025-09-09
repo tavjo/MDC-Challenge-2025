@@ -591,6 +591,136 @@ def _doi_repo_prior(text: str) -> float:
     base = 0.6
     return 1.0 if has_das_lang or has_repo_word else base
 
+# ----------------------------------------
+# Prefilter chunks for embeddings
+# ----------------------------------------
+# retrieval_module.py (or a small helper module)
+
+import re
+import numpy as np
+from typing import Dict, List, Tuple, Iterable, Optional
+
+def _compile_phrase_regex(phrases: Iterable[str]) -> re.Pattern:
+    # Match any phrase, case-insensitive. Use non-capturing group to be fast.
+    escaped = [re.escape(p.strip()) for p in phrases if p and p.strip()]
+    if not escaped:
+        # match nothing
+        return re.compile(r"$(?!)")
+    return re.compile(r"(?:%s)" % "|".join(escaped), re.IGNORECASE)
+
+def _is_reference_like(text: str) -> bool:
+    """Heuristic: reference-style lines (don’t hard-drop, just penalize).
+    Signals: multiple years, 'et al.', many commas/semicolons, doi/url.
+    """
+    t = text
+    year_hits = len(re.findall(r"\b(19|20)\d{2}\b", t))
+    has_et_al = bool(re.search(r"\bet al\.\b", t, re.IGNORECASE))
+    punct_dense = t.count(",") + t.count(";") >= 5
+    has_doi_or_url = ("doi.org/" in t.lower()) or ("http://" in t.lower()) or ("https://" in t.lower())
+    return (year_hits >= 2 and (has_et_al or punct_dense)) or (has_et_al and has_doi_or_url)
+
+def prefilter_chunks_for_embeddings(
+    id_to_text: Dict[str, str],
+    DAS_LEXICON: List[str],
+    DATA_CITATION_KEYWORDS: Dict[str, List[str]],
+    REPO_DOI_COMPILED: Dict[str, re.Pattern],
+    REGEX_SPECIFIC_COMPILED: Dict[str, re.Pattern],
+    keep_top_k: Optional[int] = None,       # e.g., keep top 40–60k before embedding (None = keep all that pass)
+    min_keep: int = 0,                      # ensure we keep at least this many by score
+    score_threshold: float = 1.0,           # base cutoff for non-forced chunks
+    penalize_references: bool = True,
+) -> Tuple[List[str], Dict[str, float]]:
+    """
+    Returns:
+      filtered_ids: list of chunk_ids to embed
+      scores:       dict chunk_id -> prefilter score (for logging / debugging)
+
+    Scoring (higher is better):
+      +3.0 per DAS phrase hit (strongest signal; publishers require DAS)
+      +1.0 per generic data-citation keyword hit (access_verbs/repositories/identifiers/data_terms)
+      +2.5 if any repository-DOI regex matches (figshare/dryad/zenodo/etc.)
+      +2.0 per accession-style regex hit (GEO/SRA/ENA/ArrayExpress/PRIDE/GISAID/PDB, etc.)
+      +1.0 synergy bonus if BOTH a DAS phrase and a regex are present
+      -1.0 to -2.0 penalty if text looks like a reference line (but NEVER drop exact hits)
+    """
+    # Compile the DAS + keyword regexes once
+    das_re = _compile_phrase_regex(DAS_LEXICON)
+
+    kw_all = []
+    for group in ("access_verbs", "repositories", "identifiers", "data_terms"):
+        kw_all.extend(DATA_CITATION_KEYWORDS.get(group, []))
+    kw_re = _compile_phrase_regex(set(kw_all))
+
+    scores: Dict[str, float] = {}
+    forced_keep: set = set()
+
+    for cid, raw in id_to_text.items():
+        t = raw if isinstance(raw, str) else str(raw)
+        tl = t.lower()
+
+        das_hits = len(das_re.findall(tl))
+        kw_hits = len(kw_re.findall(tl))
+
+        doi_hits = sum(1 for pat in REPO_DOI_COMPILED.values() if pat.search(tl))
+        acc_hits = 0
+        for pat in REGEX_SPECIFIC_COMPILED.values():
+            if pat.search(tl):
+                acc_hits += 1
+
+        # Base score: DAS > generic keywords > regex
+        score = 3.0 * das_hits + 1.0 * kw_hits + 2.5 * (doi_hits > 0) + 2.0 * acc_hits
+        if das_hits and (doi_hits > 0 or acc_hits > 0):
+            score += 1.0  # synergy: context + identifier
+
+        # Reference-like penalty (soft)
+        if penalize_references and _is_reference_like(tl):
+            # Only penalize if we don't already have an exact repo DOI or accession hit
+            if doi_hits == 0 and acc_hits == 0:
+                score -= 1.5
+
+        # Force-keep exact identifiers regardless of score
+        if doi_hits > 0 or acc_hits > 0:
+            forced_keep.add(cid)
+
+        scores[cid] = score
+
+    # Selection logic
+    # 1) Always include forced_keep
+    selected = list(forced_keep)
+
+    # 2) Add high scorers (>= threshold) among the rest
+    rest = [(cid, s) for cid, s in scores.items() if cid not in forced_keep and s >= score_threshold]
+    # Sort by score desc then by DAS presence (tiny tiebreaker toward DAS)
+    rest.sort(key=lambda x: (x[1], 1 if das_re.search(id_to_text[x[0]].lower()) else 0), reverse=True)
+
+    selected.extend(cid for cid, _ in rest)
+
+    # 3) Respect min_keep and keep_top_k (if provided)
+    if keep_top_k is not None:
+        # If we selected fewer than min_keep, pad with next-best by score regardless of threshold
+        if len(selected) < max(min_keep, keep_top_k):
+            missing = max(min_keep, keep_top_k) - len(selected)
+            # take remaining by raw score (excluding already chosen)
+            remaining = sorted(
+                ((cid, s) for cid, s in scores.items() if cid not in set(selected)),
+                key=lambda x: x[1],
+                reverse=True
+            )
+            selected.extend(cid for cid, _ in remaining[:missing])
+        # Finally, cap to keep_top_k
+        selected = selected[:keep_top_k]
+    else:
+        if len(selected) < min_keep:
+            # pad to min_keep
+            remaining = sorted(
+                ((cid, s) for cid, s in scores.items() if cid not in set(selected)),
+                key=lambda x: x[1],
+                reverse=True
+            )
+            need = min_keep - len(selected)
+            selected.extend(cid for cid, _ in remaining[:max(0, need)])
+
+    return selected, scores
 
 # ----------------------------------------
 # Hybrid retrieval with prototype priors

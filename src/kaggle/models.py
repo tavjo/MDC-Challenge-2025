@@ -59,7 +59,7 @@ class BoostConfig(BaseModel):
     )
     # New: aggregation over prototypes when computing per-chunk prototype affinity
     prototype_top_m: int = Field(
-        1,
+        10,
         ge=1,
         description=(
             "Number of top prototype similarities to average per chunk (1 reduces to max)."
