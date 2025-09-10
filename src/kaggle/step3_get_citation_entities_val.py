@@ -61,21 +61,21 @@ PROMPT_EXAMPLE_STRINGS = [
     "MK123456",
     "GSE123456",
     # Verbatim accession examples from prompt, expanded to individual entries
-    "GSE",
-    "GSM",
-    "SRR",
-    "ERR",
-    "DRR",
-    "PRJNA",
-    "PRJEB",
-    "PRJDB",
-    "E-MTAB-",
-    "E-MEXP-",
+    "GSE/GSM",
+    "SRR/ERR/DRR",
+    "PRJNA/PRJEB/PRJDB",
+    "E-MTAB-/E-MEXP-",
     "PXD",
     "MSV",
-    "EGAD",
-    "EGAS",
+    "EGAD/EGAS",
     "PDB 1Y2T",
+    "10.1016, 10.1038, 10.1126, Wiley, ncomms, PNAS",
+    "10.1016",
+    "10.1038",
+    "10.1126",
+    "Wiley",
+    "ncomms",
+    "PNAS",
 ]
 
 # Minimal DOI finder and variants
@@ -353,7 +353,7 @@ class UnknownCitationEntityExtractor:
                    not re.match(r"(?i)^ENS[A-Z]+\s+\d+$", dc):
                     continue
             # Quick guard: must have at least a digit or start with DOI prefix
-            if not (any(ch.isdigit() for ch in dc) or dc.startswith("10.")):
+            if not (any(ch.isdigit() for ch in dc)):
                 continue
             keep.append(ce)
         return keep

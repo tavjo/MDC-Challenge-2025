@@ -64,16 +64,15 @@ function ExtractCitation(document: string[]) -> CitationEntity[] {
     Evidence:
     - evidence is a single short snippet (<= 180 chars), no newlines, and must contain the identifier.
 
-    If no valid dataset DOI or accession is present, return an empty list. Do not guess.
-    Never make up a dataset DOI or accession. If text does not contain any data citations, return an empty list.
+    If no valid dataset DOI or accession number is present, return an empty list. Never make up a dataset DOI or accession. 
 
     {{ ctx.output_format }}
 
     {{ _.role("user") }}
+    ---Document Text: ---
     {% for text in document %}
-    ---Document Text: {{ text }}
+    --- {{ text }} ---
     {% endfor %}
-
   "#
 }
 
